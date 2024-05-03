@@ -52,20 +52,23 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 {
     NSLog(@"BugSplat start...");
 
-    id serverURLObjectValue = [self.bundle objectForInfoDictionaryKey:@"BugSplatServerURL"];
-    if (serverURLObjectValue == nil) {
-        NSLog(@"*** BugSplatServerURL is missing from your Info.plist - Please add this key/value to the your app's Info.plist ***");
+    id bugSplatDatabaseValue = [self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
+    if (bugSplatDatabaseValue == nil) {
+        NSLog(@"*** BugSplatDatabase is missing from your Info.plist - Please add this key/value to the your app's Info.plist ***");
 
         // NSAssert is set to be ignored in this library in Release builds
-        NSAssert(NO, @"BugSplatServerURL is missing from your Info.plist - Please add this key/value to the your app's Info.plist");
+        NSAssert(NO, @"BugSplatDatabase is missing from your Info.plist - Please add this key/value to the your app's Info.plist");
     }
 
-    NSString *serverURL = (NSString *)serverURLObjectValue;
-    NSLog(@"BugSplat BugSplatServerURL set as [%@]", serverURL);
+    NSString *bugSplatDatabase = (NSString *)bugSplatDatabaseValue;
+    NSLog(@"BugSplat BugSplatDatabase set as [%@]", bugSplatDatabase);
+
+    NSString *serverURL = [NSString stringWithFormat: @"https://%@.bugsplat.com/", bugSplatDatabase];
 
     // Uncomment line below to enable HockeySDK logging
 //    [[BITHockeyManager sharedHockeyManager] setLogLevel:BITLogLevelVerbose];
 
+    NSLog(@"BugSplat setServerURL: [%@]", serverURL);
     [[BITHockeyManager sharedHockeyManager] setServerURL:serverURL];
     [[BITHockeyManager sharedHockeyManager] startManager];
 }

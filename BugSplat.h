@@ -24,9 +24,9 @@ FOUNDATION_EXPORT const unsigned char BugSplatVersionString[];
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// An Info.plist app String entry in the form of a fully qualified URL to the BugSplat server including customer database prefix, where crash reports will be submitted.
-/// e.g: https://fred.bugsplat.com/
-#define kBugSplatServerURL @"BugSplatServerURL"
+/// App's Info.plist String entry which is a customer specific BugSplat database name where crash reports will be uploaded.
+/// e.g: "fred" (which will reference the https://fred.bugsplat.com/ database)
+#define kBugSplatDatabase @"BugSplatDatabase"
 
 
 @protocol BugSplatDelegate;

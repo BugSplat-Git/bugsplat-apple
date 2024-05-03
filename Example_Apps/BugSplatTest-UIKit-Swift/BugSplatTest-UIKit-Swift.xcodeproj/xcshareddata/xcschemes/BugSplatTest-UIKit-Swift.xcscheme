@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "6341B26F2BDC4DE9007EE8AC"
-               BuildableName = "BugSplatTest-macOS-UIKit-ObjC.app"
-               BlueprintName = "BugSplatTest-macOS-UIKit-ObjC"
-               ReferencedContainer = "container:BugSplatTest-macOS-UIKit-ObjC.xcodeproj">
+               BlueprintIdentifier = "6383C71E2BDB1BEF00ABC887"
+               BuildableName = "BugSplatTest-UIKit-Swift.app"
+               BlueprintName = "BugSplatTest-UIKit-Swift"
+               ReferencedContainer = "container:BugSplatTest-UIKit-Swift.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -44,10 +44,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "6341B26F2BDC4DE9007EE8AC"
-            BuildableName = "BugSplatTest-macOS-UIKit-ObjC.app"
-            BlueprintName = "BugSplatTest-macOS-UIKit-ObjC"
-            ReferencedContainer = "container:BugSplatTest-macOS-UIKit-ObjC.xcodeproj">
+            BlueprintIdentifier = "6383C71E2BDB1BEF00ABC887"
+            BuildableName = "BugSplatTest-UIKit-Swift.app"
+            BlueprintName = "BugSplatTest-UIKit-Swift"
+            ReferencedContainer = "container:BugSplatTest-UIKit-Swift.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>
@@ -68,10 +68,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "6341B26F2BDC4DE9007EE8AC"
-            BuildableName = "BugSplatTest-macOS-UIKit-ObjC.app"
-            BlueprintName = "BugSplatTest-macOS-UIKit-ObjC"
-            ReferencedContainer = "container:BugSplatTest-macOS-UIKit-ObjC.xcodeproj">
+            BlueprintIdentifier = "6383C71E2BDB1BEF00ABC887"
+            BuildableName = "BugSplatTest-UIKit-Swift.app"
+            BlueprintName = "BugSplatTest-UIKit-Swift"
+            ReferencedContainer = "container:BugSplatTest-UIKit-Swift.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

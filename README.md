@@ -27,11 +27,11 @@ To use this xcframework in your project manually you may:
 
 BugSplat requires a few Xcode configuration steps in order integrate the xcframework with your BugSplat account
 
-- Add the following case sensitive key to your app's Info.plist replacing DATABASE_NAME with your BugSplat database name
+- Add the following case sensitive key to your app's Info.plist replacing DATABASE_NAME with your customer specific BugSplat database name.
 
     ```
-    <key>BugSplatServerURL</key>
-    <string>https://DATABASE_NAME.bugsplat.com/</string>
+    <key>BugSplatDatabase</key>
+    <string>DATABASE_NAME</string>
     ```
     
     NOTE: For macOS apps, you must enable Outgoing network connections (client) in the Signing & Capabilities of the Target.

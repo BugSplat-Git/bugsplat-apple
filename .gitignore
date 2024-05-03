@@ -1,15 +1,6 @@
-Podfile.lock
-Pods
-BugsplatTester/.DS_Store
-BugsplatTester/Cartfile.resolved
-BugsplatTester/build
 .DS_Store
-BugsplatTester/Carthage
-Carthage
-BugsplatMac.framework.zip
-build
 xcuserdata
 xcframeworks
 Vendor
 archives
-
+symbol-upload-macos
