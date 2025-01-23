@@ -138,7 +138,7 @@ BugSplat is an open source project and we welcome contributions from the communi
 > [!WARNING]
 > This project requires Xcode Command Line Tools 15.x to build. Version 16.x will crash when building the project.
 
-First, install `Xcode 15.4` by following this [link](https://developer.apple.com/download/more/?q=xcode%2015.4) and searching for `Xcode 15.4`. Download the zip file and copy `Xcode.app` to your Applications folder. If you already have Xcode installed create a new folder in Applications and copy the `Xcode.app` to that folder. Rename `Xcode.app` to `Xcode-15.4.app`.
+First, install `Xcode 15.4` by following this [link](https://developer.apple.com/download/more/?q=xcode%2015.4) and searching for `Xcode 15.4`. Download the zip file and copy `Xcode.app` to your Applications folder. If you already have Xcode installed create a new folder in Applications and copy `Xcode.app` to that folder. Rename `Xcode.app` to `Xcode-15.4.app`.
 
 Open terminal and select the Command Line Tools for Xcode 15.4
 
