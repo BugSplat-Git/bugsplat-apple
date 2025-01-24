@@ -1,0 +1,15 @@
+{
+  "originHash" : "a949195cb111fd13c1360064bccce041557f303ea5709c93764e224c4ba3d0cb",
+  "pins" : [
+    {
+      "identity" : "bugsplat-swift-package",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ferrerod/bugsplat-swift-package",
+      "state" : {
+        "revision" : "83a059c8b17163df66e7d390ffc21b224075aa45",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -181,7 +181,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nrm \"/tmp/Xcode_run_script.log\"\n\n# Xcode doesn't show run script errors in build log.\nexec > \"/tmp/Xcode_run_script.log\" 2>&1\n\n# Use osascript(1) to present notification banners; otherwise\nosascript -e 'display notification \"preparing and uploading symbols…\" with title \"BugSplat\"'\n\n\"$PROJECT_DIR\"/../../symbol-upload-macos -a \"BugSplatTest-macOS-UIKit-ObjC\" -b \"Fred\" -u \"fred@bugsplat.com\" -p \"Flintstone\" -f \"**/*.dSYM\" -d \"$BUILT_PRODUCTS_DIR\" -v \"1.0 (1)\"\n";
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nrm -f\"/tmp/Xcode_run_script.log\"\n\n# Xcode doesn't show run script errors in build log.\nexec > \"/tmp/Xcode_run_script.log\" 2>&1\n\n# Use osascript(1) to present notification banners; otherwise\nosascript -e 'display notification \"preparing and uploading symbols…\" with title \"BugSplat\"'\n\n\"$PROJECT_DIR\"/../../Tools/symbol-upload-macos -a \"BugSplatTest-macOS-UIKit-ObjC\" -b \"Fred\" -u \"fred@bugsplat.com\" -p \"Flintstone\" -f \"**/*.dSYM\" -d \"$BUILT_PRODUCTS_DIR\" -v \"1.0 (1)\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1530"
+   LastUpgradeVersion = "1620"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "63D006DE2BBF4A5500587FBF"
-               BuildableName = "BugSplatTest-SwiftUIApp.app"
-               BlueprintName = "BugSplatTest-SwiftUIApp"
-               ReferencedContainer = "container:BugSplatTest-SwiftUI.xcodeproj">
+               BlueprintIdentifier = "637DF00D2D42F46A00DDD8FE"
+               BuildableName = "BugSplatTest-SwiftUI-SPM.app"
+               BlueprintName = "BugSplatTest-SwiftUI-SPM"
+               ReferencedContainer = "container:BugSplatTest-SwiftUI-SPM.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -44,19 +44,12 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "63D006DE2BBF4A5500587FBF"
-            BuildableName = "BugSplatTest-SwiftUIApp.app"
-            BlueprintName = "BugSplatTest-SwiftUIApp"
-            ReferencedContainer = "container:BugSplatTest-SwiftUI.xcodeproj">
+            BlueprintIdentifier = "637DF00D2D42F46A00DDD8FE"
+            BuildableName = "BugSplatTest-SwiftUI-SPM.app"
+            BlueprintName = "BugSplatTest-SwiftUI-SPM"
+            ReferencedContainer = "container:BugSplatTest-SwiftUI-SPM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "IDEPreferLogStreaming"
-            value = "YES"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -68,10 +61,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "63D006DE2BBF4A5500587FBF"
-            BuildableName = "BugSplatTest-SwiftUIApp.app"
-            BlueprintName = "BugSplatTest-SwiftUIApp"
-            ReferencedContainer = "container:BugSplatTest-SwiftUI.xcodeproj">
+            BlueprintIdentifier = "637DF00D2D42F46A00DDD8FE"
+            BuildableName = "BugSplatTest-SwiftUI-SPM.app"
+            BlueprintName = "BugSplatTest-SwiftUI-SPM"
+            ReferencedContainer = "container:BugSplatTest-SwiftUI-SPM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

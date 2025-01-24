@@ -4,5 +4,5 @@ exec > "/tmp/Xcode_run_script.log" 2>&1
 osascript -e 'display notification "preparing and uploading symbols…" with title "BugSplat"'
 
 # change this line to point to the downloaded symbol-upload-macos executable, and the parameters of -a, -b, -u, -p
-"$PROJECT_DIR"/../../symbol-upload-macos -a "App Name" -b "Fred" -u "fred@bugsplat.com" -p "Flintstone" -f "**/*.dSYM" -d "$BUILT_PRODUCTS_DIR" -v "1.0 (1)"
+"$PROJECT_DIR"/../../Tools/symbol-upload-macos -a "App Name" -b "Fred" -u "fred@bugsplat.com" -p "Flintstone" -f "**/*.dSYM" -d "$BUILT_PRODUCTS_DIR" -v "1.0 (1)"
 
