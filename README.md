@@ -1,27 +1,44 @@
-## Introduction
+[![bugsplat-github-banner-basic-outline](https://user-images.githubusercontent.com/20464226/149019306-3186103c-5315-4dad-a499-4fd1df408475.png)](https://bugsplat.com)
+<br/>
+# <div align="center">BugSplat</div> 
+### **<div align="center">Crash and error reporting built for busy developers.</div>**
+<div align="center">
+    <a href="https://twitter.com/BugSplatCo">
+        <img alt="Follow @bugsplatco on Bluesky" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpublic.api.bsky.app%2Fxrpc%2Fapp.bsky.actor.getProfile%2F%3Factor%3Dbugsplatco.bsky.social&query=%24.followersCount&style=social&logo=bluesky&label=Follow%20%40bugsplatco.bsky.social">
+    </a>
+    <a href="https://discord.gg/bugsplat">
+        <img alt="Join BugSplat on Discord" src="https://img.shields.io/discord/664965194799251487?label=Join%20Discord&logo=Discord&style=social">
+    </a>
+</div>
 
-The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac Catalyst applications to BugSplat. Visit http://www.bugsplat.com for more information and to sign up for an account.
+<br/>
 
-## 1. Requirements
+## Introduction 👋
+
+The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac Catalyst applications to BugSplat. Visit [bugsplat.com](https://www.bugsplat.com) for more information and to sign up for an account.
+
+## Requirements 📋
 
 - BugSplat for iOS supports iOS 13 and later.
 - BugSplat for macOS supports macOS 10.13 and later.
 
-## 2. Integration
+## Integration 🏗️
 
 BugSplat supports multiple methods for installing the xcfamework in a project.
+
+### Swift Package Manager (SPM)
+
+TODO BG
 
 ### Manual Setup
 
 To use this xcframework in your project manually you may:
 
-# FIXME
-
-1. Download the latest release from https://github.com/BugSplat-Git/ which is provided as a zip file
+1. Download the latest release from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The release will contain a zip file with the xcframework.
 2. Unzip the archive.
 3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to locate the unzipped BugSplat.xcframework. Once added, select Embed & Sign.
 
-## 3. Usage
+## Usage 🧑‍💻
 
 #### Configuration
 
@@ -29,7 +46,7 @@ BugSplat requires a few Xcode configuration steps in order integrate the xcframe
 
 - Add the following case sensitive key to your app's Info.plist replacing DATABASE_NAME with your customer specific BugSplat database name.
 
-  ```
+  ```xml
   <key>BugSplatDatabase</key>
   <string>DATABASE_NAME</string>
   ```
@@ -42,7 +59,7 @@ BugSplat requires a few Xcode configuration steps in order integrate the xcframe
 
   - Create a ~/.bugsplat.conf file to store your BugSplat credentials
 
-    ```
+    ```ini
     BUGSPLAT_USER="<username>"
     BUGSPLAT_PASS="<password>"
     ```
@@ -67,32 +84,32 @@ BugSplat requires a few Xcode configuration steps in order integrate the xcframe
 
 #### Crash Reporter UI Customization
 
-1. Custom banner image
+**Custom banner image**
 
 - BugSplat fo macOS provides the ability to configure a custom image to be displayed in the crash reporter UI for branding purposes. The image view dimensions are 440x110 and will scale down proportionately. There are 2 ways developers can provide an image:
 
-1. Set the image property directly on BugSplat
-2. Provide an image named `bugsplat-logo` in the main app bundle or asset catalog
+    1. Set the image property directly on BugSplat
+    2. Provide an image named `bugsplat-logo` in the main app bundle or asset catalog
 
-3. User details
+**User details**
 
 - Set `askUserDetails` to `NO` in order to prevent the name and email fields from displaying in the crash reporter UI. Defaults to `YES`.
 
-3. Auto submit
+**Auto submit**
 
 - By default, BugSplat will auto submit crash reports for iOS and will prompt the end user to submit a crash report for macOS. This default can be changed using a BugSplat property autoSubmitCrashReport. Set `autoSubmitCrashReport` to `YES` in order to send crash reports to the server automatically without presenting the crash reporter dialogue.
 
-4. Persist user details
+**Persist user details**
 
 - Set `persistUserDetails` to `YES` to save and restore the user's name and email when presenting the crash reporter dialogue. Defaults to `NO`.
 
-5. Expiration time
+**Expiration time**
 
 - Set `expirationTimeInterval` to a desired value (in seconds) whereby if the difference in time between when the crash occurred and next launch is greater than the set expiration time, auto send the report without presenting the crash reporter dialogue. Defaults to `-1`, which represents no expiration.
 
 #### Attachments
 
-1. Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded.
+Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded.
 
 #### Bitcode
 
@@ -113,9 +130,9 @@ For macOS, the BugSplat crash dialogue can be localized and supports 8 languages
 
 Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplatMac.framework/Versions/A/Frameworks/HockeySDK.framework/Resources/`
 
-## 4. Sample Applications
+#### Sample Applications
 
-Example_Apps includes several iOS and macOS BugSplat Test apps. Integrating BugSpat only requires the xcframework, and a few lines of code.
+`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSpat only requires the xcframework, and a few lines of code.
 
 # FIXME
 
@@ -135,6 +152,8 @@ Example_Apps includes several iOS and macOS BugSplat Test apps. Integrating BugS
 
 BugSplat is an open source project and we welcome contributions from the community. To configure a development environment, follow the instructions below.
 
+### Prerequisites
+
 > [!WARNING]
 > This project requires Xcode Command Line Tools 15.x to build. Version 16.x will crash when building the project.
 
@@ -145,6 +164,14 @@ Open terminal and select the Command Line Tools for Xcode 15.4
 ```sh
 sudo xcode-select -s /Applications/Xcodes/Xcode-15.4.app
 ```
+
+Next, download and install [Git-LFS](https://git-lfs.com/). Once you've installed Git-LFS, run the following command to initialize it (you only need to do this once on your machine):
+
+```sh
+git lfs install
+```
+
+### Building
 
 Clone this repository and all of the depenencies into a new `BugSplat` folder.
 
