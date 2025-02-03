@@ -59,7 +59,7 @@ Add the following case sensitive key to your app's `Info.plist` replacing `DATAB
 
 ### Symbol Upload
 
-You must upload an archive containing your app's binary and symbols to the BugSplat server in order to symbolicate crash reports. There are scripts to help with this.
+To symbolicate crash reports, you must upload your app's `dSYM` files to the BugSplat server. There are scripts to help with this.
 
 First, create a `~/.bugsplat.conf` file to store your BugSplat credentials
 
