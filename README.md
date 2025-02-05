@@ -35,7 +35,7 @@ Coming soon 🙌
 
 ### Manual Setup
 
-To use this xcframework in your project manually you may:
+To manually install the xcframework in your project:
 
 1. Download the latest release from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The release will contain a zip file with the xcframework.
 2. Unzip the archive.
@@ -47,7 +47,7 @@ To use this xcframework in your project manually you may:
 
 BugSplat requires a few Xcode configuration steps in order integrate the xcframework with your BugSplat account
 
-Add the following case sensitive key to your app's `Info.plist` replacing `DATABASE_NAME` with your customer specific BugSplat database name.
+Add the following case sensitive key to your app's `Info.plist` replacing `DATABASE_NAME` with your customer-specific BugSplat database name.
 
 ```xml
 <key>BugSplatDatabase</key>
@@ -249,7 +249,7 @@ There are several ways to customize your BugSplat crash reporter.
 
 #### Custom Banner Image
 
-- BugSplat fo macOS provides the ability to configure a custom image to be displayed in the crash reporter UI for branding purposes. The image view dimensions are 440x110 and will scale down proportionately. There are 2 ways developers can provide an image:
+- BugSplat for macOS provides the ability to configure a custom image to be displayed in the crash reporter UI for branding purposes. The image view dimensions are 440x110 and will scale down proportionately. There are 2 ways developers can provide an image:
 
   1. Set the image property directly on BugSplat
   2. Provide an image named `bugsplat-logo` in the main app bundle or asset catalog
