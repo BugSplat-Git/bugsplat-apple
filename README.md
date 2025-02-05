@@ -385,3 +385,7 @@ xcframework successfully written out to: .../BugSplat/bugsplat-apple/xcframework
 
 If all goes smoothly, `BugSplat.xcframework` will be the result in the xcframeworks folder
 of the bugsplat-apple repo.
+
+### Releasing
+
+To release a new version of BugSplat.xcframework, push a new tag to the `main` branch. The [release](.github/workflows/release.yml) workflow will build the xcframework, update `Package.swift`, and publish the zipped archive to the [Releases](https://github.com/BugSplat-Git/bugsplat-apple/releases) page.
