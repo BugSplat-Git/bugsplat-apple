@@ -50,7 +50,7 @@ jobs:
         git clone https://${{ secrets.GH_PAT }}@github.com/BugSplat-Git/bugsplat-apple.git
         git clone https://github.com/BugSplat-Git/HockeySDK-Mac
         git clone https://github.com/BugSplat-Git/HockeySDK-iOS
-        git clone https://github.com/BugSplat-Git/plcrashreporter
+        git clone https://github.com/BugSplat-Git/plCrashReporter
 
     - name: Set up Xcode 15.4
       uses: maxim-lobanov/setup-xcode@v1
@@ -58,7 +58,7 @@ jobs:
         xcode-version: '15.4'
 
     - name: Build PlCrashReporter
-      working-directory: bugsplat-workspace/plcrashreporter
+      working-directory: bugsplat-workspace/plCrashReporter
       run: |
         ./makeXCFramework.sh
         
