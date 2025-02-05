@@ -61,14 +61,7 @@ Add the following case sensitive key to your app's `Info.plist` replacing `DATAB
 
 To symbolicate crash reports, you must upload your app's `dSYM` files to the BugSplat server. There are scripts to help with this.
 
-First, create a `~/.bugsplat.conf` file to store your BugSplat credentials
-
-```ini
-BUGSPLAT_USER="<username>"
-BUGSPLAT_PASS="<password>"
-```
-
-Download BugSplat's cross-platform tool [symbol-upload-macos](https://docs.bugsplat.com/education/faq/how-to-upload-symbol-files-with-symbol-upload) for Apple Silicon by entering the following command in your terminal.
+Download BugSplat's cross-platform tool, [symbol-upload-macos](https://docs.bugsplat.com/education/faq/how-to-upload-symbol-files-with-symbol-upload) for Apple Silicon by entering the following command in your terminal.
 
 ```sh
 curl -sL -O "https://app.bugsplat.com/download/symbol-upload-macos"
