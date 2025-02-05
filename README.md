@@ -31,7 +31,11 @@ BugSplat supports multiple methods for installing the xcfamework in a project.
 
 ### Swift Package Manager (SPM)
 
-Coming soon 🙌
+Add the following URL to your project's `Additional Package Dependencies`:
+
+```sh
+https://github.com/BugSplat-Git/bugsplat-apple
+```
 
 ### Manual Setup
 

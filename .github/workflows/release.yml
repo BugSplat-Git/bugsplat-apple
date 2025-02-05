@@ -1,0 +1,101 @@
+name: Build and Release XCFramework
+
+on:
+  push:
+    tags:
+      - '*'
+
+# Add permissions block to allow writing
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Create parent directory
+      run: |
+        mkdir bugsplat-workspace
+        cd bugsplat-workspace
+        
+    - name: Clone repositories
+      working-directory: bugsplat-workspace
+      run: |
+        # Clone bugsplat-apple with token for push access
+        git clone https://${{ secrets.GH_PAT }}@github.com/BugSplat-Git/bugsplat-apple.git
+        git clone https://github.com/BugSplat-Git/HockeySDK-Mac
+        git clone https://github.com/BugSplat-Git/HockeySDK-iOS
+        git clone https://github.com/BugSplat-Git/plcrashreporter
+
+    - name: Set up Xcode 15.4
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.4'
+
+    - name: Build PlCrashReporter
+      working-directory: bugsplat-workspace/plcrashreporter
+      run: |
+        ./makeXCFramework.sh
+        
+    - name: Build HockeySDK-Mac
+      working-directory: bugsplat-workspace/HockeySDK-Mac
+      run: |
+        ./makeXCFramework.sh
+        
+    - name: Build HockeySDK-iOS
+      working-directory: bugsplat-workspace/HockeySDK-iOS
+      run: |
+        ./makeXCFramework.sh
+        
+    - name: Build BugSplat
+      working-directory: bugsplat-workspace/bugsplat-apple
+      run: |
+        ./makeXCFramework.sh
+        
+        # Create zip archive of the framework
+        cd xcframeworks
+        zip -r BugSplat.xcframework.zip BugSplat.xcframework
+        
+    - name: Update Package.swift
+      working-directory: bugsplat-workspace/bugsplat-apple
+      run: |
+        # Calculate checksum
+        CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
+        
+        # Create a temporary file with the new content
+        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ github.ref_name }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
+        sed "s|checksum: \".*\"|checksum: \"${CHECKSUM}\"|" Package.swift.tmp > Package.swift
+        rm Package.swift.tmp
+          
+        # Commit and push the updated Package.swift
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git add Package.swift
+        git commit -m "chore: release ${{ github.ref_name }}"
+        git push origin HEAD:main
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
+        name: Release ${{ github.ref_name }}
+        body: |
+          Release of BugSplat.xcframework version ${{ github.ref_name }}
+          
+          This release contains:
+          - iOS framework
+          - iOS Simulator framework
+          - macOS framework
+          
+          Swift Package Manager:
+          ```swift
+          dependencies: [
+              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ github.ref_name }}")
+          ]
+          ```
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }} 
