@@ -1,13 +1,13 @@
 {
-  "originHash" : "a949195cb111fd13c1360064bccce041557f303ea5709c93764e224c4ba3d0cb",
+  "originHash" : "083113c6a9912908d4696bbc1b2bb964d1f2f91e57b697770fab587c6eb3f4e2",
   "pins" : [
     {
-      "identity" : "bugsplat-swift-package",
+      "identity" : "bugsplat-apple",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ferrerod/bugsplat-swift-package",
+      "location" : "https://github.com/bugsplat-git/bugsplat-apple",
       "state" : {
-        "revision" : "83a059c8b17163df66e7d390ffc21b224075aa45",
-        "version" : "1.0.0"
+        "revision" : "d0f1f696fd98a5494298fbf471c109bef2259550",
+        "version" : "1.0.1"
       }
     }
   ],
