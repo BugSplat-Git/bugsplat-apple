@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		637DF0212D42F53B00DDD8FE /* BugSplat in Frameworks */ = {isa = PBXBuildFile; productRef = 637DF0202D42F53B00DDD8FE /* BugSplat */; };
+		C56C5FCD2D544DA900A8358D /* BugSplat in Frameworks */ = {isa = PBXBuildFile; productRef = C56C5FCC2D544DA900A8358D /* BugSplat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,7 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				637DF0212D42F53B00DDD8FE /* BugSplat in Frameworks */,
+				C56C5FCD2D544DA900A8358D /* BugSplat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,7 +73,7 @@
 			);
 			name = "BugSplatTest-SwiftUI-SPM";
 			packageProductDependencies = (
-				637DF0202D42F53B00DDD8FE /* BugSplat */,
+				C56C5FCC2D544DA900A8358D /* BugSplat */,
 			);
 			productName = "BugSplatTest-SwiftUI-SPM";
 			productReference = 637DF00E2D42F46A00DDD8FE /* BugSplatTest-SwiftUI-SPM.app */;
@@ -104,7 +104,7 @@
 			mainGroup = 637DF0052D42F46A00DDD8FE;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				637DF01F2D42F53B00DDD8FE /* XCRemoteSwiftPackageReference "bugsplat-swift-package" */,
+				C56C5FCB2D544DA900A8358D /* XCRemoteSwiftPackageReference "bugsplat-apple" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 637DF00F2D42F46A00DDD8FE /* Products */;
@@ -364,9 +364,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		637DF01F2D42F53B00DDD8FE /* XCRemoteSwiftPackageReference "bugsplat-swift-package" */ = {
+		C56C5FCB2D544DA900A8358D /* XCRemoteSwiftPackageReference "bugsplat-apple" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ferrerod/bugsplat-swift-package";
+			repositoryURL = "https://github.com/bugsplat-git/bugsplat-apple";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.0;
@@ -375,9 +375,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		637DF0202D42F53B00DDD8FE /* BugSplat */ = {
+		C56C5FCC2D544DA900A8358D /* BugSplat */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 637DF01F2D42F53B00DDD8FE /* XCRemoteSwiftPackageReference "bugsplat-swift-package" */;
+			package = C56C5FCB2D544DA900A8358D /* XCRemoteSwiftPackageReference "bugsplat-apple" */;
 			productName = BugSplat;
 		};
 /* End XCSwiftPackageProductDependency section */
