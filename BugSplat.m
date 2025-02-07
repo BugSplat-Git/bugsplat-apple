@@ -6,10 +6,23 @@
 
 #import <BugSplat/BugSplat.h>
 #import <HockeySDK/HockeySDK.h>
+#import "BugSplatUtilities.h"
 
 NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38e";  // Just to satisfy Hockey since this is required
 
 @interface BugSplat() <BITHockeyManagerDelegate>
+
+/**
+ * Attributes represent app supplied keys and values additional to the crash report.
+ * Attributes will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
+ *
+ * NOTES:
+ *
+ *
+ * IMPORTANT: For iOS, if BugSplatDelegate's method `- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat` returns a non-nil BugSplatAttachment,
+ * attributes will be ignored (NOT be included in the Crash Report). This is a current limitation of the iOS BugSplat API.
+ */
+@property (nonatomic, nullable) NSMutableDictionary<NSString *, NSString *> *attributes;
 
 @end
 
@@ -119,6 +132,28 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 
 }
 
+- (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
+{
+    if (_attributes == nil && value != nil) {
+        _attributes = [NSMutableDictionary dictionary];
+    }
+
+    // clean up attribute and values
+    // See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+
+    // first remove newlines and whitespace from prefix or suffix of an attribute since these will be nodes in the XML document
+    NSString *cleanedUpAttribute = [attribute stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSString *escapedAttribute = [cleanedUpAttribute stringByEscapingXMLCharactersIgnoringCDataAndComments];
+
+    // escape xml characters in value
+    NSString *escapedValue = [value stringByEscapingXMLCharactersIgnoringCDataAndComments];
+
+    NSLog(@"BugSplat adding attribute [_attributes setValue%@ forKey:%@]", escapedValue, escapedAttribute);
+
+    // add to _attributes dictionary
+    [_attributes setValue:escapedValue forKey:escapedAttribute];
+}
+
 
 #if TARGET_OS_OSX
 
@@ -172,22 +207,34 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     if ([_delegate respondsToSelector:@selector(attachmentForBugSplat:)])
     {
         BugSplatAttachment *attachment = [_delegate attachmentForBugSplat:self];
-        
-        return [[BITHockeyAttachment alloc] initWithFilename:attachment.filename
-                                        hockeyAttachmentData:attachment.attachmentData
-                                                 contentType:attachment.contentType];
+
+        if (attachment)
+        {
+            return [[BITHockeyAttachment alloc] initWithFilename:attachment.filename
+                                            hockeyAttachmentData:attachment.attachmentData
+                                                     contentType:attachment.contentType];
+        }
     }
-    
+
+    // no delegate provided BugSplatAttachment, send attributes as attributesAttachment if present
+    BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:self.attributes];
+    if (attributesAttachment)
+    {
+        return [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
+                                        hockeyAttachmentData:attributesAttachment.attachmentData
+                                                 contentType:attributesAttachment.contentType];
+    }
+
     return nil;
 }
 
 // MacOS
 - (NSArray<BITHockeyAttachment *> *)attachmentsForCrashManager:(BITCrashManager *)crashManager
 {
+    NSMutableArray *attachments = [[NSMutableArray alloc] init];
+
     if ([_delegate respondsToSelector:@selector(attachmentsForBugSplat:)])
     {
-        NSMutableArray *attachments = [[NSMutableArray alloc] init];
-
         NSArray *bugsplatAttachments = [_delegate attachmentsForBugSplat:self];
 
         for (BugSplatAttachment *attachment in bugsplatAttachments)
@@ -199,7 +246,6 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
             [attachments addObject:hockeyAttachment];
         }
 
-        return [attachments copy];
     }
     else if ([_delegate respondsToSelector:@selector(attachmentForBugSplat:)])
     {
@@ -215,7 +261,22 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
                                                                          hockeyAttachmentData:attachment.attachmentData
                                                                                   contentType:attachment.contentType];
 
-        return @[hockeyAttachment];
+        [attachments addObject:hockeyAttachment];
+    }
+
+    // include attributes as attributesAttachment if present
+    BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:self.attributes];
+    if (attributesAttachment)
+    {
+        BITHockeyAttachment *hockeyAttachment = [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
+                                                                         hockeyAttachmentData:attributesAttachment.attachmentData
+                                                                                  contentType:attributesAttachment.contentType];
+        [attachments addObject:hockeyAttachment];
+    }
+
+    if ([attachments count] > 0)
+    {
+        return [attachments copy];
     }
 
     return nil;
@@ -270,6 +331,54 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     {
         [_delegate bugSplatDidFinishSendingCrashReport:self];
     }
+}
+
+/**
+ * If attributes are present, bundle them up as a BugSplatAttachment containing
+ * NSData created from NSString representing an XML file, filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
+ */
+- (BugSplatAttachment *)bugSplatAttachmentWithAttributes:(NSDictionary *)attributes
+{
+    if (attributes == nil || [attributes count] == 0)
+    {
+        return nil;
+    }
+
+    // prepare XML as stringData from attributes
+    // NOTE: If NSXMLDocument was available for iOS, that would be the better choice for building our XMLDocument...
+
+    NSMutableString *stringData = [NSMutableString new];
+    [stringData appendString:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"];
+    [stringData appendString:@"<FGenericCrashContext>\n"];
+    [stringData appendString:@"<RuntimeProperties>\n"];
+
+    // for each attribute:value pair, add <attribute>value</attribute> row to the XML stringData
+    for (NSString *attribute in attributes.allKeys) {
+        NSString *value = attributes[attribute];
+        [stringData appendFormat:@"<%@>", attribute];
+        [stringData appendString:value];
+        [stringData appendFormat:@"</%@>", attribute];
+        [stringData appendString:@"\n"];
+    }
+
+    [stringData appendString:@"</RuntimeProperties>\n"];
+    [stringData appendString:@"</FGenericCrashContext>\n"];
+
+    NSData *data = [stringData dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
+
+    if (data)
+    {
+        // debug logging
+        NSString *debugString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        if (debugString)
+        {
+            NSLog(@"BugSplat adding attributes as BugSplatAttachment with contents: [%@]", debugString);
+        }
+
+        return [[BugSplatAttachment alloc] initWithFilename:@"CrashContext.xml" attachmentData:data contentType:@"UTF-8"];
+    }
+
+    return nil;
 }
 
 @end

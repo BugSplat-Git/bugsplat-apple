@@ -23,9 +23,18 @@ struct BugSplatTestSwiftUIApp: App {
 
     override init() {
         super.init()
-        BugSplat.shared().delegate = self
-//        BugSplat.shared().autoSubmitCrashReport = false
-        BugSplat.shared().start()
+        let bugSplat = BugSplat.shared()
+        bugSplat.delegate = self
+//        bugSplat.autoSubmitCrashReport = false
+
+        // add some attribute and value pairs to be included in a crash report
+        bugSplat.setValue("Value of Plain Attribute", forAttribute: "PlainAttribute")
+        bugSplat.setValue("Value of not so plain <value> Attribute", forAttribute: "NotSoPlainAttribute")
+        bugSplat.setValue("Launch Date <![CDATA[\(Date.now)]]> Value", forAttribute: "CDATAExample")
+        bugSplat.setValue("<!-- 'value is > or < before' --> \(Date.now)", forAttribute: "CommentExample")
+        bugSplat.setValue("This value will get XML escaping because of 'this' and & and < and >", forAttribute: "EscapingExample")
+    
+        bugSplat.start()
     }
 
     // MARK: BugSplatDelegate
