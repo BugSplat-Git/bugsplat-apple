@@ -2,7 +2,7 @@
 //  main.m
 //  BugSplatTest-macOS-UIKit-ObjC
 //
-//  Created by David Ferrero on 4/26/24.
+//  Copyright © 2024 BugSplat, LLC. All rights reserved.
 //
 
 #import <Cocoa/Cocoa.h>

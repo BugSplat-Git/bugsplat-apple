@@ -2,7 +2,7 @@
 //  BugSplatTest_SwiftUI_SPMApp.swift
 //  BugSplatTest-SwiftUI-SPM
 //
-//  Created by David Ferrero on 1/23/25.
+//  Copyright © 2025 BugSplat, LLC. All rights reserved.
 //
 
 import SwiftUI
