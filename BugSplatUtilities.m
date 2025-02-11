@@ -1,7 +1,7 @@
 //
 //  BugSplatUtilities.m
 //
-//  Copyright © 2025 BugSplat, LLC. All rights reserved.
+//  Copyright © BugSplat, LLC. All rights reserved.
 //
 
 #import "BugSplatUtilities.h"

@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  BugSplatTest-SwiftUI-SPM
 //
-//  Copyright © 2025 BugSplat, LLC. All rights reserved.
+//  Copyright © BugSplat, LLC. All rights reserved.
 //
 
 import SwiftUI

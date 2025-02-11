@@ -1,7 +1,7 @@
 //
 //  BugSplatUtilities.h
 //
-//  Copyright © 2025 BugSplat, LLC. All rights reserved.
+//  Copyright © BugSplat, LLC. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>
