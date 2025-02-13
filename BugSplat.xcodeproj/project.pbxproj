@@ -11,6 +11,10 @@
 		6341B28D2BDC514C007EE8AC /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
+		637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
+		637DF0462D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
+		637DF0482D49A50800DDD8FE /* BugSplatUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */; };
+		637DF0492D49A50800DDD8FE /* BugSplatUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */; };
 		638D38DC2BA0CEE900DC37A8 /* BugSplatDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		638D38DD2BA0CEEA00DC37A8 /* BugSplatDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63C6E2032B92852500AED3E3 /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -53,6 +57,8 @@
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
 		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
+		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
+		637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilities.m; sourceTree = "<group>"; };
 		63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplatMac.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		63C6E1FE2B9283B000AED3E3 /* BugSplat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplat.h; sourceTree = "<group>"; };
@@ -90,6 +96,8 @@
 				63E2337C2B9710420066C7FC /* BugSplatAttachment.h */,
 				63E2337A2B9710410066C7FC /* BugSplatAttachment.m */,
 				6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */,
+				637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */,
+				637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */,
 				63C6E1EE2B92831A00AED3E3 /* Products */,
 				63C6E2062B9285F400AED3E3 /* Frameworks */,
 			);
@@ -123,6 +131,7 @@
 				63D006FA2BBF785B00587FBF /* BugSplatMac.h in Headers */,
 				638D38DD2BA0CEEA00DC37A8 /* BugSplatDelegate.h in Headers */,
 				63E233822B9710420066C7FC /* BugSplatAttachment.h in Headers */,
+				637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +142,7 @@
 				63E233862B9715B50066C7FC /* BugSplat.h in Headers */,
 				638D38DC2BA0CEE900DC37A8 /* BugSplatDelegate.h in Headers */,
 				63E233842B9711AB0066C7FC /* BugSplatAttachment.h in Headers */,
+				637DF0462D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +246,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63E233802B9710420066C7FC /* BugSplatAttachment.m in Sources */,
+				637DF0482D49A50800DDD8FE /* BugSplatUtilities.m in Sources */,
 				63598C432BA0CCD500770E43 /* BugSplat.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -245,6 +256,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63E233852B9711B10066C7FC /* BugSplatAttachment.m in Sources */,
+				637DF0492D49A50800DDD8FE /* BugSplatUtilities.m in Sources */,
 				63598C442BA0CCD500770E43 /* BugSplat.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -127,6 +127,41 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, assign) BOOL autoSubmitCrashReport;
 
+/**
+ * Add an attribute and value to the crash report.
+ * Attributes and values represent app supplied keys and values to associate with a crash report.
+ * Attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
+ *
+ * IMPORTANT: For iOS, only one BugSplatAttachment is currently supported.
+ * If BugSplatDelegate's method `- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat` returns a non-nil BugSplatAttachment,
+ * BugSplat will send that BugSplatAttachment, not the BugSplatAttachment that would otherwise be created due to adding attributes and values using this method.
+ *
+ * NOTES:
+ *
+ * This method may be called multiple times, once per attribute+value pair.
+ * Attributes are backed by an NSDictionary so attribute names must be unique.
+ * If the attribute does not exist, it will be added to attributes dictionary.
+ * If attribute already exists, the value will be replaced in the dictionary.
+ * If attribute already exists, and the value is nil, the attribute will be removed from the dictionary.
+ *
+ * When this method is called, the following preprocessing occurs:
+ * 1. attribute will first have white space and newlines removed from both the beginning and end of the String.
+ *
+ * 2. attribute will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
+ * See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+ * Any XML comment blocks or CDATA blocks found will disable XML escaping within the block.
+ *
+ * 3. values will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
+ * Any XML comment blocks or CDATA blocks found will disable XML escaping within the block.
+ *
+ * 4. After processing both attribute and value for XML escape characters, the attribute+value pair will be stored in an NSDictionary.
+ *
+ * If a crash occurs, attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml"
+ * and encoding of "UTF-8". The attachment will be included with the crash data (except as noted above regarding iOS BugSplatAttachment limitation).
+ * 
+ */
+- (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute;
+
 // macOS specific API
 #if TARGET_OS_OSX
 /*!

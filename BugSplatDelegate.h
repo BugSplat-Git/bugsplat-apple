@@ -70,8 +70,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)applicationKeyForBugSplat:(BugSplat *)bugSplat signal:(NSString *)signal exceptionName:(NSString *)exceptionName exceptionReason:(NSString *)exceptionReason API_AVAILABLE(macosx(10.13));
 
-/** Return a collection of BugsplatAttachment objects providing an NSData object the crash report
- being processed should contain
+/** Return a collection of BugsplatAttachment objects providing an NSData object the crash report being processed should contain
 
  Example implementation:
 
@@ -87,8 +86,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 // MARK: - BugSplatDelegate (iOS)
 
-/** Return a collection of BugSplatAttachment objects providing an NSData object the crash report
- being processed should contain
+/** Return a BugSplatAttachment object providing an NSData object the crash report being processed should contain
+ NOTE: If this method returns a non-nil BugSplatAttachment, any attributes added via setAttribute:value: to BugSplat will NOT be included in the Crash Report.
 
  Example implementation:
 
