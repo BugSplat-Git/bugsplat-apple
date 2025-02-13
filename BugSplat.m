@@ -349,8 +349,7 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 
     NSMutableString *stringData = [NSMutableString new];
     [stringData appendString:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"];
-    [stringData appendString:@"<FGenericCrashContext>\n"];
-    [stringData appendString:@"<RuntimeProperties>\n"];
+    [stringData appendString:@"<Attributes>\n"];
 
     // for each attribute:value pair, add <attribute>value</attribute> row to the XML stringData
     for (NSString *attribute in attributes.allKeys) {
@@ -361,8 +360,7 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
         [stringData appendString:@"\n"];
     }
 
-    [stringData appendString:@"</RuntimeProperties>\n"];
-    [stringData appendString:@"</FGenericCrashContext>\n"];
+    [stringData appendString:@"</Attributes>\n"];
 
     NSData *data = [stringData dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
 
