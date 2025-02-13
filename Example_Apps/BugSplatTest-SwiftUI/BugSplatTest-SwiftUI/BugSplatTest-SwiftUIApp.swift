@@ -27,7 +27,7 @@ struct BugSplatTestSwiftUIApp: App {
         bugSplat.delegate = self
 //        bugSplat.autoSubmitCrashReport = false
 
-        // add some attribute and value pairs to be included in a crash report
+        // Add some attribute and value pairs to be included in a crash report
         bugSplat.setValue("Value of Plain Attribute", forAttribute: "PlainAttribute")
         bugSplat.setValue("Value of not so plain <value> Attribute", forAttribute: "NotSoPlainAttribute")
         bugSplat.setValue("Launch Date <![CDATA[\(Date.now)]]> Value", forAttribute: "CDATAExample")
