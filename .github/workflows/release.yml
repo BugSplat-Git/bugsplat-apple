@@ -2,8 +2,8 @@ name: Build and Release XCFramework
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
 
 # Add permissions block to allow writing
 permissions:
@@ -15,6 +15,14 @@ jobs:
     runs-on: macos-latest
     
     steps:
+    - name: Get Next Version
+      id: semver
+      uses: ietf-tools/semver-action@v1
+      with:
+        token: ${{ secrets.GH_PAT }}
+        prefix: 'v'
+        branch: main
+        
     - name: Create parent directory
       run: |
         mkdir bugsplat-workspace
@@ -88,7 +96,7 @@ jobs:
         CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
         
         # Create a temporary file with the new content
-        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ github.ref_name }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
+        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ steps.semver.outputs.next }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
         sed "s|checksum: \".*\"|checksum: \"${CHECKSUM}\"|" Package.swift.tmp > Package.swift
         rm Package.swift.tmp
           
@@ -96,16 +104,16 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add Package.swift
-        git commit -m "chore: release ${{ github.ref_name }}"
+        git commit -m "chore: release ${{ steps.semver.outputs.next }}"
         git push origin HEAD:main
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
-        name: Release ${{ github.ref_name }}
+        name: Release ${{ steps.semver.outputs.next }}
         body: |
-          Release of BugSplat.xcframework version ${{ github.ref_name }}
+          Release of BugSplat.xcframework version ${{ steps.semver.outputs.next }}
           
           This release contains:
           - iOS framework
@@ -115,7 +123,7 @@ jobs:
           Swift Package Manager:
           ```swift
           dependencies: [
-              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ github.ref_name }}")
+              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ steps.semver.outputs.next }}")
           ]
           ```
         draft: false
