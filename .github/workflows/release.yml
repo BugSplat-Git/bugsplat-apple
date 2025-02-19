@@ -26,7 +26,6 @@ jobs:
         token: ${{ secrets.GH_PAT }}
         prefix: 'v'
         branch: main
-        patchList: chore
         noVersionBumpBehavior: silent
 
     - name: Check Version Bump
@@ -129,10 +128,17 @@ jobs:
         git add Package.swift
         git commit -m "chore: release ${{ needs.check-version.outputs.next }}"
         git push origin HEAD:main
+
+    - name: Create and Push Tag
+      working-directory: bugsplat-workspace/bugsplat-apple
+      run: |
+        git tag ${{ needs.check-version.outputs.next }}
+        git push origin ${{ needs.check-version.outputs.next }}
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ needs.check-version.outputs.next }}
         files: bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
         name: Release ${{ needs.check-version.outputs.next }}
         body: |
