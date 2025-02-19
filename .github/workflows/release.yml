@@ -2,8 +2,8 @@ name: Build and Release XCFramework
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
 
 # Add permissions block to allow writing
 permissions:
@@ -11,7 +11,38 @@ permissions:
   pull-requests: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      current: ${{ steps.semver.outputs.current }}
+      next: ${{ steps.semver.outputs.next }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    
+    steps:
+    - name: Get Next Version
+      id: semver
+      uses: ietf-tools/semver-action@v1
+      with:
+        token: ${{ secrets.GH_PAT }}
+        prefix: 'v'
+        branch: main
+        patchList: chore
+        noVersionBumpBehavior: silent
+
+    - name: Check Version Bump
+      id: check
+      run: |
+        if [ "${{ steps.semver.outputs.next }}" = "${{ steps.semver.outputs.current }}" ]; then
+          echo "No version bump needed. Current version: ${{ steps.semver.outputs.current }}"
+          echo "should_build=false" >> $GITHUB_OUTPUT
+        else
+          echo "Version bump needed from ${{ steps.semver.outputs.current }} to ${{ steps.semver.outputs.next }}"
+          echo "should_build=true" >> $GITHUB_OUTPUT
+        fi
+
   build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
     runs-on: macos-latest
     
     steps:
@@ -88,7 +119,7 @@ jobs:
         CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
         
         # Create a temporary file with the new content
-        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ github.ref_name }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
+        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
         sed "s|checksum: \".*\"|checksum: \"${CHECKSUM}\"|" Package.swift.tmp > Package.swift
         rm Package.swift.tmp
           
@@ -96,16 +127,16 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add Package.swift
-        git commit -m "chore: release ${{ github.ref_name }}"
+        git commit -m "chore: release ${{ needs.check-version.outputs.next }}"
         git push origin HEAD:main
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
-        name: Release ${{ github.ref_name }}
+        name: Release ${{ needs.check-version.outputs.next }}
         body: |
-          Release of BugSplat.xcframework version ${{ github.ref_name }}
+          Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next }}
           
           This release contains:
           - iOS framework
@@ -115,7 +146,7 @@ jobs:
           Swift Package Manager:
           ```swift
           dependencies: [
-              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ github.ref_name }}")
+              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ needs.check-version.outputs.next }}")
           ]
           ```
         draft: false
