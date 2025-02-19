@@ -240,6 +240,20 @@ struct BugSplatTestSwiftUIApp: App {
 }
 ```
 
+### Attributes
+
+BugSplat supports custom attributes that can be added to a crash report. These attributes are searchable in the BugSplat dashboard.
+
+```swift
+BugSplat.shared().setValue("Value of Attribute", forAttribute: "AttributeName")
+```
+
+```objc
+[[BugSplat shared] setValue:@"Value of Attribute" forAttribute:@"AttributeName"];
+```
+
+For more examples demonstrating how to use attributes please see the framework-specific [sample applications](#sample-applications-).
+
 ### Crash Reporter Customization
 
 There are several ways to customize your BugSplat crash reporter.
