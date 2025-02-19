@@ -31,7 +31,7 @@ jobs:
     - name: Check Version Bump
       id: check
       run: |
-        if [ "${{ steps.semver.outputs.next }}" = "${{ steps.semver.outputs.current }}" ]; then
+        if [ -z "${{ steps.semver.outputs.next }}" ] || [ "${{ steps.semver.outputs.next }}" = "${{ steps.semver.outputs.current }}" ]; then
           echo "No version bump needed. Current version: ${{ steps.semver.outputs.current }}"
           echo "should_build=false" >> $GITHUB_OUTPUT
         else
