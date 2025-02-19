@@ -252,7 +252,7 @@ BugSplat.shared().setValue("Value of Attribute", forAttribute: "AttributeName")
 [[BugSplat shared] setValue:@"Value of Attribute" forAttribute:@"AttributeName"];
 ```
 
-For more examples demonstrating how to use attributes please see the framework-specific [sample applications](#sample-applications-).
+Please see the framework-specific [sample applications](#sample-applications-) for more examples demonstrating how to use attributes.
 
 ### Crash Reporter Customization
 
