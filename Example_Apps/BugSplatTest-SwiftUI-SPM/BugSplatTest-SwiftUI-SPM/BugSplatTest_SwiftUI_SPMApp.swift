@@ -23,9 +23,22 @@ struct BugSplatTest_SwiftUI_SPMApp: App {
 
     override init() {
         super.init()
-        BugSplat.shared().delegate = self
-//        BugSplat.shared().autoSubmitCrashReport = false
-        BugSplat.shared().start()
+        
+        // Initialize BugSplat
+        let bugSplat = BugSplat.shared()
+        bugSplat.delegate = self
+        bugSplat.autoSubmitCrashReport = false
+
+        // Optionally, add some attributes to your crash reports.
+        // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
+        bugSplat.setValue("Value of Plain Attribute", forAttribute: "PlainAttribute")
+        bugSplat.setValue("Value of not so plain <value> Attribute", forAttribute: "NotSoPlainAttribute")
+        bugSplat.setValue("Launch Date <![CDATA[\(Date.now)]]> Value", forAttribute: "CDATAExample")
+        bugSplat.setValue("<!-- 'value is > or < before' --> \(Date.now)", forAttribute: "CommentExample")
+        bugSplat.setValue("This value will get XML escaping because of 'this' and & and < and >", forAttribute: "EscapingExample")
+    
+        // Don't forget to call start after you've finished configuring BugSplat
+        bugSplat.start()
     }
 
     // MARK: BugSplatDelegate
