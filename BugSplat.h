@@ -75,6 +75,9 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, nullable) NSString *userID;
 
+/** Set the bugsplat database name, which will override the "BugSplatDatabase" Info.plist key value */
+@property (nonatomic, assign) NSString *bugSplatDatabase;
+
 /** Set the user name that should used in the SDK components
 
  Right now this is used by the Crash Manager to attach to a crash report.
