@@ -24,7 +24,6 @@ jobs:
       uses: ietf-tools/semver-action@v1
       with:
         token: ${{ secrets.GH_PAT }}
-        prefix: 'v'
         branch: main
         noVersionBumpBehavior: silent
 
