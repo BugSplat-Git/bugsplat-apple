@@ -108,7 +108,7 @@ jobs:
         
         # Create zip archive of the framework
         cd xcframeworks
-        zip -r BugSplat.xcframework.zip BugSplat.xcframework
+        zip -y -r BugSplat.xcframework.zip BugSplat.xcframework
         
     - name: Update Package.swift
       working-directory: bugsplat-workspace/bugsplat-apple
