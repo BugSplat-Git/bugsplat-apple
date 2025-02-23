@@ -12,6 +12,9 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 
 @interface BugSplat() <BITHockeyManagerDelegate>
 
+/** set to YES if start is called and returns successfully */
+@property (atomic, assign) BOOL isStartInvoked;
+
 /**
  * Attributes represent app supplied keys and values additional to the crash report.
  * Attributes will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
@@ -27,6 +30,10 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 @end
 
 @implementation BugSplat
+
+    // internal instance variable
+    NSString * _bugSplatDatabase = nil;
+
 
 + (instancetype)shared
 {
@@ -45,6 +52,8 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     if (self = [super init]) {
         [[BITHockeyManager sharedHockeyManager] configureWithIdentifier:kHockeyIdentifierPlaceholder];
 
+        self.isStartInvoked = NO;
+
 #if TARGET_OS_OSX
         _autoSubmitCrashReport = NO;
         _askUserDetails = YES;
@@ -56,22 +65,6 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
             self.bannerImage = bannerImage;
         }
 #endif
-        
-        id bugSplatDatabaseValue = [self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
-        if (bugSplatDatabaseValue == nil) {
-            NSLog(@"*** BugSplat init: BugSplatDatabase is missing from your Info.plist - Please add this key/value to the your app's Info.plist or use setBugSplatDatabase to set it from code ***");
-
-            // NSAssert is set to be ignored in this library in Release builds
-            NSAssert(NO, @"BugSplat init: BugSplatDatabase is missing from your Info.plist - Please add this key/value to the your app's Info.plist or use setBugSplatDatabase to set it from code");
-        } else {
-            NSString *bugSplatDatabase = (NSString *)bugSplatDatabaseValue;
-            NSLog(@"BugSplat init: BugSplat BugSplatDatabase set as [%@]", bugSplatDatabase);
-            
-            NSString *serverURL = [NSString stringWithFormat: @"https://%@.bugsplat.com/", bugSplatDatabase];
-
-            NSLog(@"BugSplat init: setServerURL: [%@]", serverURL);
-            [[BITHockeyManager sharedHockeyManager] setServerURL:serverURL];
-        }
     }
 
     return self;
@@ -80,13 +73,33 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 - (void)start
 {
     NSLog(@"BugSplat start...");
-    
+
+    if (!self.bugSplatDatabase)
+    {
+        NSLog(@"*** BugSplatDatabase is nil. Please add this key/value to the your app's Info.plist or set bugSplatDatabase before invoking start. ***");
+
+        // NSAssert is set to be ignored in this library in Release builds
+        NSAssert(NO, @"*** BugSplatDatabase is nil. Please add this key/value to the your app's Info.plist or set bugSplatDatabase before invoking start. ***");
+        self.isStartInvoked = NO; // unsuccessful return
+        return;
+    }
+
+    if (self.isStartInvoked)
+    {
+        NSLog(@"*** BugSplat `start` was already invoked. ***");
+        return;
+    }
+
+    NSLog(@"BugSplat BugSplatDatabase set as [%@]", self.bugSplatDatabase);
+    NSString *serverURL = [NSString stringWithFormat: @"https://%@.bugsplat.com/", self.bugSplatDatabase];
 
     // Uncomment line below to enable HockeySDK logging
 //    [[BITHockeyManager sharedHockeyManager] setLogLevel:BITLogLevelVerbose];
 
-    // setServerUrl will be called from either `init` or `setBugSplatDatabase`
+    NSLog(@"BugSplat setServerURL: [%@]", serverURL);
+    [[BITHockeyManager sharedHockeyManager] setServerURL:serverURL];
     [[BITHockeyManager sharedHockeyManager] startManager];
+    self.isStartInvoked = YES;
 }
 
 - (void)setDelegate:(id<BugSplatDelegate>)delegate
@@ -104,12 +117,31 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     return [NSBundle mainBundle]; // return app's main bundle, not BugSplat framework's bundle
 }
 
+- (NSString *)bugSplatDatabase
+{
+    // defer to Info.plist value if present
+    NSString *bugSplatDatabaseValue = (NSString *)[self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
+    if (bugSplatDatabaseValue)
+    {
+        return [bugSplatDatabaseValue copy];
+    }
+
+    return _bugSplatDatabase;
+}
+
 - (void)setBugSplatDatabase:(NSString *)bugSplatDatabase
 {
-    NSString *serverURL = [NSString stringWithFormat: @"https://%@.bugsplat.com/", bugSplatDatabase];
+    // if a value is already present, do not change it
+    if (self.bugSplatDatabase)
+    {
+        return;
+    }
 
-    NSLog(@"BugSplat setBugSplatDatabase: setServerURL: [%@]", serverURL);
-    [[BITHockeyManager sharedHockeyManager] setServerURL:serverURL];
+    // Set a value if value is not nil, and if isStartInvoked is NO
+    if (bugSplatDatabase && !self.isStartInvoked)
+    {
+        _bugSplatDatabase = [bugSplatDatabase copy];
+    }
 }
 
 - (void)setUserID:(NSString *)userID

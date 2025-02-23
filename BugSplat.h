@@ -75,8 +75,25 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, nullable) NSString *userID;
 
-/** Set the bugsplat database name, which will override the "BugSplatDatabase" Info.plist key value */
-@property (nonatomic, assign) NSString *bugSplatDatabase;
+/**
+ * The database name BugSplat will use to construct the BugSplatDatabase URL where crash reports will be submitted.
+ *
+ * NOTES:
+ * By default, the BugSplat database name is pulled from the App's Info.plist.
+ *
+ * When a third party library or plugin developer is leveraging BugSplat, but the App developer incorporating
+ * the plugin is not using BugSplat, programmatically setting this property would be appropriate.
+ *
+ * Only one BugSplat database can be specified within an App including any third party libraries and plugins.
+ * This means if the Info.plist contains a BugSplat database, attempting to change this property will have no effect.
+ *
+ * Additionally, if the Info.plist does not contain a BugSplat database key and value, the first call to
+ * set this property will set the BugSplat database name. Any subsequent calls to set this property will have no effect.
+ *
+ * Finally, with the above considerations, if programmatic change of this property is desired, it must be set before calling
+ * BugSplat `start` method or it will have no effect.
+ */
+@property (nonatomic, copy, nullable) NSString *bugSplatDatabase;
 
 /** Set the user name that should used in the SDK components
 
