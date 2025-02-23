@@ -82,7 +82,7 @@ NS_ASSUME_NONNULL_BEGIN
  * By default, the BugSplat database name is pulled from the App's Info.plist.
  *
  * When a third party library or plugin developer is leveraging BugSplat, but the App developer incorporating
- * the plugin is not using BugSplat, programmatically setting this property would be approperiate.
+ * the plugin is not using BugSplat, programmatically setting this property would be appropriate.
  *
  * Only one BugSplat database can be specified within an App including any third party libraries and plugins.
  * This means if the Info.plist contains a BugSplat database, attempting to change this property will have no effect.
