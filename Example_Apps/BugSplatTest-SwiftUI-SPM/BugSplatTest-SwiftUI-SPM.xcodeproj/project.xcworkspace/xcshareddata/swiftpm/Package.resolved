@@ -1,12 +1,13 @@
 {
-  "originHash" : "083113c6a9912908d4696bbc1b2bb964d1f2f91e57b697770fab587c6eb3f4e2",
+  "originHash" : "3cfaf58c2fabb27ba8665aae0652c6370e465b008e7e85a57fc54632e011f824",
   "pins" : [
     {
       "identity" : "bugsplat-apple",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/bugsplat-git/bugsplat-apple",
       "state" : {
-        "revision" : "06459ebd948605b046eac9bdbd4a704d7ff1e2e2"
+        "revision" : "e09225b7fa0de98dbd409fb211629c2f39070643",
+        "version" : "1.2.2"
       }
     }
   ],
