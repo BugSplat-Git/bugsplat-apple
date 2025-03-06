@@ -73,7 +73,7 @@ A command line application can be written in several different languages. BugSpl
 3. set Current Project Version
 4. set Marketing Version (optional)
 
-+ BugSplat expects an AppKit NSApplicationDidFinishLaunchingNotification NSNotication to be posted when the application has completed the startup phase. In this example, it is programmatically sent after [[BugSplat shaerd] start] is called. This NSNotification allows BugSplat to begin processing any crash reports that may have been captured during a prior application session. This would normally be sent by AppKit or UIKit as part of the normal application life cycle, but it is not sent in a command line application.
++ BugSplat expects an AppKit NSApplicationDidFinishLaunchingNotification NSNotication to be posted when the application has completed the startup phase. In this example, it is programmatically sent after [[BugSplat shared] start] is called. This NSNotification allows BugSplat to begin processing any crash reports that may have been captured during a prior application session. This would normally be sent by AppKit or UIKit as part of the normal application life cycle, but it is not sent in a command line application.
 
 
 ### Xcode Build Settings required for a Command Line application
