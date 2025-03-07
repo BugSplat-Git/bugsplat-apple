@@ -2,7 +2,7 @@
 //  BugSplatMac.h
 //  BugSplat
 //
-//  Copyright © 2024 BugSplat, LLC. All rights reserved.
+//  Copyright © BugSplat, LLC. All rights reserved.
 //
 
 #ifndef BugSplatMac_h
