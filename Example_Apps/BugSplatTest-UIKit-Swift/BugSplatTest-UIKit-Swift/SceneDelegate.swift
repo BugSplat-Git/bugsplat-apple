@@ -2,7 +2,7 @@
 //  SceneDelegate.swift
 //  BugSplatTest-UIKit-Swift
 //
-//  Copyright © 2024 BugSplat, LLC. All rights reserved.
+//  Copyright © BugSplat, LLC. All rights reserved.
 //
 
 import UIKit
