@@ -248,6 +248,18 @@ BugSplat.shared().setValue("Value of Attribute", forAttribute: "AttributeName")
 [[BugSplat shared] setValue:@"Value of Attribute" forAttribute:@"AttributeName"];
 ```
 
+It is important to understand how attributes are set, as well as if and when attributes will be included in a crash report.
+
+Attributes and their associated values are programmatically set at any time while an app is running. Attributes are unique `NSString` keys so there can only be one attribute of a given name in any given set of attributes. Every time BugSplat's `setValue:forAttribute:` API is called, this attribute/value pair will be added to a `NSDictionary<NSString *, NSString *>` and persisted to `NSUserDefaults`. If the app session terminates due to a crash, the persisted attributes are handled as follows:
+
+    1. Upon first launch after a crash and when BugSplat.shared is being initialized, any persisted attributes are loaded into memory.
+    2. Next, the persisted NSDictionary holding the attributes within NSUserDefaults is erased.
+    3. Next, if a crash occurred in the last app session prior to this app session, any attributes that were just loaded into memory from the persisted attributes, will be added to the crash report as an attachment (see iOS API limitation notes about a single attachment). 
+    4. Finally, the dictionary in memory holding the prior app session attributes is erased.
+
+Put another way, attributes and their values are only valid for the lifetime of the app session and only used in a crash report if the crash occurs during that app session. Any attributes set in the prior app session will be attached to the crash report that is processed during the next launch of the app. If the app terminates normally, any attributes persisted during the prior `normal` app session will be erased during the next app launch.
+
+
 Please see the framework-specific [sample applications](#sample-applications-) for more examples demonstrating how to use attributes.
 
 ### Crash Reporter Customization

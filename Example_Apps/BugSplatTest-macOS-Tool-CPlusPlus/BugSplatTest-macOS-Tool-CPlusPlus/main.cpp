@@ -8,6 +8,19 @@
 #include <iostream>
 #include "BugSplatInit.hpp"
 
+int setAttributeAndValue()
+{
+    std::string attribute, value;
+    std::cout << "Enter attribute and value separated by a space:\n";
+    std::cin >> attribute >> value;
+
+    std::cout << "setAttributeAndValue called with: ";
+    std::cout << attribute << "\n";
+    std::cout << value << "\n";
+
+    return bugSplatSetAttributeValue(attribute, value);
+}
+
 int checkInput(std::string input)
 {
     std::cout << "checkInput called: ";
@@ -24,8 +37,25 @@ int checkInput(std::string input)
         int b = 0;
         std::cout << "Result: " << a / b << std::endl;  // Division by zero
     }
+    else if (input == "set")
+    {
+        return setAttributeAndValue();
+    }
 
     return 0;
+}
+
+int getUserInput() {
+    std::string input;
+
+    std::cout << "Enter text (enter 'q' to quit):\n";
+    std::getline(std::cin, input);
+    if (input == "q")
+    {
+        return -1;
+    }
+
+    return checkInput(input);
 }
 
 int main(int argc, const char * argv[]) {
@@ -39,7 +69,10 @@ int main(int argc, const char * argv[]) {
     std::string input;
 
     while (true) {
-        std::cout << "Enter text (enter 'q' to quit):\n";
+
+        mainObjCRunLoop();
+
+        std::cout << "\nEnter text (enter 'q' to quit):\n";
         std::getline(std::cin, input);
         if (input == "q")
         {

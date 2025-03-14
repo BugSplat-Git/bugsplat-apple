@@ -6,7 +6,7 @@
 //
 
 import UIKit
-
+import BugSplat
 
 
 class ViewController: UIViewController {
@@ -16,6 +16,10 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         nonOptional = nil
+
+        // Attributes can be set any time and can contain dynamic values
+        // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
+        BugSplat.shared().setValue(NSDate().description, forAttribute: "ViewDidLoadDateTime")
     }
 
     @IBAction func crashApp(_ sender: Any) {

@@ -148,8 +148,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL autoSubmitCrashReport;
 
 /**
- * Add an attribute and value to the crash report.
- * Attributes and values represent app supplied keys and values to associate with a crash report.
+ * Add an attribute and value to a dictionary of attributes that will potentially be included in a crash report.
+ * Attributes and values represent app supplied keys and values to associate with a crash report, should the app crash during this session.
  * Attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
  *
  * IMPORTANT: For iOS, only one BugSplatAttachment is currently supported.
@@ -159,7 +159,8 @@ NS_ASSUME_NONNULL_BEGIN
  * NOTES:
  *
  * This method may be called multiple times, once per attribute+value pair.
- * Attributes are backed by an NSDictionary so attribute names must be unique.
+ * This method may be called at any time during the app session prior to a crash.
+ * Attributes are persisted to NSUserDefaults within a NSDictionary<NSString *, NSString *>, so attribute names must be unique.
  * If the attribute does not exist, it will be added to attributes dictionary.
  * If attribute already exists, the value will be replaced in the dictionary.
  * If attribute already exists, and the value is nil, the attribute will be removed from the dictionary.
@@ -174,11 +175,17 @@ NS_ASSUME_NONNULL_BEGIN
  * 3. values will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
  * Any XML comment blocks or CDATA blocks found will disable XML escaping within the block.
  *
- * 4. After processing both attribute and value for XML escape characters, the attribute+value pair will be stored in an NSDictionary.
+ * 4. After processing both attribute and value for XML escape characters, the attribute+value pair will be
+ * persisted to NSUserDefaults within a NSDictionary<NSString *, NSString *>.
  *
  * If a crash occurs, attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml"
  * and encoding of "UTF-8". The attachment will be included with the crash data (except as noted above regarding iOS BugSplatAttachment limitation).
- * 
+ *
+ * Attributes and their values are only valid for the lifetime of the app session and only used in a crash report if the crash occurs during that app session.
+ * Any attributes set in the prior app session will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml,
+ * MIME type of "application/xml" and encoding of "UTF-8". The attachment will be added to the crash report when it is processed during the next launch of the app.
+ * If the app terminates normally, any attributes persisted during the prior `normal` app session will be erased during the next app launch.
+ *
  */
 - (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute;
 
