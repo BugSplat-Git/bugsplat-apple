@@ -66,6 +66,33 @@ int bugSplatInit(const char * bugSplatDatabase)
     return 0;
 }
 
+int bugSplatSetAttributeValue(std::string attribute, std::string value)
+{
+    @autoreleasepool {
+        NSString *attributeString = @(attribute.c_str());
+        NSString *valueString = @(value.c_str());
+        NSLog(@"bugSplatSetAttributeValue(%@, %@)", attributeString, valueString);
+
+        // Attributes can be set any time and can contain dynamic values
+        // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
+        [[BugSplat shared] setValue:valueString forAttribute:attributeString];
+    }
+
+    return 0;
+}
+
+void mainObjCRunLoop() {
+    @autoreleasepool {
+        // Objective-C often needs an NSRunLoop
+        // BugSplat needs a NSRunLoop to process events
+        // give run loop 3 seconds to process any events
+        NSLog(@"*** mainObjCRunLoop giving NSRunLoop time to run...");
+
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:3]];
+    }
+}
+
+
 @implementation MyBugSplatDelegate
 
 
