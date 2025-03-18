@@ -19,7 +19,7 @@ class ViewController: UIViewController {
 
         // Attributes can be set any time and can contain dynamic values
         // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
-        BugSplat.shared().setValue(NSDate().description, forAttribute: "ViewDidLoadDateTime")
+        BugSplat.shared().set(NSDate().description, for: "ViewDidLoadDateTime")
     }
 
     @IBAction func crashApp(_ sender: Any) {

@@ -65,7 +65,7 @@ struct ContentView: View {
 
     func update(attribute: String, value: String?) {
         print("update(\(attribute), value: \(value ?? "nil")")
-        BugSplat.shared().setValue(value, forAttribute: attribute)
+        BugSplat.shared().set(value, for: attribute)
     }
 
 }

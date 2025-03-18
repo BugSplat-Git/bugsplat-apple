@@ -3,4 +3,5 @@ xcuserdata
 xcframeworks
 Vendor
 archives
+build/*
 Tools/symbol-upload-macos

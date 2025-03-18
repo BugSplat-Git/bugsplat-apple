@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		637DF0922D6CEF9500DDD8FE /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */; };
 		637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF0D72D72A69C00DDD8FE /* AppKit.framework */; };
+		637EA8B82D8A24AD008F79E3 /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -42,8 +42,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				637DF0922D6CEF9500DDD8FE /* BugSplat.xcframework in Frameworks */,
 				637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */,
+				637EA8B82D8A24AD008F79E3 /* BugSplat.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,32 +284,38 @@
 		637DF06A2D6CE56800DDD8FE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = TN6R4Q475K;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.bugsplat.BugSplatTest-macOS-Tool-CPlusPlus";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
 		};
 		637DF06B2D6CE56800DDD8FE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = TN6R4Q475K;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.bugsplat.BugSplatTest-macOS-Tool-CPlusPlus";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Release;
 		};

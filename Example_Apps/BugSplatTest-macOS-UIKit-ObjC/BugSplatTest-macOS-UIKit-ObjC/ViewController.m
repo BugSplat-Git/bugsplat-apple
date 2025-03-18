@@ -16,7 +16,7 @@
     // Do any additional setup after loading the view.
     // Attributes can be set any time and can contain dynamic values
     // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
-    [[BugSplat shared] setValue:[[NSDate now] description] forAttribute:@"Date+Time"];
+    [[BugSplat shared] setValue:[[NSDate now] description] forAttribute:@"DateAndTime"];
 }
 
 

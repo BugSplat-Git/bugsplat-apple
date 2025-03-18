@@ -149,6 +149,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  * Add an attribute and value to a dictionary of attributes that will potentially be included in a crash report.
+ * If the attribute is an invalid XML entity name, or the attribute+value pair cannot be set,
+ * the method will return NO, otherwise it will return YES.
+ *
  * Attributes and values represent app supplied keys and values to associate with a crash report, should the app crash during this session.
  * Attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml" and encoding of "UTF-8".
  *
@@ -166,17 +169,16 @@ NS_ASSUME_NONNULL_BEGIN
  * If attribute already exists, and the value is nil, the attribute will be removed from the dictionary.
  *
  * When this method is called, the following preprocessing occurs:
- * 1. attribute will first have white space and newlines removed from both the beginning and end of the String.
+ * 1. attribute will be checked for XML entity name rules. If validation fails, method returns NO.
  *
- * 2. attribute will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
+ * 2. values will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
  * See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
  * Any XML comment blocks or CDATA blocks found will disable XML escaping within the block.
  *
- * 3. values will then be processed by an XML escaping routine which looks for escapable characters ",',&,<, and >
- * Any XML comment blocks or CDATA blocks found will disable XML escaping within the block.
- *
- * 4. After processing both attribute and value for XML escape characters, the attribute+value pair will be
+ * 3. After processing both attribute and value for XML escape characters, the attribute+value pair will be
  * persisted to NSUserDefaults within a NSDictionary<NSString *, NSString *>.
+ *
+ * 4. If the attribute or value cannot be set, the method will return NO, otherwise it will return YES.
  *
  * If a crash occurs, attributes and values will be bundled up in a BugSplatAttachment as NSData, with a filename of CrashContext.xml, MIME type of "application/xml"
  * and encoding of "UTF-8". The attachment will be included with the crash data (except as noted above regarding iOS BugSplatAttachment limitation).
@@ -187,7 +189,7 @@ NS_ASSUME_NONNULL_BEGIN
  * If the app terminates normally, any attributes persisted during the prior `normal` app session will be erased during the next app launch.
  *
  */
-- (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute;
+- (BOOL)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute NS_SWIFT_NAME(set(_:for:));
 
 // macOS specific API
 #if TARGET_OS_OSX

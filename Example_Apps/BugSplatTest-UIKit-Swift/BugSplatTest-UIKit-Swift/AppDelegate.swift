@@ -23,12 +23,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Optionally, add some attributes to your crash reports.
         // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
-        bugSplat.setValue("Value of Plain Attribute", forAttribute: "PlainAttribute")
-        bugSplat.setValue("Value of not so plain <value> Attribute", forAttribute: "NotSoPlainAttribute")
-        bugSplat.setValue("Launch Date <![CDATA[\(Date.now)]]> Value", forAttribute: "CDATAExample")
-        bugSplat.setValue("<!-- 'value is > or < before' --> \(Date.now)", forAttribute: "CommentExample")
-        bugSplat.setValue("This value will get XML escaping because of 'this' and & and < and >", forAttribute: "EscapingExample")
-    
+        bugSplat.set("Value of Plain Attribute", for: "PlainAttribute")
+        bugSplat.set("Value of not so plain <value> Attribute", for: "NotSoPlainAttribute")
+        bugSplat.set("Launch Date <![CDATA[\(Date.now)]]> Value", for: "CDATAExample")
+        bugSplat.set("<!-- 'value is > or < before' --> \(Date.now)", for: "CommentExample")
+        bugSplat.set("This value will get XML escaping because of 'this' and & and < and >", for: "EscapingExample")
+
         // Don't forget to call start after you've finished configuring BugSplat
         bugSplat.start()
         

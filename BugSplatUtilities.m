@@ -299,4 +299,31 @@
     return [tokenPairValueRanges copy];
 }
 
+- (BOOL)isValidXMLEntity
+{
+    if (self.length == 0) return NO;
+
+    // Regular expression for a valid XML entity name
+    // See https://regex101.com
+    //    ^ asserts position at start of a line
+    //    Match a single character present in the list below [a-zA-Z_]
+    //    a-z matches a single character in the range between a (index 97) and z (index 122) (case sensitive)
+    //    A-Z matches a single character in the range between A (index 65) and Z (index 90) (case sensitive)
+    //    _ matches the character _ with index 9510 (5F16 or 1378) literally (case sensitive)
+    //    Match a single character present in the list below [\w.:-]
+    //    * matches the previous token between zero and unlimited times, as many times as possible, giving back as needed (greedy)
+    //    \w matches any word character (equivalent to [a-zA-Z0-9_])
+    //    .:- matches a single character in the list .:- (case sensitive)
+    //    $ asserts position at the end of a line
+    NSString *pattern = @"^[a-zA-Z_][\\w.:-]*$";
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
+
+    // Check if the entity matches the regex
+    NSRange range = NSMakeRange(0, self.length);
+    NSUInteger matchCount = [regex numberOfMatchesInString:self options:0 range:range];
+
+    // Return YES if there is a match, NO otherwise
+    return matchCount > 0;
+}
+
 @end

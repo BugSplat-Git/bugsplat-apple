@@ -183,15 +183,16 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; //
 /**
  * All attribute+value pairs are persisted in a `NSDictionary<NSString *, NSString *>` to NSUserDefaults under the key `kBugSplatUserDefaultsAttributes`.
  * Any attribute+value pairs persisted during an app session will be included as an attachment in a crash report if the app crashes in the session in which the attributes are set.
+ * return NO if attribute is an invalid XML Entity name, otherwise returns YES.
  */
-- (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
+- (BOOL)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
 {
     NSMutableDictionary<NSString *, NSString*> *mutableAttributes;
     NSDictionary<NSString *, NSString*> *persistedAttributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
 
     if (persistedAttributes == nil && value == nil)
     {
-        return; // nil value and nil persistedAttributes
+        return NO; // nil value and nil persistedAttributes
     }
 
     if (persistedAttributes)
@@ -202,23 +203,26 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; //
         mutableAttributes = [NSMutableDictionary dictionary];
     }
 
-    // xml clean up attribute and values
-    // See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+    // first validate attribute as a valid entity name
+    if (![attribute isValidXMLEntity])
+    {
+        return NO; // invalid attribute as xml entity
+    }
 
-    // first remove newlines and whitespace from prefix or suffix of an attribute since these will be nodes in the XML document
-    NSString *cleanedUpAttribute = [attribute stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    NSString *escapedAttribute = [cleanedUpAttribute stringByEscapingXMLCharactersIgnoringCDataAndComments];
+    // xml clean up attribute
+    // See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
 
     // escape xml characters in value
     NSString *escapedValue = [value stringByEscapingXMLCharactersIgnoringCDataAndComments];
 
-    NSLog(@"BugSplat [setValue:%@ forKey:%@]", escapedValue, escapedAttribute);
+    NSLog(@"BugSplat [setValue:%@ forKey:%@]", escapedValue, attribute);
 
     // add to mutableAttributes dictionary
-    [mutableAttributes setValue:escapedValue forKey:escapedAttribute];
+    [mutableAttributes setValue:escapedValue forKey:attribute];
 
     // persist newly updated mutableAttributes
     [NSUserDefaults.standardUserDefaults setValue:mutableAttributes forKey:kBugSplatUserDefaultsAttributes];
+    return YES;
 }
 
 
