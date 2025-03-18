@@ -51,7 +51,7 @@
 - (NSString *)stringByXMLEscapingWithExclusionRanges:(NSArray<NSValue *> *)ascendingExclusionRanges;
 
 /**
- * Validate NSString as an XML entity name (including element name, attribute names), return true if it is a valid XL entity.
+ * Validate NSString as an XML entity name (including element name, attribute names), return YES if it is a valid XML entity.
  * In XML, the rules for naming entities (which include element names, attribute names, and other identifiers) are defined by the XML specification. Here are the key rules for valid XML names:
  * 1. Start Character: An XML name must start with a letter (either uppercase or lowercase) or an underscore (_). It cannot start with a digit or any other character.
  * 2. Subsequent Characters: After the first character, the name can contain:
