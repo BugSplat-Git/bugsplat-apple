@@ -17,8 +17,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.2/BugSplat.xcframework.zip",
-            checksum: "6b51886a0decc5577695ab456ee91b2e5448aace17eee3225d34c64f61094bef"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.3/BugSplat.xcframework.zip",
+            checksum: "629c0ce8e5cf66331f4d06a1430571687c8dcae8b626c006a1ec1886f3123bb9"
         ),
         // Add a fake target to satisfy the swift build system
         // Add a dependency to the .binaryTarget
