@@ -50,4 +50,27 @@
  */
 - (NSString *)stringByXMLEscapingWithExclusionRanges:(NSArray<NSValue *> *)ascendingExclusionRanges;
 
+/**
+ * Validate NSString as an XML entity name (including element name, attribute names), return YES if it is a valid XML entity.
+ * In XML, the rules for naming entities (which include element names, attribute names, and other identifiers) are defined by the XML specification. Here are the key rules for valid XML names:
+ * 1. Start Character: An XML name must start with a letter (either uppercase or lowercase) or an underscore (_). It cannot start with a digit or any other character.
+ * 2. Subsequent Characters: After the first character, the name can contain:
+ *    Letters (A-Z, a-z)
+ *    Digits (0-9)
+ *    Hyphens (-)
+ *    Underscores (_)
+ *    Periods (.)
+ *    Colons (:)
+ *    Combining characters
+ *    Extender characters
+ * 3. Length: There is no specific limit on the length of an XML name, but it should be reasonable for practical purposes.
+ * 4. Case Sensitivity: XML names are case-sensitive. For example, <Tag> and <tag> would be considered different names.
+ * 5. Forbidden Characters: The following characters are not allowed in XML names:
+ *    Spaces
+ *    Special characters (like @, #, $, etc.)
+ *    Punctuation marks (except for the allowed ones mentioned above)
+ *    Control characters (ASCII values 0-31)
+ * 6. Reserved Names: Certain names are reserved in XML, such as those starting with "xml" (e.g., xml, xmlns, etc.), which are used for XML namespaces.
+ */
+- (BOOL)isValidXMLEntity;
 @end

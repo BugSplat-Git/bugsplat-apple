@@ -9,6 +9,7 @@
 #import "BugSplatUtilities.h"
 
 NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38e";  // Just to satisfy Hockey since this is required
+NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; // UserDefaults key where BugSplat attributes are stored
 
 @interface BugSplat() <BITHockeyManagerDelegate>
 
@@ -25,7 +26,7 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
  * IMPORTANT: For iOS, if BugSplatDelegate's method `- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat` returns a non-nil BugSplatAttachment,
  * attributes will be ignored (NOT be included in the Crash Report). This is a current limitation of the iOS BugSplat API.
  */
-@property (nonatomic, nullable) NSMutableDictionary<NSString *, NSString *> *attributes;
+@property (nonatomic, nullable) NSDictionary<NSString *, NSString *> *attributes;
 
 @end
 
@@ -42,6 +43,10 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     
     dispatch_once(&pred, ^{
         sharedInstance = [[BugSplat alloc] init];
+
+        // load and erase any persisted attributes before `setValue:forAttribute:` API is available for this new app session.
+        sharedInstance.attributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
+        [NSUserDefaults.standardUserDefaults setValue:nil forKey:kBugSplatUserDefaultsAttributes];
     });
     
     return sharedInstance;
@@ -94,7 +99,7 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     NSString *serverURL = [NSString stringWithFormat: @"https://%@.bugsplat.com/", self.bugSplatDatabase];
 
     // Uncomment line below to enable HockeySDK logging
-//    [[BITHockeyManager sharedHockeyManager] setLogLevel:BITLogLevelVerbose];
+    // [[BITHockeyManager sharedHockeyManager] setLogLevel:BITLogLevelVerbose];
 
     NSLog(@"BugSplat setServerURL: [%@]", serverURL);
     [[BITHockeyManager sharedHockeyManager] setServerURL:serverURL];
@@ -175,26 +180,49 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
 
 }
 
-- (void)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
+/**
+ * All attribute+value pairs are persisted in a `NSDictionary<NSString *, NSString *>` to NSUserDefaults under the key `kBugSplatUserDefaultsAttributes`.
+ * Any attribute+value pairs persisted during an app session will be included as an attachment in a crash report if the app crashes in the session in which the attributes are set.
+ * return NO if attribute is an invalid XML Entity name, otherwise returns YES.
+ */
+- (BOOL)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
 {
-    if (_attributes == nil && value != nil) {
-        _attributes = [NSMutableDictionary dictionary];
+    NSMutableDictionary<NSString *, NSString*> *mutableAttributes;
+    NSDictionary<NSString *, NSString*> *persistedAttributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
+
+    if (persistedAttributes == nil && value == nil)
+    {
+        return NO; // nil value and nil persistedAttributes
     }
 
-    // clean up attribute and values
-    // See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+    if (persistedAttributes)
+    {
+        mutableAttributes = [[NSMutableDictionary<NSString *, NSString *> alloc] initWithDictionary:persistedAttributes];
+    }
+    else {
+        mutableAttributes = [NSMutableDictionary dictionary];
+    }
 
-    // first remove newlines and whitespace from prefix or suffix of an attribute since these will be nodes in the XML document
-    NSString *cleanedUpAttribute = [attribute stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    NSString *escapedAttribute = [cleanedUpAttribute stringByEscapingXMLCharactersIgnoringCDataAndComments];
+    // first validate attribute as a valid entity name
+    if (![attribute isValidXMLEntity])
+    {
+        return NO; // invalid attribute as xml entity
+    }
+
+    // xml clean up attribute
+    // See: https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
 
     // escape xml characters in value
     NSString *escapedValue = [value stringByEscapingXMLCharactersIgnoringCDataAndComments];
 
-    NSLog(@"BugSplat adding attribute [_attributes setValue%@ forKey:%@]", escapedValue, escapedAttribute);
+    NSLog(@"BugSplat [setValue:%@ forKey:%@]", escapedValue, attribute);
 
-    // add to _attributes dictionary
-    [_attributes setValue:escapedValue forKey:escapedAttribute];
+    // add to mutableAttributes dictionary
+    [mutableAttributes setValue:escapedValue forKey:attribute];
+
+    // persist newly updated mutableAttributes
+    [NSUserDefaults.standardUserDefaults setValue:mutableAttributes forKey:kBugSplatUserDefaultsAttributes];
+    return YES;
 }
 
 
@@ -244,7 +272,7 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     return nil;
 }
 
-// iOS
+// iOS & MacOS
 -(BITHockeyAttachment *)attachmentForCrashManager:(BITCrashManager *)crashManager
 {
     if ([_delegate respondsToSelector:@selector(attachmentForBugSplat:)])
@@ -259,19 +287,28 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
         }
     }
 
-    // no delegate provided BugSplatAttachment, send attributes as attributesAttachment if present
-    BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:self.attributes];
-    if (attributesAttachment)
+    // if last session ended in a crash AND attributes were set in that session, build an attachment for the crash report
+    if (crashManager.didCrashInLastSession && self.attributes)
     {
-        return [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
-                                        hockeyAttachmentData:attributesAttachment.attachmentData
-                                                 contentType:attributesAttachment.contentType];
+        NSDictionary<NSString *, NSString*> *attributes = self.attributes;
+        self.attributes = nil; // do not reuse these attributes
+
+        // no delegate provided BugSplatAttachment, send attributes as attributesAttachment if present
+        BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:attributes];
+
+        if (attributesAttachment)
+        {
+            return [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
+                                            hockeyAttachmentData:attributesAttachment.attachmentData
+                                                     contentType:attributesAttachment.contentType];
+        }
     }
 
     return nil;
 }
 
 // MacOS
+#if TARGET_OS_OSX
 - (NSArray<BITHockeyAttachment *> *)attachmentsForCrashManager:(BITCrashManager *)crashManager
 {
     NSMutableArray *attachments = [[NSMutableArray alloc] init];
@@ -307,14 +344,20 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
         [attachments addObject:hockeyAttachment];
     }
 
-    // include attributes as attributesAttachment if present
-    BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:self.attributes];
-    if (attributesAttachment)
+    // if last session ended in a crash AND attributes were set in that session, build an attachment for the crash report
+    if (crashManager.didCrashInLastSession && self.attributes)
     {
-        BITHockeyAttachment *hockeyAttachment = [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
-                                                                         hockeyAttachmentData:attributesAttachment.attachmentData
-                                                                                  contentType:attributesAttachment.contentType];
-        [attachments addObject:hockeyAttachment];
+        NSDictionary<NSString *, NSString*> *attributes = self.attributes;
+        self.attributes = nil; // do not reuse these attributes
+        
+        BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:attributes];
+        if (attributesAttachment)
+        {
+            BITHockeyAttachment *hockeyAttachment = [[BITHockeyAttachment alloc] initWithFilename:attributesAttachment.filename
+                                                                             hockeyAttachmentData:attributesAttachment.attachmentData
+                                                                                      contentType:attributesAttachment.contentType];
+            [attachments addObject:hockeyAttachment];
+        }
     }
 
     if ([attachments count] > 0)
@@ -335,6 +378,19 @@ NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38
     
     return nil;
 }
+
+// iOS
+#else
+
+-(void)crashManagerWillSendCrashReportsAlways:(BITCrashManager *)crashManager
+{
+    if ([_delegate respondsToSelector:@selector(bugSplatWillSendCrashReportsAlways:)])
+    {
+        [_delegate bugSplatWillSendCrashReportsAlways:self];
+    }
+}
+
+#endif
 
 - (void)crashManagerWillShowSubmitCrashReportAlert:(BITCrashManager *)crashManager
 {
