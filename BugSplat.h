@@ -54,27 +54,6 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (weak, nonatomic, nullable) id<BugSplatDelegate> delegate;
 
-/** Set the userID that should used in the SDK components
-
- Right now this is used by the Crash Manager to attach to a crash report.
-
- The value can be set at any time and will be stored in the keychain on the current
- device only! To delete the value from the keychain set the value to `nil`.
-
- This property is optional.
-
- @warning When returning a non nil value, crash reports are not anonymous any more
- and the crash alerts will not show the word "anonymous"!
-
- @warning This property needs to be set before calling `start` to be considered
- for being added to crash reports as meta data.
-
- @see userName
- @see userEmail
- @see `[BITHockeyManagerDelegate userIDForHockeyManager:componentManager:]`
- */
-@property (nonatomic, copy, nullable) NSString *userID;
-
 /**
  * The database name BugSplat will use to construct the BugSplatDatabase URL where crash reports will be submitted.
  *
@@ -95,45 +74,60 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, nullable) NSString *bugSplatDatabase;
 
-/** Set the user name that should used in the SDK components
+/**
+ * The userID that will be used when a crash report is submitted.
+ *
+ * The value can be set programmatically at any time and will be stored in NSUserDefaults.
+ * To delete the value from NSUserDefaults, set the value to `nil`.
+ *
+ * This property is optional.
+ *
+ * @warning When returning a non nil value, crash reports are not anonymous any more
+ * and the crash alerts will not show the word "anonymous"!
+ *
+ * @warning If setting this property programmatically, it needs to be set before calling `start`
+ * if the userID should be included in a possible crash from the last app session.
+ *
+ * @see userName
+ * @see userEmail
+ */
+@property (nonatomic, copy, nullable) NSString *userID;
 
- Right now this is used by the Crash Manager to attach to a crash report.
-
- The value can be set at any time and will be stored in the keychain on the current
- device only! To delete the value from the keychain set the value to `nil`.
-
- This property is optional.
-
- @warning When returning a non nil value, crash reports are not anonymous any more
- and the crash alerts will not show the word "anonymous"!
-
- @warning This property needs to be set before calling `start` to be considered
- for being added to crash reports as meta data.
-
- @see userID
- @see userEmail
- @see `[BITHockeyManagerDelegate userNameForHockeyManager:componentManager:]`
+/**
+ * The user name that will be used when a crash report is submitted.
+ *
+ * The value can be set programmatically at any time and will be stored in NSUserDefaults.
+ * To delete the value from NSUserDefaults, set the value to `nil`.
+ *
+ * This property is optional.
+ *
+ * @warning When returning a non nil value, crash reports are not anonymous any more
+ * and the crash alerts will not show the word "anonymous"!
+ *
+ * @warning If setting this property programmatically, it needs to be set before calling `start`
+ * if the userName should be included in a possible crash from the last app session.
+ *
+ * @see userID
+ * @see userEmail
  */
 @property (nonatomic, copy, nullable) NSString *userName;
 
-/** Set the users email address that should used in the SDK components
-
- Right now this is used by the Crash Manager to attach to a crash report.
-
- The value can be set at any time and will be stored in the keychain on the current
- device only! To delete the value from the keychain set the value to `nil`.
-
- This property is optional.
-
- @warning When returning a non nil value, crash reports are not anonymous any more
- and the crash alerts will not show the word "anonymous"!
-
- @warning This property needs to be set before calling `start` to be considered
- for being added to crash reports as meta data.
-
- @see userID
- @see userName
- @see [BITHockeyManagerDelegate userEmailForHockeyManager:componentManager:]
+/**
+ * The user email address that will be used when a crash report is submitted.
+ *
+ * The value can be set programmatically at any time and will be stored in NSUserDefaults.
+ * To delete the value from NSUserDefaults, set the value to `nil`.
+ *
+ * This property is optional.
+ *
+ * @warning When returning a non nil value, crash reports are not anonymous any more
+ * and the crash alerts will not show the word "anonymous"!
+ *
+ * @warning If setting this property programmatically, it needs to be set before calling `start`
+ * if the userEmail should be included in a possible crash from the last app session.
+ *
+ * @see userID
+ * @see userName
  */
 @property (nonatomic, copy, nullable) NSString *userEmail;
 
@@ -207,9 +201,18 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL askUserDetails;
 
 /**
- *  Defines if user's name and email entered in the crash report UI should be saved to the keychain.
+ * If the user enters their name or email on a Bug Crash Alert Form, persist their data to NSUserDefaults.
+ * After this occurs, userName and userEmail properties will contain the values the user entered.
+ * When the Bug Crash Alert Form is presented again, it will be pre-populated with user name and email.
+ * To erase their user name or email, set the property value to nil programmatically.
  *
- *  Default: _NO_
+ * This property defaults to NO.
+ * This property is optional.
+ *
+ * @warning If setting this property to YES, it needs to be set before calling `start`.
+ *
+ * @see userName
+ * @see userEmail
  */
 @property (nonatomic, assign) BOOL persistUserDetails;
 
