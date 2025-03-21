@@ -71,7 +71,7 @@
 {
     NSError *error = nil;
     NSArray<NSValue *> *cDataTokenPairRanges = [self tokenPairRangesForStartToken:@"<![CDATA[" endToken:@"]]>" error:&error];
-    NSLog(@"CDATA token pair ranges found: %ld", cDataTokenPairRanges.count);
+
     if (error != nil) {
         NSLog(@"CDATA parsing error was found!");
     }
@@ -79,7 +79,7 @@
     error = nil; // reset
     // does not check for invalid use of -- within the comment pair, nor for invalid ending --->, nor for <--- invalid starts
     NSArray<NSValue *> *commentTokenPairRanges = [self tokenPairRangesForStartToken:@"<!--" endToken:@"-->" error:&error];
-    NSLog(@"Comment token pair ranges found: %ld", commentTokenPairRanges.count);
+
     if (error != nil) {
         NSLog(@"XML Comment parsing error was found!");
     }
@@ -92,15 +92,7 @@
     [exclusionRanges addObjectsFromArray:commentTokenPairRanges];
 
     NSArray<NSValue *> *validTokenPairRanges = [NSArray validTokenPairRanges:exclusionRanges];
-
-    NSLog(@"valid token pair ranges found: %ld", validTokenPairRanges.count);
-    for (NSValue *rangeValue in validTokenPairRanges) {
-        NSLog(@"range found: loc: %lu, len: %lu", rangeValue.rangeValue.location, rangeValue.rangeValue.length);
-    }
-
     NSString *escapedString = [self stringByXMLEscapingWithExclusionRanges:validTokenPairRanges];
-    NSLog(@"before escape: %@", self);
-    NSLog(@"after escape:  %@", escapedString);
 
     return escapedString;
 }
@@ -255,10 +247,6 @@
             NSRange startTokenRange = [self rangeOfString:startToken options:NSLiteralSearch range:startTokenSearchRange];
 
             if (startTokenRange.length != 0) { // start token found, now look for end token
-
-
-                NSLog(@"startToken %@ found at Range: loc: %lu, len: %lu", startToken, startTokenRange.location, startTokenRange.length);
-
                 NSUInteger endTokenSearchRangeLocation = startTokenRange.location + startTokenRange.length;
                 NSUInteger endTokenSearchRangeLength = self.length - endTokenSearchRangeLocation;
 
@@ -269,9 +257,6 @@
                     NSRange endTokenRange = [self rangeOfString:endToken options:NSLiteralSearch range:endTokenSearchRange];
 
                     if (endTokenRange.length != 0) { // end token found
-
-                        NSLog(@"endToken %@ found at Range: loc: %lu, len: %lu", endToken, endTokenRange.location, endTokenRange.length);
-
                         // token pair range begins at startRange.location and ends at endRange.location + endRange.length
                         NSRange tokenPairRange = NSMakeRange(startTokenRange.location, endTokenRange.location - startTokenRange.location + endTokenRange.length);
                         [tokenPairValueRanges addObject:[NSValue valueWithRange:tokenPairRange]];

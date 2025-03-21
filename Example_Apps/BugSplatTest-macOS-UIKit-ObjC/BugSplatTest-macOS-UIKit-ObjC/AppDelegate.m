@@ -22,6 +22,9 @@
     [[BugSplat shared] setDelegate:self];
     [[BugSplat shared] setAutoSubmitCrashReport:NO];
 
+    // if user enters name and email, store in in NSUserDefaults for use on subsequent crahes
+    [[BugSplat shared] setPersistUserDetails:YES];
+
     // Optionally, add some attributes to your crash reports.
     // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
     [[BugSplat shared] setValue:@"Value of Plain Attribute" forAttribute:@"PlainAttribute"];
