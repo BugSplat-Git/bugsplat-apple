@@ -9,6 +9,9 @@
 #import "BugSplatUtilities.h"
 
 NSString *const kHockeyIdentifierPlaceholder = @"b0cf675cb9334a3e96eda0764f95e38e";  // Just to satisfy Hockey since this is required
+NSString *const kBugSplatUserDefaultsUserID = @"com.bugsplat.userID"; // UserDefaults key where BugSplat userID is stored
+NSString *const kBugSplatUserDefaultsUserName = @"com.bugsplat.userName"; // UserDefaults key where BugSplat userName is stored
+NSString *const kBugSplatUserDefaultsUserEmail = @"com.bugsplat.userEmail"; // UserDefaults key where BugSplat userEmail is stored
 NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; // UserDefaults key where BugSplat attributes are stored
 
 @interface BugSplat() <BITHockeyManagerDelegate>
@@ -149,22 +152,34 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; //
     }
 }
 
+- (NSString *)userID
+{
+    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserID];
+}
+
 - (void)setUserID:(NSString *)userID
 {
-    _userID = userID;
-    [[BITHockeyManager sharedHockeyManager] setUserID:userID];
+    [NSUserDefaults.standardUserDefaults setObject:userID forKey:kBugSplatUserDefaultsUserID];
+}
+
+- (NSString *)userName
+{
+    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserName];
 }
 
 - (void)setUserName:(NSString *)userName
 {
-    _userName = userName;
-    [[BITHockeyManager sharedHockeyManager] setUserName:userName];
+    [NSUserDefaults.standardUserDefaults setObject:userName forKey:kBugSplatUserDefaultsUserName];
+}
+
+- (NSString *)userEmail
+{
+    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserEmail];
 }
 
 - (void)setUserEmail:(NSString *)userEmail
 {
-    _userEmail = userEmail;
-    [[BITHockeyManager sharedHockeyManager] setUserEmail:userEmail];
+    [NSUserDefaults.standardUserDefaults setObject:userEmail forKey:kBugSplatUserDefaultsUserEmail];
 }
 
 - (void)setAutoSubmitCrashReport:(BOOL)autoSubmitCrashReport
@@ -238,12 +253,6 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; //
 {
     _askUserDetails = askUserDetails;
     [[[BITHockeyManager sharedHockeyManager] crashManager] setAskUserDetails:self.askUserDetails];
-}
-
-- (void)setPersistUserDetails:(BOOL)persistUserDetails
-{
-    _persistUserDetails = persistUserDetails;
-    [[[BITHockeyManager sharedHockeyManager] crashManager] setPersistUserInfo:self.persistUserDetails];
 }
 
 - (void)setExpirationTimeInterval:(NSTimeInterval)expirationTimeInterval
@@ -477,5 +486,38 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes"; //
 
     return nil;
 }
+
+- (NSString *)userIDForHockeyManager:(BITHockeyManager *)hockeyManager componentManager:(BITHockeyBaseManager *)componentManager
+{
+    return [self userID];
+}
+
+- (NSString *)userNameForHockeyManager:(BITHockeyManager *)hockeyManager componentManager:(BITHockeyBaseManager *)componentManager
+{
+    return [self userName];
+}
+
+- (NSString *)userEmailForHockeyManager:(BITHockeyManager *)hockeyManager componentManager:(BITHockeyBaseManager *)componentManager
+{
+    return [self userEmail];
+}
+
+/**
+ * This optional delegate callback is called when the user submits a crash report after manually entering in meta data for the crash report.
+ */
+- (void)userProvidedData:(BITHockeyUserData *)userProvidedData hockeyManager:(BITHockeyManager *)hockeyManager componentManager:(BITHockeyBaseManager *)componentManager
+{
+    if (!userProvidedData) return;
+
+#if TARGET_OS_OSX
+    if ([self persistUserDetails] == NO) {
+        return;
+    }
+#endif
+
+    [self setUserName:userProvidedData.userName];
+    [self setUserEmail:userProvidedData.userEmail];
+}
+
 
 @end
