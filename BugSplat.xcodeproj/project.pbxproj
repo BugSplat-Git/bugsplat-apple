@@ -3,12 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		6341B28C2BDC514C007EE8AC /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; };
-		6341B28D2BDC514C007EE8AC /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
@@ -21,7 +20,6 @@
 		63905E972D83912E009CDBEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */; };
 		63C6E2032B92852500AED3E3 /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63D006F62BBF5F3600587FBF /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; };
-		63D006F72BBF5F3600587FBF /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		63D006FA2BBF785B00587FBF /* BugSplatMac.h in Headers */ = {isa = PBXBuildFile; fileRef = 63D006F92BBF785B00587FBF /* BugSplatMac.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233802B9710420066C7FC /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
 		63E233822B9710420066C7FC /* BugSplatAttachment.h in Headers */ = {isa = PBXBuildFile; fileRef = 63E2337C2B9710420066C7FC /* BugSplatAttachment.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -30,34 +28,9 @@
 		63E233862B9715B50066C7FC /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		6341B28E2BDC514D007EE8AC /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				6341B28D2BDC514C007EE8AC /* HockeySDK.xcframework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		63D006F82BBF5F3600587FBF /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				63D006F72BBF5F3600587FBF /* HockeySDK.xcframework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
-		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
+		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
 		637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilities.m; sourceTree = "<group>"; };
@@ -161,7 +134,6 @@
 				63C6E1E92B92831A00AED3E3 /* Sources */,
 				63C6E1EA2B92831A00AED3E3 /* Frameworks */,
 				63C6E1EB2B92831A00AED3E3 /* Resources */,
-				6341B28E2BDC514D007EE8AC /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -180,7 +152,6 @@
 				63C6E1F82B9283B000AED3E3 /* Sources */,
 				63C6E1F92B9283B000AED3E3 /* Frameworks */,
 				63C6E1FA2B9283B000AED3E3 /* Resources */,
-				63D006F82BBF5F3600587FBF /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -465,8 +436,6 @@
 		63C6E2012B9283B000AED3E3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TN6R4Q475K;
@@ -503,8 +472,6 @@
 		63C6E2022B9283B000AED3E3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TN6R4Q475K;

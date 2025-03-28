@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,10 @@
 		63D006E92BBF4A5700587FBF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */; };
 		63D006F22BBF4C3700587FBF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006F12BBF4C3700587FBF /* Assets.xcassets */; };
 		63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63D006F42BBF569200587FBF /* BugSplat.xcframework */; };
+		63E96A142D973F1700C0C026 /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A122D973F1700C0C026 /* HockeySDK.xcframework */; };
+		63E96A152D973F1700C0C026 /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A122D973F1700C0C026 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		63E96A162D973F1700C0C026 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A132D973F1700C0C026 /* CrashReporter.xcframework */; };
+		63E96A172D973F1700C0C026 /* CrashReporter.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A132D973F1700C0C026 /* CrashReporter.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,6 +31,18 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		63E96A182D973F1700C0C026 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				63E96A172D973F1700C0C026 /* CrashReporter.xcframework in Embed Frameworks */,
+				63E96A152D973F1700C0C026 /* HockeySDK.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -36,7 +52,9 @@
 		63D006E32BBF4A5500587FBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		63D006F12BBF4C3700587FBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "BugSplatTest-SwiftUI/Assets.xcassets"; sourceTree = "<group>"; };
-		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		63E96A122D973F1700C0C026 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = ../../Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
+		63E96A132D973F1700C0C026 /* CrashReporter.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = ../../Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +63,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */,
+				63E96A142D973F1700C0C026 /* HockeySDK.xcframework in Frameworks */,
+				63E96A162D973F1700C0C026 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +92,8 @@
 		63D006F32BBF569200587FBF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				63E96A132D973F1700C0C026 /* CrashReporter.xcframework */,
+				63E96A122D973F1700C0C026 /* HockeySDK.xcframework */,
 				63D006F42BBF569200587FBF /* BugSplat.xcframework */,
 			);
 			name = Frameworks;
@@ -108,6 +130,7 @@
 				63D006DD2BBF4A5500587FBF /* Resources */,
 				63D006FD2BC0B03700587FBF /* Embed Frameworks */,
 				634ABCCF2BD85E8500926648 /* BugSplat Symbol Upload */,
+				63E96A182D973F1700C0C026 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF0D72D72A69C00DDD8FE /* AppKit.framework */; };
-		637EA8B82D8A24AD008F79E3 /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */; };
+		63E96A372D97423B00C0C026 /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */; };
+		63E96A3C2D97423F00C0C026 /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A302D97418800C0C026 /* HockeySDK.xcframework */; };
+		63E96A3E2D9742A200C0C026 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A312D97418800C0C026 /* CrashReporter.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,8 +27,10 @@
 
 /* Begin PBXFileReference section */
 		637DF0622D6CE56800DDD8FE /* BugSplatTest-macOS-Tool-CPlusPlus */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "BugSplatTest-macOS-Tool-CPlusPlus"; sourceTree = BUILT_PRODUCTS_DIR; };
-		637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
 		637DF0D72D72A69C00DDD8FE /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		63E96A302D97418800C0C026 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = ../../Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
+		63E96A312D97418800C0C026 /* CrashReporter.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = ../../Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -42,8 +46,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63E96A3E2D9742A200C0C026 /* CrashReporter.xcframework in Frameworks */,
+				63E96A3C2D97423F00C0C026 /* HockeySDK.xcframework in Frameworks */,
+				63E96A372D97423B00C0C026 /* BugSplat.xcframework in Frameworks */,
 				637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */,
-				637EA8B82D8A24AD008F79E3 /* BugSplat.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,6 +76,8 @@
 		637DF06C2D6CE5D500DDD8FE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				63E96A312D97418800C0C026 /* CrashReporter.xcframework */,
+				63E96A302D97418800C0C026 /* HockeySDK.xcframework */,
 				637DF0D72D72A69C00DDD8FE /* AppKit.framework */,
 				637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */,
 			);
@@ -84,6 +92,7 @@
 			buildConfigurationList = 637DF0692D6CE56800DDD8FE /* Build configuration list for PBXNativeTarget "BugSplatTest-macOS-Tool-CPlusPlus" */;
 			buildPhases = (
 				637DF05E2D6CE56800DDD8FE /* Sources */,
+				63E96A412D9748C100C0C026 /* Manually Codesign Frameworks */,
 				637DF05F2D6CE56800DDD8FE /* Frameworks */,
 				637DF0602D6CE56800DDD8FE /* CopyFiles */,
 				637DF0982D6E532B00DDD8FE /* BugSplat Symbol Upload */,
@@ -109,7 +118,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 1620;
 				TargetAttributes = {
 					637DF0612D6CE56800DDD8FE = {
 						CreatedOnToolsVersion = 16.1;
@@ -154,6 +163,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nrm -f \"/tmp/Xcode_run_script.log\"\n\n# Xcode doesn't show run script errors in build log.\nexec > \"/tmp/Xcode_run_script.log\" 2>&1\n\n# Ensure symbol upload tool is available\nif [ ! -f \"$PROJECT_DIR/../../Tools/symbol-upload-macos\" ]; then\n    mkdir -p \"$PROJECT_DIR/../../Tools\"\n    cd \"$PROJECT_DIR/../../Tools\"\n    curl -sL -O \"https://app.bugsplat.com/download/symbol-upload-macos\"\n    chmod +x symbol-upload-macos\nfi\n\n# Use osascript(1) to present notification banners; otherwise\nosascript -e 'display notification \"preparing and uploading symbols…\" with title \"BugSplat\"'\n\n\"$PROJECT_DIR\"/../../Tools/symbol-upload-macos -a \"BugSplatTest-macOS-Tool-CPlusPlus\" -b \"Fred\" -u \"fred@bugsplat.com\" -p \"Flintstone\" -f \"**/*.dSYM\" -d \"$BUILT_PRODUCTS_DIR\" -v \"1.0 (1)\"\n";
+		};
+		63E96A412D9748C100C0C026 /* Manually Codesign Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Manually Codesign Frameworks";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Manually Codesign dependency frameworks. Team ID for cert must match app Team ID.\n# Path to your frameworks\nCRASHREPORTER_PATH=\"${BUILT_PRODUCTS_DIR}/CrashReporter.framework\"\nHOCKEYSDK_PATH=\"${BUILT_PRODUCTS_DIR}/HockeySDK.framework\"\nBUGSPLAT_PATH=\"${BUILT_PRODUCTS_DIR}/BugSplatMac.framework\"\n\n# Sign the frameworks\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$CRASHREPORTER_PATH\"\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$HOCKEYSDK_PATH\"\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$BUGSPLAT_PATH\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -201,6 +229,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -261,6 +290,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -285,11 +315,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
@@ -304,11 +335,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
