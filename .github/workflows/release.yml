@@ -106,20 +106,30 @@ jobs:
       run: |
         ./makeXCFramework.sh
         
-        # Create zip archive of the framework
+        # Create zip archives of the frameworks
         cd xcframeworks
         zip -y -r BugSplat.xcframework.zip BugSplat.xcframework
+        cd ../Vendor
+        zip -y -r HockeySDK.xcframework.zip HockeySDK.xcframework
+        zip -y -r CrashReporter.xcframework.zip CrashReporter.xcframework
         
     - name: Update Package.swift
       working-directory: bugsplat-workspace/bugsplat-apple
       run: |
-        # Calculate checksum
-        CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
+        # Calculate checksums
+        BUGSPLAT_CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
+        HOCKEY_CHECKSUM=$(swift package compute-checksum Vendor/HockeySDK.xcframework.zip)
+        CRASHREPORTER_CHECKSUM=$(swift package compute-checksum Vendor/CrashReporter.xcframework.zip)
         
-        # Create a temporary file with the new content
-        sed "s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip\"|" Package.swift > Package.swift.tmp
-        sed "s|checksum: \".*\"|checksum: \"${CHECKSUM}\"|" Package.swift.tmp > Package.swift
-        rm Package.swift.tmp
+        # Update all frameworks in Package.swift
+        sed -i '' \
+          -e "/name: \"BugSplat\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip\"|" \
+          -e "/name: \"BugSplat\"/,/}/ s|checksum: \".*\"|checksum: \"${BUGSPLAT_CHECKSUM}\"|" \
+          -e "/name: \"HockeySDK\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/HockeySDK.xcframework.zip\"|" \
+          -e "/name: \"HockeySDK\"/,/}/ s|checksum: \".*\"|checksum: \"${HOCKEY_CHECKSUM}\"|" \
+          -e "/name: \"CrashReporter\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/CrashReporter.xcframework.zip\"|" \
+          -e "/name: \"CrashReporter\"/,/}/ s|checksum: \".*\"|checksum: \"${CRASHREPORTER_CHECKSUM}\"|" \
+          Package.swift
           
         # Commit and push the updated Package.swift
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -138,15 +148,18 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.check-version.outputs.next }}
-        files: bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
+        files: |
+          bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
+          bugsplat-workspace/bugsplat-apple/Vendor/HockeySDK.xcframework.zip
+          bugsplat-workspace/bugsplat-apple/Vendor/CrashReporter.xcframework.zip
         name: Release ${{ needs.check-version.outputs.next }}
         body: |
           Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next }}
           
           This release contains:
-          - iOS framework
-          - iOS Simulator framework
-          - macOS framework
+          - BugSplat.xcframework
+          - HockeySDK.xcframework
+          - CrashReporter.xcframework
           
           Swift Package Manager:
           ```swift

@@ -23,12 +23,12 @@ let package = Package(
         .binaryTarget(
             name: "HockeySDK",
             // this zip should be created from the contents of xcframeworks/HockeySDK.xcframework after combining HockeySDK-Mac and HockeySDK-iOS
-            url: "https://github.com/BugSplat-Git/HockeySDK-iOS/releases/download/vFIXME/HockeySDK.xcframework.zip",
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/vFIXME/HockeySDK.xcframework.zip",
             checksum: "FIXME"
         ),
         .binaryTarget(
             name: "CrashReporter",
-            url: "https://github.com/BugSplat-Git/plcrashreporter/releases/download/vFIXME/CrashReporter.xcframework.zip",
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/vFIXME/CrashReporter.xcframework.zip",
             checksum: "FIXME"
         ),
         // Add a fake target to satisfy the swift build system
