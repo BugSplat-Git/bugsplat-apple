@@ -23,9 +23,9 @@ The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac 
 
 ## Integration 🏗️
 
-BugSplat supports multiple methods for installing the xcfamework in a project.
-- Using Swift Package Manager.
-- Manually adding xcframeworks.
+The BugSplat crash reporting SDK can be integrated into your project via the following methods:
+- Using Swift Package Manager
+- Manually adding xcframeworks
 
 ### Swift Package Manager (SPM)
 
