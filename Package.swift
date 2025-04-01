@@ -11,14 +11,25 @@ let package = Package(
     products: [
         .library(
             name: "BugSplat",
-            targets: ["BugSplat"]
+            targets: ["BugSplatPackage"]
         )
     ],
     targets: [
         .binaryTarget(
             name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.4/BugSplat.xcframework.zip",
-            checksum: "8d12099d3c8fbe09d72ae77b1f39625f4ac29ed4dbf951a73dcfac8bb56a24c2"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/vFIXME/BugSplat.xcframework.zip",
+            checksum: "FIXME"
+        ),
+        .binaryTarget(
+            name: "HockeySDK",
+            // this zip should be created from the contents of xcframeworks/HockeySDK.xcframework after combining HockeySDK-Mac and HockeySDK-iOS
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/vFIXME/HockeySDK.xcframework.zip",
+            checksum: "FIXME"
+        ),
+        .binaryTarget(
+            name: "CrashReporter",
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/vFIXME/CrashReporter.xcframework.zip",
+            checksum: "FIXME"
         ),
         // Add a fake target to satisfy the swift build system
         // Add a dependency to the .binaryTarget
@@ -26,7 +37,7 @@ let package = Package(
         // Add a fake Swift source: Sources/BugSplatPackage/Empty.swift
         .target(
             name: "BugSplatPackage",
-            dependencies: ["BugSplat"]
+            dependencies: ["BugSplat", "HockeySDK", "CrashReporter"]
         )
     ]
 )

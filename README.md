@@ -23,7 +23,9 @@ The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac 
 
 ## Integration 🏗️
 
-BugSplat supports multiple methods for installing the xcfamework in a project.
+The BugSplat crash reporting SDK can be integrated into your project via the following methods:
+- Using Swift Package Manager
+- Manually adding xcframeworks
 
 ### Swift Package Manager (SPM)
 
@@ -33,13 +35,13 @@ Add the following URL to your project's `Additional Package Dependencies`:
 https://github.com/BugSplat-Git/bugsplat-apple
 ```
 
-### Manual Setup
+### Manually Add xcframeworks
 
-To manually install BugSplat.xcframework in your project:
+To manually integrate BugSplat into your Xcode project, three xcframeworks (BugSplat.xcframework, HockeySDK.xcframework, and CrashReporter.xcframework) need to be added and configured within Xcode.
 
-1. Download the latest release from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The release will contain a zip file with the xcframework.
-2. Unzip the archive.
-3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to locate the unzipped BugSplat.xcframework. Once added, select Embed & Sign.
+1. Download the latest released xcframeworks (BugSplat.xcframework.zip, HockeySDK.xcframework.zip, and CrashReporter.xcframework.zip) from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. Each zip will contain the corresponding xcframework.
+2. Unzip each archive.
+3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to where you unzipped the three archives in step 2. Select BugSplat.xcframework, HockeySDK.xcframework, and CrashReporter.xcframework, then tap the "Add" button. Once added, select Embed & Sign for each xcframework.
 
 ## Usage 🧑‍💻
 
@@ -275,7 +277,7 @@ There are several ways to customize your BugSplat crash reporter.
 
 #### User Details
 
-- Set `askUserDetails` to `NO` to prevent the name and email fields from displaying in the crash reporter UI. Defaults to `YES`.
+- BugSplat for macOS provides the ability for the user to provide a name and email when submitting a crash report. To provide the name and email, set `askUserDetails` to `NO` to prevent the name and email fields from displaying in the crash reporter UI. Defaults to `YES`.
 
 #### Auto Submit
 
@@ -283,7 +285,7 @@ There are several ways to customize your BugSplat crash reporter.
 
 #### Persist User Details
 
-- Set `persistUserDetails` to `YES` to save and restore the user's name and email when presenting the crash reporter dialogue. Defaults to `NO`.
+- BugSplat for macOS provides the ability to persist the user name and email entered in a crash reporter UI. Set `persistUserDetails` to `YES` to save and restore the user's name and email when presenting the crash reporter dialogue. Defaults to `NO`.
 
 #### Expiration Time
 
@@ -291,7 +293,7 @@ There are several ways to customize your BugSplat crash reporter.
 
 #### Attachments
 
-Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded.
+Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Currently, iOS supports only one attachment with crash reports. See additional iOS attachment limitation when using Attributes.
 
 #### Bitcode
 

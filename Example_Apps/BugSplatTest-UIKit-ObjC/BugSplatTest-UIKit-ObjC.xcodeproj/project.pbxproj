@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -16,6 +16,10 @@
 		6341B25B2BDC3CA5007EE8AC /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B25A2BDC3CA5007EE8AC /* main.m */; };
 		6341B2632BDC3D0B007EE8AC /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */; };
 		6341B2642BDC3D0B007EE8AC /* BugSplat.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		63E96A212D97403C00C0C026 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A1F2D97403C00C0C026 /* CrashReporter.xcframework */; };
+		63E96A222D97403C00C0C026 /* CrashReporter.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A1F2D97403C00C0C026 /* CrashReporter.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		63E96A232D97403C00C0C026 /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A202D97403C00C0C026 /* HockeySDK.xcframework */; };
+		63E96A242D97403C00C0C026 /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A202D97403C00C0C026 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +29,8 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				63E96A242D97403C00C0C026 /* HockeySDK.xcframework in Embed Frameworks */,
+				63E96A222D97403C00C0C026 /* CrashReporter.xcframework in Embed Frameworks */,
 				6341B2642BDC3D0B007EE8AC /* BugSplat.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -46,6 +52,8 @@
 		6341B2592BDC3CA5007EE8AC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6341B25A2BDC3CA5007EE8AC /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		63E96A1F2D97403C00C0C026 /* CrashReporter.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = ../../Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
+		63E96A202D97403C00C0C026 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = ../../Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +61,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63E96A232D97403C00C0C026 /* HockeySDK.xcframework in Frameworks */,
+				63E96A212D97403C00C0C026 /* CrashReporter.xcframework in Frameworks */,
 				6341B2632BDC3D0B007EE8AC /* BugSplat.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -98,6 +108,8 @@
 		6341B2612BDC3D0A007EE8AC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				63E96A1F2D97403C00C0C026 /* CrashReporter.xcframework */,
+				63E96A202D97403C00C0C026 /* HockeySDK.xcframework */,
 				6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */,
 			);
 			name = Frameworks;
