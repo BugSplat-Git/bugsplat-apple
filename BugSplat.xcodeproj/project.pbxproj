@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -30,7 +30,7 @@
 
 /* Begin PBXFileReference section */
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
-		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
+		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
 		637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilities.m; sourceTree = "<group>"; };

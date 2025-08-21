@@ -31,4 +31,10 @@
     assert(NO);
 }
 
+- (IBAction)hangApp:(id)sender {
+    while(YES) {
+        sleep(100);
+    }
+}
+
 @end
