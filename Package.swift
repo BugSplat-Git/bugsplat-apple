@@ -17,19 +17,19 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.5/BugSplat.xcframework.zip",
-            checksum: "f6fa738601a7af8b2f95ff2697fe6221f70d707a5d386ced02532be3f95c6580"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/BugSplat.xcframework.zip",
+            checksum: "c88a6b05d83415b968e85745376fa997dc6ce19df865447ae6a21e2d7288400f"
         ),
         .binaryTarget(
             name: "HockeySDK",
             // this zip should be created from the contents of xcframeworks/HockeySDK.xcframework after combining HockeySDK-Mac and HockeySDK-iOS
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.5/HockeySDK.xcframework.zip",
-            checksum: "03366d0e4bbeff763bc169df7ece551cf68652b16172f04031155e7aebe319a5"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/HockeySDK.xcframework.zip",
+            checksum: "22c4e6ce9448a8985b0e48c58cff535268eacda566991b79260f19c24be98dfa"
         ),
         .binaryTarget(
             name: "CrashReporter",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.5/CrashReporter.xcframework.zip",
-            checksum: "e71125b0a375edeb99480b3865a3f0a954df1e39ffee0ae5bb9b3760d1b3c978"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/CrashReporter.xcframework.zip",
+            checksum: "d6e9f19c161fa6a29baa7792883409c3546df910cfbcc0f6dc55896ce4c5c588"
         ),
         // Add a fake target to satisfy the swift build system
         // Add a dependency to the .binaryTarget
