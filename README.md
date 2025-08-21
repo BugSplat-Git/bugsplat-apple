@@ -49,7 +49,7 @@ To manually integrate BugSplat into your Xcode project, three xcframeworks (BugS
 
 BugSplat requires a few Xcode configuration steps to integrate the xcframework with your BugSplat account.
 
-Add the following case-sensitive key to your app's `Info.plist` replacing `DATABASE_NAME` with your customer-specific BugSplat database name.
+Add the following case-sensitive key to your app's `Info.plist`, replacing `DATABASE_NAME` with your customer-specific BugSplat database name.
 
 ```xml
 <key>BugSplatDatabase</key>
@@ -256,13 +256,13 @@ Attributes and their associated values are programmatically set at any time whil
 
     1. Upon first launch after a crash and when BugSplat.shared is being initialized, any persisted attributes are loaded into memory.
     2. Next, the persisted NSDictionary holding the attributes within NSUserDefaults is erased.
-    3. Next, if a crash occurred in the last app session prior to this app session, any attributes that were just loaded into memory from the persisted attributes, will be added to the crash report as an attachment (see iOS API limitation notes about a single attachment). 
+    3. Next, if a crash occurred in the last app session prior to this app session, any attributes that were just loaded into memory from the persisted attributes will be added to the crash report as an attachment (see iOS API limitation notes about a single attachment). 
     4. Finally, the dictionary in memory holding the prior app session attributes is erased.
 
-Put another way, attributes and their values are only valid for the lifetime of the app session and only used in a crash report if the crash occurs during that app session. Any attributes set in the prior app session will be attached to the crash report that is processed during the next launch of the app. If the app terminates normally, any attributes persisted during the prior `normal` app session will be erased during the next app launch.
+Put another way, attributes and their values are only valid for the lifetime of the app session and are only used in a crash report if the crash occurs during that app session. Any attributes set in the prior app session will be attached to the crash report that is processed during the next launch of the app. If the app terminates normally, any attributes persisted during the prior `normal` app session will be erased during the next app launch.
 
 
-Please see the framework-specific [sample applications](#sample-applications-) for more examples demonstrating how to use attributes.
+Please take a look at the framework-specific [sample applications](#sample-applications-) for more examples showing how to use attributes.
 
 ### Crash Reporter Customization
 
@@ -301,7 +301,7 @@ Bitcode was introduced by Apple to allow apps sent to the App Store to be recomp
 
 #### Localization
 
-For macOS, the BugSplat crash dialogue can be localized and supports 8 languages out of the box.
+For macOS, the BugSplat crash dialogue can be localized and supports eight languages out of the box.
 
 1. English
 2. Finnish
@@ -316,7 +316,7 @@ Additional languages may be supported by adding the language bundle and strings 
 
 ## Sample Applications 🧑‍🏫
 
-`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSpat only requires the xcframework, and a few lines of code.
+`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSpat only requires the xcframework and a few lines of code.
 
 1. Clone the [bugsplat-apple repo](https://github.com/BugSplat-Git/bugsplat-apple).
 
@@ -324,7 +324,7 @@ Additional languages may be supported by adding the language bundle and strings 
 
 1. Once the app launches, click the "crash" button when prompted.
 
-1. Relaunch the app on the iOS device. At this point a crash report should be submitted to bugsplat.com
+1. Relaunch the app on the iOS device. At this point, a crash report should be submitted to bugsplat.com
 
 1. Visit BugSplat's [Crashes](https://app.bugsplat.com/v2/crashes) page. When prompted for credentials, enter user `fred@bugsplat.com` and password `Flintstone`. The crash you posted from BugSplatTester should be at the top of the list of crashes.
 
@@ -339,7 +339,7 @@ BugSplat is an open-source project, and we welcome contributions from the commun
 > [!WARNING]
 > This project requires Xcode Command Line Tools 15.x to build. Version 16.x will crash when building the project.
 
-Install `Xcode 15.4` by following this [link](https://developer.apple.com/download/more/?q=xcode%2015.4) and searching for `Xcode 15.4`. Download the zip file and copy `Xcode.app` to your Applications folder. If you already have Xcode installed create a new folder in Applications and copy `Xcode.app` to that folder. Rename `Xcode.app` to `Xcode-15.4.app`.
+Install `Xcode 15.4` by following this [link](https://developer.apple.com/download/more/?q=xcode%2015.4) and searching for `Xcode 15.4`. Download the zip file and copy `Xcode.app` to your Applications folder. If you already have Xcode installed, create a new folder in Applications and copy `Xcode.app` to that folder. Rename `Xcode.app` to `Xcode-15.4.app`.
 
 Open terminal and select the Command Line Tools for Xcode 15.4
 
@@ -349,7 +349,7 @@ sudo xcode-select -s /Applications/Xcodes/Xcode-15.4.app
 
 ### Building
 
-Clone this repository and all of the depenencies into a new `BugSplat` folder.
+Clone this repository and all of the dependencies into a new `BugSplat` folder.
 
 ```sh
 mkdir BugSplat
@@ -362,8 +362,8 @@ git clone https://github.com/BugSplat-Git/plCrashReporter
 
 Next, in the prescribed order, build each repo. If an error occurs in a specific repo, it
 must be resolved before you can move to the next repo. This process was verified with
-specific Apple Developer account for code signing. A different Apple Developer account
-require adjusting the code signing within a given project.
+a specific Apple Developer account for code signing. A different Apple Developer account
+requires adjusting the code signing within a given project.
 
 1. Build PlCrashReporter
 
