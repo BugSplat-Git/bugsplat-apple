@@ -10,11 +10,15 @@ import BugSplat
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-
-
+    
+    /// URL for the sample log file that will be attached to crash reports
+    private var logFileURL: URL?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        
+        // Create a sample log file for attachment demonstration
+        createSampleLogFile()
 
         // Initialize BugSplat
         let bugSplat = BugSplat.shared()
@@ -33,6 +37,51 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bugSplat.start()
         
         return true
+    }
+    
+    // MARK: - Sample Log File
+    
+    /// Creates a sample log file in the documents directory for attachment demonstration
+    private func createSampleLogFile() {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("Could not access documents directory")
+            return
+        }
+        
+        logFileURL = documentsURL.appendingPathComponent("sample_log.txt")
+        
+        let logContent = """
+        =====================================
+        BugSplat Sample Log File
+        =====================================
+        App Launch: \(Date())
+        Device: \(UIDevice.current.model)
+        System Version: \(UIDevice.current.systemVersion)
+        
+        This is a sample log file demonstrating how to attach
+        files to BugSplat crash reports.
+        
+        You can use this pattern to attach:
+        - Application logs
+        - Configuration files
+        - User session data
+        - Any other relevant debugging information
+        
+        Log entries:
+        [\(Date())] INFO: Application started
+        [\(Date())] DEBUG: BugSplat initialized
+        [\(Date())] INFO: Sample log file created for attachment demo
+        =====================================
+        """
+        
+        do {
+            try logContent.write(to: logFileURL!, atomically: true, encoding: .utf8)
+            print("Sample log file created at: \(logFileURL!.path)")
+        } catch {
+            print("Failed to create sample log file: \(error)")
+            logFileURL = nil
+        }
     }
 
     // MARK: UISceneSession Lifecycle
@@ -79,5 +128,22 @@ extension AppDelegate: BugSplatDelegate {
 
     func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error) {
         print("\(#file) - \(#function)")
+    }
+    
+    /// Returns a file attachment to include with the crash report
+    /// This demonstrates how to attach log files or other data to crash reports
+    func attachmentForBugSplat(_ bugSplat: BugSplat) -> BugSplatAttachment? {
+        guard let logFileURL = logFileURL,
+              let logData = try? Data(contentsOf: logFileURL) else {
+            print("Could not read log file for attachment")
+            return nil
+        }
+        
+        print("Attaching log file to crash report: \(logFileURL.lastPathComponent)")
+        return BugSplatAttachment(
+            filename: "sample_log.txt",
+            attachmentData: logData,
+            contentType: "text/plain"
+        )
     }
 }

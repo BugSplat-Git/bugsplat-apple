@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *userDescription;
 @property (nonatomic, copy, nullable) NSString *applicationLog;
 @property (nonatomic, copy, nullable) NSString *applicationKey;
+@property (nonatomic, copy, nullable) NSDictionary<NSString *, NSString *> *attributes;
 
 @end
 

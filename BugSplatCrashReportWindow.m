@@ -492,23 +492,20 @@ static const CGFloat kButtonHeight = 32.0;
 
 - (BOOL)textView:(NSTextView *)textView shouldChangeTextInRange:(NSRange)affectedCharRange replacementString:(NSString *)replacementString
 {
-    if (textView == self.commentsTextView && self.showingPlaceholder) {
-        // User is typing - clear placeholder first
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self clearPlaceholderIfNeeded];
-            // Insert the typed character
-            if (replacementString.length > 0) {
-                [self.commentsTextView insertText:replacementString replacementRange:NSMakeRange(0, 0)];
-            }
-        });
-        return NO; // We'll handle the text insertion ourselves
-    }
+    // Placeholder is now cleared in textDidBeginEditing: when the field gets focus
     return YES;
+}
+
+- (void)textDidBeginEditing:(NSNotification *)notification
+{
+    if (notification.object == self.commentsTextView) {
+        [self clearPlaceholderIfNeeded];
+    }
 }
 
 - (void)textDidEndEditing:(NSNotification *)notification
 {
-    if (self.commentsTextView.string.length == 0) {
+    if (notification.object == self.commentsTextView && self.commentsTextView.string.length == 0) {
         [self updateCommentsPlaceholder];
     }
 }

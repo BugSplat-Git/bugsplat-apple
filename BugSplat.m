@@ -77,7 +77,7 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
             symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
         
         _crashReporter = [[PLCrashReporter alloc] initWithConfiguration:config];
-        
+
 #if TARGET_OS_OSX
         _autoSubmitCrashReport = NO;
         _askUserDetails = YES;
@@ -159,6 +159,30 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
     NSString *crashReportText = [PLCrashReportTextFormatter stringValueForCrashReport:crashReport
                                                                        withTextFormat:PLCrashReportTextFormatiOS];
     
+    // IMMEDIATELY gather attachments from delegate and persist to disk
+    // This captures attachment data early, before app state changes
+    NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
+    
+#if TARGET_OS_OSX
+    if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
+        NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self];
+        if (delegateAttachments) {
+            [attachments addObjectsFromArray:delegateAttachments];
+        }
+    } else
+#endif
+    if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
+        BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self];
+        if (attachment) {
+            [attachments addObject:attachment];
+        }
+    }
+    
+    // Persist attachments to disk immediately
+    if (attachments.count > 0) {
+        [self persistAttachments:attachments];
+    }
+    
     // Check expiration (macOS only)
 #if TARGET_OS_OSX
     if (self.expirationTimeInterval > 0 && crashReport.systemInfo.timestamp) {
@@ -218,6 +242,9 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
                 if ([self.delegate respondsToSelector:@selector(bugSplatWillCancelSendingCrashReport:)]) {
                     [self.delegate bugSplatWillCancelSendingCrashReport:self];
                 }
+                // Cleanup persisted attachments and crash report
+                [self cleanupPersistedAttachments];
+                self.attributes = nil;
                 [self.crashReporter purgePendingCrashReport];
             }
             
@@ -244,39 +271,15 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
         [self.delegate bugSplatWillSendCrashReport:self];
     }
     
-    // Gather attachments
-    NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
-    
-    // Get delegate attachments
-#if TARGET_OS_OSX
-    if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
-        NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self];
-        if (delegateAttachments) {
-            [attachments addObjectsFromArray:delegateAttachments];
-        }
-    } else
-#endif
-    if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
-        BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self];
-        if (attachment) {
-            [attachments addObject:attachment];
-        }
-    }
-    
-    // Add attributes attachment if no delegate attachment and attributes exist
-    if (attachments.count == 0 && self.attributes.count > 0) {
-        BugSplatAttachment *attributesAttachment = [self bugSplatAttachmentWithAttributes:self.attributes];
-        if (attributesAttachment) {
-            [attachments addObject:attributesAttachment];
-        }
-    }
-    self.attributes = nil;
+    // Load attachments from disk (they were persisted in handlePendingCrashReport)
+    NSArray<BugSplatAttachment *> *attachments = [self loadPersistedAttachments];
     
     // Build metadata
     BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
     metadata.userName = userName;
     metadata.userEmail = userEmail;
     metadata.userDescription = comments;
+    metadata.attributes = self.attributes;
     
     // Get application log from delegate
     if ([self.delegate respondsToSelector:@selector(applicationLogForBugSplat:)]) {
@@ -312,6 +315,11 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
                                completion:^(BOOL success, NSError *error) {
         if (success) {
             NSLog(@"BugSplat: Crash report uploaded successfully");
+            
+            // Only clear attributes and cleanup attachments after successful upload
+            self.attributes = nil;
+            [self cleanupPersistedAttachments];
+            
             if ([self.delegate respondsToSelector:@selector(bugSplatDidFinishSendingCrashReport:)]) {
                 [self.delegate bugSplatDidFinishSendingCrashReport:self];
             }
@@ -439,6 +447,10 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
 
 - (BOOL)setValue:(nullable NSString *)value forAttribute:(NSString *)attribute
 {
+    if (!attribute || attribute.length == 0) {
+        return NO;
+    }
+    
     NSMutableDictionary<NSString *, NSString *> *mutableAttributes;
     NSDictionary<NSString *, NSString *> *persistedAttributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
     
@@ -452,47 +464,134 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
         mutableAttributes = [NSMutableDictionary dictionary];
     }
 
-    // Validate attribute as valid XML entity name
-    if (![attribute isValidXMLEntity]) {
-        return NO;
+    NSLog(@"BugSplat [setValue:%@ forKey:%@]", value, attribute);
+
+    if (value) {
+        [mutableAttributes setValue:value forKey:attribute];
+    } else {
+        [mutableAttributes removeObjectForKey:attribute];
     }
     
-    // Escape XML characters in value
-    NSString *escapedValue = [value stringByEscapingXMLCharactersIgnoringCDataAndComments];
-
-    NSLog(@"BugSplat [setValue:%@ forKey:%@]", escapedValue, attribute);
-
-    [mutableAttributes setValue:escapedValue forKey:attribute];
     [NSUserDefaults.standardUserDefaults setValue:mutableAttributes forKey:kBugSplatUserDefaultsAttributes];
     
     return YES;
 }
 
-- (BugSplatAttachment *)bugSplatAttachmentWithAttributes:(NSDictionary *)attributes
+#pragma mark - Attachment Persistence
+
+- (NSString *)crashesDirectoryPath
 {
-    if (attributes == nil || attributes.count == 0) {
-        return nil;
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    NSString *appSupportDir = paths.firstObject;
+    NSString *crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
+    
+    if (![fileManager fileExistsAtPath:crashesDir]) {
+        NSError *error = nil;
+        [fileManager createDirectoryAtPath:crashesDir withIntermediateDirectories:YES attributes:nil error:&error];
+        if (error) {
+            NSLog(@"BugSplat: Failed to create crashes directory: %@", error);
+            return nil;
+        }
     }
+    
+    return crashesDir;
+}
 
-    NSMutableString *stringData = [NSMutableString new];
-    [stringData appendString:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"];
-    [stringData appendString:@"<Attributes>\n"];
-
-    for (NSString *attribute in attributes.allKeys) {
-        NSString *value = attributes[attribute];
-        [stringData appendFormat:@"<%@>%@</%@>\n", attribute, value, attribute];
+- (void)persistAttachments:(NSArray<BugSplatAttachment *> *)attachments
+{
+    if (!attachments || attachments.count == 0) {
+        return;
     }
-
-    [stringData appendString:@"</Attributes>\n"];
-
-    NSData *data = [stringData dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
-
-    if (data) {
-        NSLog(@"BugSplat adding attributes attachment: [%@]", stringData);
-        return [[BugSplatAttachment alloc] initWithFilename:@"CrashContext.xml" attachmentData:data contentType:@"application/xml"];
+    
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return;
     }
+    
+    for (BugSplatAttachment *attachment in attachments) {
+        NSString *filename = [NSString stringWithFormat:@"%@-%@.data", 
+                              @([[NSDate date] timeIntervalSince1970]),
+                              [[NSUUID UUID] UUIDString]];
+        NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
+        
+        NSError *error = nil;
+        NSData *archiveData = [NSKeyedArchiver archivedDataWithRootObject:attachment 
+                                                    requiringSecureCoding:YES 
+                                                                    error:&error];
+        if (archiveData && !error) {
+            [archiveData writeToFile:filePath atomically:YES];
+            NSLog(@"BugSplat: Persisted attachment to %@", filename);
+        } else {
+            NSLog(@"BugSplat: Failed to archive attachment: %@", error);
+        }
+    }
+}
 
-    return nil;
+- (NSArray<BugSplatAttachment *> *)loadPersistedAttachments
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return @[];
+    }
+    
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSError *error = nil;
+    NSArray *files = [fileManager contentsOfDirectoryAtPath:crashesDir error:&error];
+    if (error) {
+        NSLog(@"BugSplat: Failed to list crashes directory: %@", error);
+        return @[];
+    }
+    
+    NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
+    
+    for (NSString *filename in files) {
+        if (![filename hasSuffix:@".data"]) {
+            continue;
+        }
+        
+        NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
+        NSData *data = [NSData dataWithContentsOfFile:filePath];
+        if (!data) {
+            continue;
+        }
+        
+        NSError *unarchiveError = nil;
+        BugSplatAttachment *attachment = [NSKeyedUnarchiver unarchivedObjectOfClass:[BugSplatAttachment class]
+                                                                           fromData:data
+                                                                              error:&unarchiveError];
+        if (attachment && !unarchiveError) {
+            [attachments addObject:attachment];
+            NSLog(@"BugSplat: Loaded persisted attachment from %@", filename);
+        } else {
+            NSLog(@"BugSplat: Failed to unarchive attachment: %@", unarchiveError);
+        }
+    }
+    
+    return attachments;
+}
+
+- (void)cleanupPersistedAttachments
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return;
+    }
+    
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSError *error = nil;
+    NSArray *files = [fileManager contentsOfDirectoryAtPath:crashesDir error:&error];
+    if (error) {
+        return;
+    }
+    
+    for (NSString *filename in files) {
+        if ([filename hasSuffix:@".data"]) {
+            NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
+            [fileManager removeItemAtPath:filePath error:nil];
+            NSLog(@"BugSplat: Cleaned up persisted attachment %@", filename);
+        }
+    }
 }
 
 @end

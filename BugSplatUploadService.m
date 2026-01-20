@@ -69,8 +69,21 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         return;
     }
     
-    // Create ZIP archive
-    NSData *zipData = [BugSplatZipHelper zipData:crashData withFilename:crashFilename];
+    // Create ZIP archive with crash data and attachments
+    NSMutableArray<BugSplatZipEntry *> *zipEntries = [NSMutableArray array];
+    
+    // Add crash data as the primary file
+    [zipEntries addObject:[BugSplatZipEntry entryWithFilename:crashFilename data:crashData]];
+    
+    // Add all attachments to the ZIP
+    for (BugSplatAttachment *attachment in attachments) {
+        if (attachment.attachmentData && attachment.filename) {
+            [zipEntries addObject:[BugSplatZipEntry entryWithFilename:attachment.filename data:attachment.attachmentData]];
+            NSLog(@"BugSplat: Adding attachment to ZIP: %@", attachment.filename);
+        }
+    }
+    
+    NSData *zipData = [BugSplatZipHelper zipEntries:zipEntries];
     if (!zipData) {
         NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                              code:BugSplatUploadErrorCodeInvalidData
@@ -98,7 +111,6 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             // Step 3: Commit the upload
             [self commitUploadWithS3Key:presignedURL
                                 md5Hash:md5Hash
-                            attachments:attachments
                                metadata:metadata
                              completion:completion];
         }];
@@ -236,7 +248,6 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 
 - (void)commitUploadWithS3Key:(NSString *)s3Key
                       md5Hash:(NSString *)md5Hash
-                  attachments:(NSArray<BugSplatAttachment *> *)attachments
                      metadata:(BugSplatCrashMetadata *)metadata
                    completion:(BugSplatUploadCompletion)completion
 {
@@ -285,15 +296,17 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         [self appendFormField:@"appKey" value:metadata.applicationKey boundary:boundary toData:body];
     }
     
-    // Attachments
-    for (BugSplatAttachment *attachment in attachments) {
-        [self appendFileField:@"attachment"
-                     filename:attachment.filename
-                  contentType:attachment.contentType
-                         data:attachment.attachmentData
-                     boundary:boundary
-                       toData:body];
+    // Attributes as JSON string
+    if (metadata.attributes.count > 0) {
+        NSError *jsonError = nil;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:metadata.attributes options:0 error:&jsonError];
+        if (jsonData && !jsonError) {
+            NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+            [self appendFormField:@"attributes" value:jsonString boundary:boundary toData:body];
+        }
     }
+    
+    // Note: Attachments are included in the ZIP file uploaded to S3, not sent here
     
     // End boundary
     [body appendData:[[NSString stringWithFormat:@"--%@--\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];

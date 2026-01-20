@@ -17,6 +17,18 @@
 #define ZIP_COMPRESSION_DEFLATE             8
 #define ZIP_COMPRESSION_STORE               0
 
+@implementation BugSplatZipEntry
+
++ (instancetype)entryWithFilename:(NSString *)filename data:(NSData *)data
+{
+    BugSplatZipEntry *entry = [[BugSplatZipEntry alloc] init];
+    entry.filename = filename;
+    entry.data = data;
+    return entry;
+}
+
+@end
+
 @implementation BugSplatZipHelper
 
 + (nullable NSData *)zipData:(NSData *)data withFilename:(NSString *)filename
@@ -25,99 +37,151 @@
         return nil;
     }
     
-    NSData *filenameData = [filename dataUsingEncoding:NSUTF8StringEncoding];
-    if (!filenameData) {
+    BugSplatZipEntry *entry = [BugSplatZipEntry entryWithFilename:filename data:data];
+    return [self zipEntries:@[entry]];
+}
+
++ (nullable NSData *)zipEntries:(NSArray<BugSplatZipEntry *> *)entries
+{
+    if (!entries || entries.count == 0) {
         return nil;
     }
     
-    // Compress the data using deflate
-    NSData *compressedData = [self deflateData:data];
-    if (!compressedData) {
-        return nil;
-    }
-    
-    // Calculate CRC32 of uncompressed data
-    uLong crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, data.bytes, (uInt)data.length);
-    
-    // Get current DOS date/time
+    // Get current DOS date/time (same for all files)
     uint16_t dosTime, dosDate;
     [self getDOSTime:&dosTime date:&dosDate];
     
     NSMutableData *zipData = [NSMutableData data];
+    NSMutableArray<NSNumber *> *localHeaderOffsets = [NSMutableArray array];
+    NSMutableArray<NSData *> *compressedDataArray = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *crcValues = [NSMutableArray array];
     
-    // === Local File Header ===
-    uint32_t localHeaderSignature = ZIP_LOCAL_FILE_HEADER_SIGNATURE;
-    uint16_t versionNeeded = ZIP_VERSION_NEEDED;
-    uint16_t generalPurposeFlag = 0;
-    uint16_t compressionMethod = ZIP_COMPRESSION_DEFLATE;
-    uint32_t crc32Value = (uint32_t)crc;
-    uint32_t compressedSize = (uint32_t)compressedData.length;
-    uint32_t uncompressedSize = (uint32_t)data.length;
-    uint16_t filenameLength = (uint16_t)filenameData.length;
-    uint16_t extraFieldLength = 0;
+    // === Write Local File Headers and File Data ===
+    for (BugSplatZipEntry *entry in entries) {
+        if (!entry.data || !entry.filename || entry.filename.length == 0) {
+            continue;
+        }
+        
+        NSData *filenameData = [entry.filename dataUsingEncoding:NSUTF8StringEncoding];
+        if (!filenameData) {
+            continue;
+        }
+        
+        // Compress the data using deflate
+        NSData *compressedData = [self deflateData:entry.data];
+        if (!compressedData) {
+            continue;
+        }
+        
+        // Calculate CRC32 of uncompressed data
+        uLong crc = crc32(0L, Z_NULL, 0);
+        crc = crc32(crc, entry.data.bytes, (uInt)entry.data.length);
+        
+        // Store for central directory
+        [localHeaderOffsets addObject:@(zipData.length)];
+        [compressedDataArray addObject:compressedData];
+        [crcValues addObject:@((uint32_t)crc)];
+        
+        // Write Local File Header
+        uint32_t localHeaderSignature = ZIP_LOCAL_FILE_HEADER_SIGNATURE;
+        uint16_t versionNeeded = ZIP_VERSION_NEEDED;
+        uint16_t generalPurposeFlag = 0;
+        uint16_t compressionMethod = ZIP_COMPRESSION_DEFLATE;
+        uint32_t crc32Value = (uint32_t)crc;
+        uint32_t compressedSize = (uint32_t)compressedData.length;
+        uint32_t uncompressedSize = (uint32_t)entry.data.length;
+        uint16_t filenameLength = (uint16_t)filenameData.length;
+        uint16_t extraFieldLength = 0;
+        
+        [zipData appendBytes:&localHeaderSignature length:4];
+        [zipData appendBytes:&versionNeeded length:2];
+        [zipData appendBytes:&generalPurposeFlag length:2];
+        [zipData appendBytes:&compressionMethod length:2];
+        [zipData appendBytes:&dosTime length:2];
+        [zipData appendBytes:&dosDate length:2];
+        [zipData appendBytes:&crc32Value length:4];
+        [zipData appendBytes:&compressedSize length:4];
+        [zipData appendBytes:&uncompressedSize length:4];
+        [zipData appendBytes:&filenameLength length:2];
+        [zipData appendBytes:&extraFieldLength length:2];
+        [zipData appendData:filenameData];
+        
+        // Write File Data
+        [zipData appendData:compressedData];
+    }
     
-    [zipData appendBytes:&localHeaderSignature length:4];
-    [zipData appendBytes:&versionNeeded length:2];
-    [zipData appendBytes:&generalPurposeFlag length:2];
-    [zipData appendBytes:&compressionMethod length:2];
-    [zipData appendBytes:&dosTime length:2];
-    [zipData appendBytes:&dosDate length:2];
-    [zipData appendBytes:&crc32Value length:4];
-    [zipData appendBytes:&compressedSize length:4];
-    [zipData appendBytes:&uncompressedSize length:4];
-    [zipData appendBytes:&filenameLength length:2];
-    [zipData appendBytes:&extraFieldLength length:2];
-    [zipData appendData:filenameData];
+    if (localHeaderOffsets.count == 0) {
+        return nil;
+    }
     
-    // === File Data ===
-    uint32_t localHeaderOffset = 0;
-    [zipData appendData:compressedData];
-    
-    // === Central Directory Header ===
+    // === Write Central Directory Headers ===
     uint32_t centralDirOffset = (uint32_t)zipData.length;
     
-    uint32_t centralHeaderSignature = ZIP_CENTRAL_DIR_HEADER_SIGNATURE;
-    uint16_t versionMadeBy = ZIP_VERSION_MADE_BY;
-    uint16_t fileCommentLength = 0;
-    uint16_t diskNumberStart = 0;
-    uint16_t internalFileAttributes = 0;
-    uint32_t externalFileAttributes = 0;
-    
-    [zipData appendBytes:&centralHeaderSignature length:4];
-    [zipData appendBytes:&versionMadeBy length:2];
-    [zipData appendBytes:&versionNeeded length:2];
-    [zipData appendBytes:&generalPurposeFlag length:2];
-    [zipData appendBytes:&compressionMethod length:2];
-    [zipData appendBytes:&dosTime length:2];
-    [zipData appendBytes:&dosDate length:2];
-    [zipData appendBytes:&crc32Value length:4];
-    [zipData appendBytes:&compressedSize length:4];
-    [zipData appendBytes:&uncompressedSize length:4];
-    [zipData appendBytes:&filenameLength length:2];
-    [zipData appendBytes:&extraFieldLength length:2];
-    [zipData appendBytes:&fileCommentLength length:2];
-    [zipData appendBytes:&diskNumberStart length:2];
-    [zipData appendBytes:&internalFileAttributes length:2];
-    [zipData appendBytes:&externalFileAttributes length:4];
-    [zipData appendBytes:&localHeaderOffset length:4];
-    [zipData appendData:filenameData];
+    NSUInteger validEntryIndex = 0;
+    for (BugSplatZipEntry *entry in entries) {
+        if (!entry.data || !entry.filename || entry.filename.length == 0) {
+            continue;
+        }
+        
+        NSData *filenameData = [entry.filename dataUsingEncoding:NSUTF8StringEncoding];
+        if (!filenameData) {
+            continue;
+        }
+        
+        NSData *compressedData = compressedDataArray[validEntryIndex];
+        uint32_t crc32Value = [crcValues[validEntryIndex] unsignedIntValue];
+        uint32_t localHeaderOffset = [localHeaderOffsets[validEntryIndex] unsignedIntValue];
+        
+        uint32_t centralHeaderSignature = ZIP_CENTRAL_DIR_HEADER_SIGNATURE;
+        uint16_t versionMadeBy = ZIP_VERSION_MADE_BY;
+        uint16_t versionNeeded = ZIP_VERSION_NEEDED;
+        uint16_t generalPurposeFlag = 0;
+        uint16_t compressionMethod = ZIP_COMPRESSION_DEFLATE;
+        uint32_t compressedSize = (uint32_t)compressedData.length;
+        uint32_t uncompressedSize = (uint32_t)entry.data.length;
+        uint16_t filenameLength = (uint16_t)filenameData.length;
+        uint16_t extraFieldLength = 0;
+        uint16_t fileCommentLength = 0;
+        uint16_t diskNumberStart = 0;
+        uint16_t internalFileAttributes = 0;
+        uint32_t externalFileAttributes = 0;
+        
+        [zipData appendBytes:&centralHeaderSignature length:4];
+        [zipData appendBytes:&versionMadeBy length:2];
+        [zipData appendBytes:&versionNeeded length:2];
+        [zipData appendBytes:&generalPurposeFlag length:2];
+        [zipData appendBytes:&compressionMethod length:2];
+        [zipData appendBytes:&dosTime length:2];
+        [zipData appendBytes:&dosDate length:2];
+        [zipData appendBytes:&crc32Value length:4];
+        [zipData appendBytes:&compressedSize length:4];
+        [zipData appendBytes:&uncompressedSize length:4];
+        [zipData appendBytes:&filenameLength length:2];
+        [zipData appendBytes:&extraFieldLength length:2];
+        [zipData appendBytes:&fileCommentLength length:2];
+        [zipData appendBytes:&diskNumberStart length:2];
+        [zipData appendBytes:&internalFileAttributes length:2];
+        [zipData appendBytes:&externalFileAttributes length:4];
+        [zipData appendBytes:&localHeaderOffset length:4];
+        [zipData appendData:filenameData];
+        
+        validEntryIndex++;
+    }
     
     // === End of Central Directory Record ===
     uint32_t centralDirSize = (uint32_t)zipData.length - centralDirOffset;
+    uint16_t numEntries = (uint16_t)localHeaderOffsets.count;
     
     uint32_t endOfCentralDirSignature = ZIP_END_OF_CENTRAL_DIR_SIGNATURE;
     uint16_t diskNumber = 0;
     uint16_t diskNumberWithCentralDir = 0;
-    uint16_t numEntriesOnDisk = 1;
-    uint16_t numEntriesTotal = 1;
     uint16_t commentLength = 0;
     
     [zipData appendBytes:&endOfCentralDirSignature length:4];
     [zipData appendBytes:&diskNumber length:2];
     [zipData appendBytes:&diskNumberWithCentralDir length:2];
-    [zipData appendBytes:&numEntriesOnDisk length:2];
-    [zipData appendBytes:&numEntriesTotal length:2];
+    [zipData appendBytes:&numEntries length:2];
+    [zipData appendBytes:&numEntries length:2];
     [zipData appendBytes:&centralDirSize length:4];
     [zipData appendBytes:&centralDirOffset length:4];
     [zipData appendBytes:&commentLength length:2];

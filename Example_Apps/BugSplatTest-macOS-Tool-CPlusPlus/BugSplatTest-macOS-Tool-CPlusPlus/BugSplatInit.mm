@@ -11,6 +11,13 @@
 #import <BugSplatMac/BugSplatMac.h>
 
 @interface MyBugSplatDelegate : NSObject <BugSplatDelegate>
+
+/// URL for the sample log file that will be attached to crash reports
+@property (nonatomic, strong) NSURL *logFileURL;
+
+/// Creates a sample log file for attachment demonstration
+- (void)createSampleLogFile;
+
 @end
 
 
@@ -33,6 +40,9 @@ int bugSplatInit(const char * bugSplatDatabase)
 
         // Initialize BugSplat
         MyBugSplatDelegate *delegate = [[MyBugSplatDelegate alloc] init];
+        
+        // Create a sample log file for attachment demonstration
+        [delegate createSampleLogFile];
 
         // Set a BugSplatDelegate
         [[BugSplat shared] setDelegate:delegate];
@@ -95,6 +105,59 @@ void mainObjCRunLoop() {
 
 @implementation MyBugSplatDelegate
 
+#pragma mark - Sample Log File
+
+/// Creates a sample log file in the temp directory for attachment demonstration
+- (void)createSampleLogFile {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSURL *tempURL = [NSURL fileURLWithPath:NSTemporaryDirectory()];
+    self.logFileURL = [tempURL URLByAppendingPathComponent:@"sample_log.txt"];
+    
+    NSProcessInfo *processInfo = [NSProcessInfo processInfo];
+    NSDate *now = [NSDate date];
+    
+    NSString *logContent = [NSString stringWithFormat:
+        @"=====================================\n"
+        @"BugSplat Sample Log File\n"
+        @"=====================================\n"
+        @"App Launch: %@\n"
+        @"Host Name: %@\n"
+        @"OS Version: %@\n"
+        @"Process Name: %@\n"
+        @"Process ID: %d\n"
+        @"\n"
+        @"This is a sample log file demonstrating how to attach\n"
+        @"files to BugSplat crash reports from a command line tool.\n"
+        @"\n"
+        @"You can use this pattern to attach:\n"
+        @"- Application logs\n"
+        @"- Configuration files\n"
+        @"- Diagnostic data\n"
+        @"- Any other relevant debugging information\n"
+        @"\n"
+        @"Log entries:\n"
+        @"[%@] INFO: Command line tool started\n"
+        @"[%@] DEBUG: BugSplat initialized\n"
+        @"[%@] INFO: Sample log file created for attachment demo\n"
+        @"=====================================\n",
+        now, processInfo.hostName, processInfo.operatingSystemVersionString,
+        processInfo.processName, processInfo.processIdentifier, now, now, now];
+    
+    NSError *error = nil;
+    BOOL success = [logContent writeToURL:self.logFileURL
+                               atomically:YES
+                                 encoding:NSUTF8StringEncoding
+                                    error:&error];
+    
+    if (success) {
+        NSLog(@"Sample log file created at: %@", self.logFileURL.path);
+    } else {
+        NSLog(@"Failed to create sample log file: %@", error.localizedDescription);
+        self.logFileURL = nil;
+    }
+}
+
+#pragma mark - BugSplatDelegate
 
 - (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat
 {
@@ -121,5 +184,28 @@ void mainObjCRunLoop() {
     NSLog(@"*** bugSplatWillCancelSendingCrashReport");
 }
 
+/// Returns an array of file attachments to include with the crash report
+/// This demonstrates how to attach log files or other data to crash reports
+/// Note: macOS supports multiple attachments, unlike iOS which only supports one
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat {
+    if (!self.logFileURL) {
+        NSLog(@"Could not read log file for attachment - no URL");
+        return @[];
+    }
+    
+    NSError *error = nil;
+    NSData *logData = [NSData dataWithContentsOfURL:self.logFileURL options:0 error:&error];
+    
+    if (!logData) {
+        NSLog(@"Could not read log file for attachment: %@", error.localizedDescription);
+        return @[];
+    }
+    
+    NSLog(@"Attaching log file to crash report: %@", self.logFileURL.lastPathComponent);
+    BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"sample_log.txt"
+                                                                   attachmentData:logData
+                                                                      contentType:@"text/plain"];
+    return @[attachment];
+}
 
 @end
