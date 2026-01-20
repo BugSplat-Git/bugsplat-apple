@@ -291,6 +291,29 @@ There are several ways to customize your BugSplat crash reporter.
 
 - Set `expirationTimeInterval` to a desired value (in seconds) whereby if the difference in time between when the crash occurred and the next launch is greater than the set expiration time, auto-send the report without presenting the crash reporter dialogue. Defaults to `-1`, which represents no expiration.
 
+#### Application Name and Version
+
+By default, BugSplat uses values from your app's `Info.plist` (`CFBundleDisplayName`/`CFBundleName` for application name and `CFBundleShortVersionString` for version). You can override these values programmatically before calling `start`:
+
+**Swift:**
+
+```swift
+BugSplat.shared().applicationName = "MyCustomAppName"
+BugSplat.shared().applicationVersion = "2.0.0-beta"
+BugSplat.shared().start()
+```
+
+**Obj-C:**
+
+```objc
+[[BugSplat shared] setApplicationName:@"MyCustomAppName"];
+[[BugSplat shared] setApplicationVersion:@"2.0.0-beta"];
+[[BugSplat shared] start];
+```
+
+> [!NOTE]
+> These values must be set before calling `start`. Any changes made after `start` is invoked will be ignored.
+
 #### Attachments
 
 Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Currently, iOS supports only one attachment with crash reports. See additional iOS attachment limitation when using Attributes.

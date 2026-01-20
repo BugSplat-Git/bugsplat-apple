@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6341B28C2BDC514C007EE8AC /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
@@ -19,18 +18,28 @@
 		63905E962D83912E009CDBEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */; };
 		63905E972D83912E009CDBEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */; };
 		63C6E2032B92852500AED3E3 /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		63D006F62BBF5F3600587FBF /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */; };
 		63D006FA2BBF785B00587FBF /* BugSplatMac.h in Headers */ = {isa = PBXBuildFile; fileRef = 63D006F92BBF785B00587FBF /* BugSplatMac.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233802B9710420066C7FC /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
 		63E233822B9710420066C7FC /* BugSplatAttachment.h in Headers */ = {isa = PBXBuildFile; fileRef = 63E2337C2B9710420066C7FC /* BugSplatAttachment.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233842B9711AB0066C7FC /* BugSplatAttachment.h in Headers */ = {isa = PBXBuildFile; fileRef = 63E2337C2B9710420066C7FC /* BugSplatAttachment.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233852B9711B10066C7FC /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
 		63E233862B9715B50066C7FC /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		AA0000012E3FA00000000001 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000002E3FA00000000000 /* CrashReporter.xcframework */; };
+		AA0000022E3FA00000000002 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000002E3FA00000000000 /* CrashReporter.xcframework */; };
+		AA0000032E3FA00000000003 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
+		AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
+		AA0000062E3FA00000000006 /* BugSplatUploadService.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000072E3FA00000000007 /* BugSplatUploadService.h */; };
+		AA0000082E3FA00000000008 /* BugSplatUploadService.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000072E3FA00000000007 /* BugSplatUploadService.h */; };
+		AA0000092E3FA00000000009 /* BugSplatCrashReportWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = AA000010E3FA0000000000010 /* BugSplatCrashReportWindow.m */; };
+		AA0000112E3FA00000000011 /* BugSplatCrashReportWindow.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000122E3FA00000000012 /* BugSplatCrashReportWindow.h */; };
+		AA0000132E3FA00000000013 /* BugSplatZipHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000142E3FA00000000014 /* BugSplatZipHelper.m */; };
+		AA0000152E3FA00000000015 /* BugSplatZipHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000142E3FA00000000014 /* BugSplatZipHelper.m */; };
+		AA0000162E3FA00000000016 /* BugSplatZipHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000172E3FA00000000017 /* BugSplatZipHelper.h */; };
+		AA0000182E3FA00000000018 /* BugSplatZipHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000172E3FA00000000017 /* BugSplatZipHelper.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
-		63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
 		637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilities.m; sourceTree = "<group>"; };
@@ -41,6 +50,13 @@
 		63D006F92BBF785B00587FBF /* BugSplatMac.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatMac.h; sourceTree = "<group>"; };
 		63E2337A2B9710410066C7FC /* BugSplatAttachment.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplatAttachment.m; sourceTree = "<group>"; };
 		63E2337C2B9710420066C7FC /* BugSplatAttachment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatAttachment.h; sourceTree = "<group>"; };
+		AA0000002E3FA00000000000 /* CrashReporter.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
+		AA0000042E3FA00000000004 /* BugSplatUploadService.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUploadService.m; sourceTree = "<group>"; };
+		AA0000072E3FA00000000007 /* BugSplatUploadService.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUploadService.h; sourceTree = "<group>"; };
+		AA000010E3FA0000000000010 /* BugSplatCrashReportWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatCrashReportWindow.m; sourceTree = "<group>"; };
+		AA0000122E3FA00000000012 /* BugSplatCrashReportWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatCrashReportWindow.h; sourceTree = "<group>"; };
+		AA0000142E3FA00000000014 /* BugSplatZipHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatZipHelper.m; sourceTree = "<group>"; };
+		AA0000172E3FA00000000017 /* BugSplatZipHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatZipHelper.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,7 +64,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6341B28C2BDC514C007EE8AC /* HockeySDK.xcframework in Frameworks */,
+				AA0000012E3FA00000000001 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,7 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63D006F62BBF5F3600587FBF /* HockeySDK.xcframework in Frameworks */,
+				AA0000022E3FA00000000002 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +91,12 @@
 				6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */,
 				637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */,
 				637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */,
+				AA0000072E3FA00000000007 /* BugSplatUploadService.h */,
+				AA0000042E3FA00000000004 /* BugSplatUploadService.m */,
+				AA0000122E3FA00000000012 /* BugSplatCrashReportWindow.h */,
+				AA000010E3FA0000000000010 /* BugSplatCrashReportWindow.m */,
+				AA0000172E3FA00000000017 /* BugSplatZipHelper.h */,
+				AA0000142E3FA00000000014 /* BugSplatZipHelper.m */,
 				63C6E1EE2B92831A00AED3E3 /* Products */,
 				63C6E2062B9285F400AED3E3 /* Frameworks */,
 			);
@@ -92,7 +114,7 @@
 		63C6E2062B9285F400AED3E3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				63598C3C2B9BBD6600770E43 /* HockeySDK.xcframework */,
+				AA0000002E3FA00000000000 /* CrashReporter.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -109,6 +131,9 @@
 				638D38DD2BA0CEEA00DC37A8 /* BugSplatDelegate.h in Headers */,
 				63E233822B9710420066C7FC /* BugSplatAttachment.h in Headers */,
 				637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */,
+				AA0000062E3FA00000000006 /* BugSplatUploadService.h in Headers */,
+				AA0000112E3FA00000000011 /* BugSplatCrashReportWindow.h in Headers */,
+				AA0000162E3FA00000000016 /* BugSplatZipHelper.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -120,6 +145,8 @@
 				638D38DC2BA0CEE900DC37A8 /* BugSplatDelegate.h in Headers */,
 				63E233842B9711AB0066C7FC /* BugSplatAttachment.h in Headers */,
 				637DF0462D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */,
+				AA0000082E3FA00000000008 /* BugSplatUploadService.h in Headers */,
+				AA0000182E3FA00000000018 /* BugSplatZipHelper.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -225,6 +252,9 @@
 				63E233802B9710420066C7FC /* BugSplatAttachment.m in Sources */,
 				637DF0482D49A50800DDD8FE /* BugSplatUtilities.m in Sources */,
 				63598C432BA0CCD500770E43 /* BugSplat.m in Sources */,
+				AA0000032E3FA00000000003 /* BugSplatUploadService.m in Sources */,
+				AA0000092E3FA00000000009 /* BugSplatCrashReportWindow.m in Sources */,
+				AA0000132E3FA00000000013 /* BugSplatZipHelper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -235,6 +265,8 @@
 				63E233852B9711B10066C7FC /* BugSplatAttachment.m in Sources */,
 				637DF0492D49A50800DDD8FE /* BugSplatUtilities.m in Sources */,
 				63598C442BA0CCD500770E43 /* BugSplat.m in Sources */,
+				AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */,
+				AA0000152E3FA00000000015 /* BugSplatZipHelper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,6 +407,10 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -388,6 +424,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatMac;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -409,6 +446,10 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -422,6 +463,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatMac;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -460,6 +502,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplat;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SDKROOT = iphoneos;
@@ -497,6 +540,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplat;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SDKROOT = iphoneos;

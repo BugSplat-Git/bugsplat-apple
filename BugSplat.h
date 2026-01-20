@@ -75,6 +75,30 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *bugSplatDatabase;
 
 /**
+ * The application name that will be used when a crash report is submitted.
+ *
+ * By default, this value is pulled from the App's Info.plist (CFBundleDisplayName or CFBundleName).
+ *
+ * Set this property to override the default application name. This is useful when you want
+ * the crash report to use a different name than what's in the Info.plist.
+ *
+ * @warning This property must be set before calling `start` to have any effect.
+ */
+@property (nonatomic, copy, nullable) NSString *applicationName;
+
+/**
+ * The application version that will be used when a crash report is submitted.
+ *
+ * By default, this value is pulled from the App's Info.plist (CFBundleShortVersionString).
+ *
+ * Set this property to override the default application version. This is useful when you want
+ * the crash report to use a different version than what's in the Info.plist.
+ *
+ * @warning This property must be set before calling `start` to have any effect.
+ */
+@property (nonatomic, copy, nullable) NSString *applicationVersion;
+
+/**
  * The userID that will be used when a crash report is submitted.
  *
  * The value can be set programmatically at any time and will be stored in NSUserDefaults.
