@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CC0000022E3FC00000000002 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
+		CC0000032E3FC00000000003 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
+		CC0000042E3FC00000000004 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
@@ -24,8 +27,6 @@
 		63E233842B9711AB0066C7FC /* BugSplatAttachment.h in Headers */ = {isa = PBXBuildFile; fileRef = 63E2337C2B9710420066C7FC /* BugSplatAttachment.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233852B9711B10066C7FC /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
 		63E233862B9715B50066C7FC /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		AA0000012E3FA00000000001 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000002E3FA00000000000 /* CrashReporter.xcframework */; };
-		AA0000022E3FA00000000002 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000002E3FA00000000000 /* CrashReporter.xcframework */; };
 		AA0000032E3FA00000000003 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		AA0000062E3FA00000000006 /* BugSplatUploadService.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000072E3FA00000000007 /* BugSplatUploadService.h */; };
@@ -36,9 +37,22 @@
 		AA0000152E3FA00000000015 /* BugSplatZipHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000142E3FA00000000014 /* BugSplatZipHelper.m */; };
 		AA0000162E3FA00000000016 /* BugSplatZipHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000172E3FA00000000017 /* BugSplatZipHelper.h */; };
 		AA0000182E3FA00000000018 /* BugSplatZipHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000172E3FA00000000017 /* BugSplatZipHelper.h */; };
+		BB0000012E3FB00000000001 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
+		BB0000022E3FB00000000002 /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
+		BB0000032E3FB00000000003 /* BugSplatUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */; };
+		BB0000042E3FB00000000004 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
+		BB0000052E3FB00000000005 /* BugSplatZipHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000142E3FA00000000014 /* BugSplatZipHelper.m */; };
+		BB0000062E3FB00000000006 /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		BB0000072E3FB00000000007 /* BugSplatAttachment.h in Headers */ = {isa = PBXBuildFile; fileRef = 63E2337C2B9710420066C7FC /* BugSplatAttachment.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		BB0000082E3FB00000000008 /* BugSplatDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		BB0000092E3FB00000000009 /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
+		BB0000102E3FB00000000010 /* BugSplatUploadService.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000072E3FA00000000007 /* BugSplatUploadService.h */; };
+		BB0000112E3FB00000000011 /* BugSplatZipHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000172E3FA00000000017 /* BugSplatZipHelper.h */; };
+		BB0000122E3FB00000000012 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CC0000012E3FC00000000001 /* CrashReporter.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = "Vendor/PLCrashReporter/CrashReporter.xcframework"; sourceTree = SOURCE_ROOT; };
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
@@ -50,13 +64,13 @@
 		63D006F92BBF785B00587FBF /* BugSplatMac.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatMac.h; sourceTree = "<group>"; };
 		63E2337A2B9710410066C7FC /* BugSplatAttachment.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplatAttachment.m; sourceTree = "<group>"; };
 		63E2337C2B9710420066C7FC /* BugSplatAttachment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatAttachment.h; sourceTree = "<group>"; };
-		AA0000002E3FA00000000000 /* CrashReporter.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
 		AA0000042E3FA00000000004 /* BugSplatUploadService.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUploadService.m; sourceTree = "<group>"; };
 		AA0000072E3FA00000000007 /* BugSplatUploadService.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUploadService.h; sourceTree = "<group>"; };
 		AA000010E3FA0000000000010 /* BugSplatCrashReportWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatCrashReportWindow.m; sourceTree = "<group>"; };
 		AA0000122E3FA00000000012 /* BugSplatCrashReportWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatCrashReportWindow.h; sourceTree = "<group>"; };
 		AA0000142E3FA00000000014 /* BugSplatZipHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatZipHelper.m; sourceTree = "<group>"; };
 		AA0000172E3FA00000000017 /* BugSplatZipHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatZipHelper.h; sourceTree = "<group>"; };
+		BB0000002E3FB00000000000 /* BugSplatTV.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplatTV.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,7 +78,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA0000012E3FA00000000001 /* CrashReporter.xcframework in Frameworks */,
+				CC0000022E3FC00000000002 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,7 +86,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA0000022E3FA00000000002 /* CrashReporter.xcframework in Frameworks */,
+				CC0000032E3FC00000000003 /* CrashReporter.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000132E3FB00000000013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC0000042E3FC00000000004 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -107,6 +129,7 @@
 			children = (
 				63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */,
 				63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */,
+				BB0000002E3FB00000000000 /* BugSplatTV.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,7 +137,7 @@
 		63C6E2062B9285F400AED3E3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				AA0000002E3FA00000000000 /* CrashReporter.xcframework */,
+				CC0000012E3FC00000000001 /* CrashReporter.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -147,6 +170,19 @@
 				637DF0462D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */,
 				AA0000082E3FA00000000008 /* BugSplatUploadService.h in Headers */,
 				AA0000182E3FA00000000018 /* BugSplatZipHelper.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000142E3FB00000000014 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000062E3FB00000000006 /* BugSplat.h in Headers */,
+				BB0000072E3FB00000000007 /* BugSplatAttachment.h in Headers */,
+				BB0000082E3FB00000000008 /* BugSplatDelegate.h in Headers */,
+				BB0000092E3FB00000000009 /* BugSplatUtilities.h in Headers */,
+				BB0000102E3FB00000000010 /* BugSplatUploadService.h in Headers */,
+				BB0000112E3FB00000000011 /* BugSplatZipHelper.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -189,6 +225,24 @@
 			productReference = 63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		BB0000152E3FB00000000015 /* BugSplatTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000192E3FB00000000019 /* Build configuration list for PBXNativeTarget "BugSplatTV" */;
+			buildPhases = (
+				BB0000142E3FB00000000014 /* Headers */,
+				BB0000162E3FB00000000016 /* Sources */,
+				BB0000132E3FB00000000013 /* Frameworks */,
+				BB0000172E3FB00000000017 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BugSplatTV;
+			productName = BugSplatTV;
+			productReference = BB0000002E3FB00000000000 /* BugSplatTV.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -202,6 +256,9 @@
 						CreatedOnToolsVersion = 15.2;
 					};
 					63C6E1FB2B9283B000AED3E3 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					BB0000152E3FB00000000015 = {
 						CreatedOnToolsVersion = 15.2;
 					};
 				};
@@ -221,6 +278,7 @@
 			targets = (
 				63C6E1EC2B92831A00AED3E3 /* BugSplatMac */,
 				63C6E1FB2B9283B000AED3E3 /* BugSplat */,
+				BB0000152E3FB00000000015 /* BugSplatTV */,
 			);
 		};
 /* End PBXProject section */
@@ -239,6 +297,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				63905E972D83912E009CDBEE /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000172E3FB00000000017 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000122E3FB00000000012 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +333,18 @@
 				63598C442BA0CCD500770E43 /* BugSplat.m in Sources */,
 				AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */,
 				AA0000152E3FA00000000015 /* BugSplatZipHelper.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000162E3FB00000000016 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000012E3FB00000000001 /* BugSplat.m in Sources */,
+				BB0000022E3FB00000000002 /* BugSplatAttachment.m in Sources */,
+				BB0000032E3FB00000000003 /* BugSplatUtilities.m in Sources */,
+				BB0000042E3FB00000000004 /* BugSplatUploadService.m in Sources */,
+				BB0000052E3FB00000000005 /* BugSplatZipHelper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -409,7 +487,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Vendor/",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -448,7 +526,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Vendor/",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -487,7 +565,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Vendor/",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -525,7 +603,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Vendor/",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -548,6 +626,76 @@
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BB0000202E3FB00000000020 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatTV;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 13.0;
+			};
+			name = Debug;
+		};
+		BB0000212E3FB00000000021 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				OTHER_LDFLAGS = "-lc++";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatTV;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 13.0;
 			};
 			name = Release;
 		};
@@ -577,6 +725,15 @@
 			buildConfigurations = (
 				63C6E2012B9283B000AED3E3 /* Debug */,
 				63C6E2022B9283B000AED3E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB0000192E3FB00000000019 /* Build configuration list for PBXNativeTarget "BugSplatTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000202E3FB00000000020 /* Debug */,
+				BB0000212E3FB00000000021 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

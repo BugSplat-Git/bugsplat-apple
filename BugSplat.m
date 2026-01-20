@@ -66,9 +66,15 @@ NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
         self.isStartInvoked = NO;
 
         // Configure PLCrashReporter
+        // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
+#if TARGET_OS_TV
+        PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeBSD;
+#else
+        PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeMach;
+#endif
         PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
-            initWithSignalHandlerType:PLCrashReporterSignalHandlerTypeMach
-                symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
+            initWithSignalHandlerType:signalHandlerType
+            symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
         
         _crashReporter = [[PLCrashReporter alloc] initWithConfiguration:config];
         
