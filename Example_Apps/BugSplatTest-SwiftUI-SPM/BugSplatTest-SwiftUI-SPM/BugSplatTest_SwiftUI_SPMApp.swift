@@ -119,7 +119,7 @@ struct BugSplatTest_SwiftUI_SPMApp: App {
     
     /// Returns a file attachment to include with the crash report
     /// This demonstrates how to attach log files or other data to crash reports
-    func attachmentForBugSplat(_ bugSplat: BugSplat) -> BugSplatAttachment? {
+    func attachment(for bugSplat: BugSplat) -> BugSplatAttachment? {
         guard let logFileURL = logFileURL,
               let logData = try? Data(contentsOf: logFileURL) else {
             print("Could not read log file for attachment")
