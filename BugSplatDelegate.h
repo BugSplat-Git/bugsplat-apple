@@ -71,7 +71,7 @@ NS_ASSUME_NONNULL_BEGIN
                                                                    contentType:@"application/octet-stream"];
  @param bugSplat The `BugSplat` instance invoking this delegate
 */
-- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(ios(13.0));
+- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(ios(13.0));
 
 // MARK: - BugSplatDelegate (MacOS)
 #if TARGET_OS_OSX
