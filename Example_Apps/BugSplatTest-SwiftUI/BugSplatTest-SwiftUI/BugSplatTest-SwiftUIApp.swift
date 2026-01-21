@@ -39,7 +39,6 @@ struct BugSplatTestSwiftUIApp: App {
 
         // example of programmatically setting user meta data
         // when user has granted permission to include their PII in a crash report
-        bugSplat.userID = "User-123456"
         bugSplat.userName = "Foo Barr"
         bugSplat.userEmail = "foo@barr.com"
 

@@ -99,25 +99,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *applicationVersion;
 
 /**
- * The userID that will be used when a crash report is submitted.
- *
- * The value can be set programmatically at any time and will be stored in NSUserDefaults.
- * To delete the value from NSUserDefaults, set the value to `nil`.
- *
- * This property is optional.
- *
- * @warning When returning a non nil value, crash reports are not anonymous any more
- * and the crash alerts will not show the word "anonymous"!
- *
- * @warning If setting this property programmatically, it needs to be set before calling `start`
- * if the userID should be included in a possible crash from the last app session.
- *
- * @see userName
- * @see userEmail
- */
-@property (nonatomic, copy, nullable) NSString *userID;
-
-/**
  * The user name that will be used when a crash report is submitted.
  *
  * The value can be set programmatically at any time and will be stored in NSUserDefaults.
@@ -131,7 +112,6 @@ NS_ASSUME_NONNULL_BEGIN
  * @warning If setting this property programmatically, it needs to be set before calling `start`
  * if the userName should be included in a possible crash from the last app session.
  *
- * @see userID
  * @see userEmail
  */
 @property (nonatomic, copy, nullable) NSString *userName;
@@ -150,7 +130,6 @@ NS_ASSUME_NONNULL_BEGIN
  * @warning If setting this property programmatically, it needs to be set before calling `start`
  * if the userEmail should be included in a possible crash from the last app session.
  *
- * @see userID
  * @see userName
  */
 @property (nonatomic, copy, nullable) NSString *userEmail;

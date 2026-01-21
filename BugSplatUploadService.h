@@ -11,8 +11,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  * Metadata to include with crash report upload.
+ * All values represent crash-time context - they may differ from current app values
+ * if the app was updated between when the crash occurred and when it's uploaded.
  */
 @interface BugSplatCrashMetadata : NSObject
+
+/**
+ * Crash-time context - these values are captured when the crash occurs and may
+ * differ from current app values if the app was updated before the crash is uploaded.
+ */
+@property (nonatomic, copy, nullable) NSString *database;
+@property (nonatomic, copy, nullable) NSString *applicationName;
+@property (nonatomic, copy, nullable) NSString *applicationVersion;
 
 @property (nonatomic, copy, nullable) NSString *userName;
 @property (nonatomic, copy, nullable) NSString *userEmail;

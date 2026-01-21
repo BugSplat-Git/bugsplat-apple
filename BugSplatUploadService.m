@@ -76,6 +76,11 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             return;
         }
         
+        // Use crash-time values from metadata, fall back to upload service defaults
+        NSString *database = metadata.database ?: self.database;
+        NSString *appName = metadata.applicationName ?: self.applicationName;
+        NSString *appVersion = metadata.applicationVersion ?: self.applicationVersion;
+        
         // Create ZIP archive with crash data and attachments
         NSMutableArray<BugSplatZipEntry *> *zipEntries = [NSMutableArray array];
         
@@ -106,8 +111,12 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         
         NSString *md5Hash = [BugSplatZipHelper md5HashOfData:zipData];
     
-        // Step 1: Get presigned URL
-        [self getPresignedURLForSize:zipData.length completion:^(NSString *presignedURL, NSError *error) {
+        // Step 1: Get presigned URL (using crash-time values)
+        [self getPresignedURLForDatabase:database
+                         applicationName:appName
+                      applicationVersion:appVersion
+                                    size:zipData.length
+                              completion:^(NSString *presignedURL, NSError *error) {
             if (error) {
                 completion(NO, error, nil);
                 return;
@@ -120,9 +129,12 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                     return;
                 }
                 
-                // Step 3: Commit the upload
+                // Step 3: Commit the upload (using crash-time values)
                 [self commitUploadWithS3Key:presignedURL
                                     md5Hash:md5Hash
+                                   database:database
+                            applicationName:appName
+                         applicationVersion:appVersion
                                    metadata:metadata
                                  completion:completion];
             }];
@@ -144,15 +156,18 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 
 #pragma mark - Step 1: Get Presigned URL
 
-- (void)getPresignedURLForSize:(NSUInteger)size
-                    completion:(void(^)(NSString * _Nullable url, NSError * _Nullable error))completion
+- (void)getPresignedURLForDatabase:(NSString *)database
+                   applicationName:(NSString *)appName
+                applicationVersion:(NSString *)appVersion
+                              size:(NSUInteger)size
+                        completion:(void(^)(NSString * _Nullable url, NSError * _Nullable error))completion
 {
     NSString *urlString = [NSString stringWithFormat:
         @"https://%@.bugsplat.com/api/getCrashUploadUrl?database=%@&appName=%@&appVersion=%@&crashPostSize=%lu",
-        self.database,
-        [self urlEncode:self.database],
-        [self urlEncode:self.applicationName],
-        [self urlEncode:self.applicationVersion],
+        database,
+        [self urlEncode:database],
+        [self urlEncode:appName],
+        [self urlEncode:appVersion],
         (unsigned long)size];
     
     NSURL *url = [NSURL URLWithString:urlString];
@@ -267,10 +282,13 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 
 - (void)commitUploadWithS3Key:(NSString *)s3Key
                       md5Hash:(NSString *)md5Hash
+                     database:(NSString *)database
+              applicationName:(NSString *)appName
+           applicationVersion:(NSString *)appVersion
                      metadata:(BugSplatCrashMetadata *)metadata
                    completion:(BugSplatUploadCompletion)completion
 {
-    NSString *urlString = [NSString stringWithFormat:@"https://%@.bugsplat.com/api/commitS3CrashUpload", self.database];
+    NSString *urlString = [NSString stringWithFormat:@"https://%@.bugsplat.com/api/commitS3CrashUpload", database];
     NSURL *url = [NSURL URLWithString:urlString];
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -282,10 +300,10 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     
     NSMutableData *body = [NSMutableData data];
     
-    // Required fields
-    [self appendFormField:@"database" value:self.database boundary:boundary toData:body];
-    [self appendFormField:@"appName" value:self.applicationName boundary:boundary toData:body];
-    [self appendFormField:@"appVersion" value:self.applicationVersion boundary:boundary toData:body];
+    // Required fields - use crash-time values passed as parameters
+    [self appendFormField:@"database" value:database boundary:boundary toData:body];
+    [self appendFormField:@"appName" value:appName boundary:boundary toData:body];
+    [self appendFormField:@"appVersion" value:appVersion boundary:boundary toData:body];
     
 #if TARGET_OS_OSX
     [self appendFormField:@"crashType" value:@"macOS" boundary:boundary toData:body];

@@ -21,13 +21,10 @@
 #import <UIKit/UIKit.h>
 #endif
 
-NSString *const kBugSplatUserDefaultsUserID = @"com.bugsplat.userID";
+// NSUserDefaults keys - only for dialog pre-population and user preferences
 NSString *const kBugSplatUserDefaultsUserName = @"com.bugsplat.userName";
 NSString *const kBugSplatUserDefaultsUserEmail = @"com.bugsplat.userEmail";
-NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
 NSString *const kBugSplatUserDefaultsAlwaysSend = @"com.bugsplat.alwaysSend";
-NSString *const kBugSplatUserDefaultsAppKey = @"com.bugsplat.appKey";
-NSString *const kBugSplatUserDefaultsNotes = @"com.bugsplat.notes";
 
 // File extensions for persisted crash data
 static NSString *const kBugSplatCrashFileExtension = @"crash";
@@ -78,10 +75,6 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     
     dispatch_once(&pred, ^{
         sharedInstance = [[BugSplat alloc] init];
-
-        // Load and erase any persisted attributes from previous session
-        sharedInstance.attributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
-        [NSUserDefaults.standardUserDefaults setValue:nil forKey:kBugSplatUserDefaultsAttributes];
     });
     
     return sharedInstance;
@@ -151,7 +144,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                       applicationVersion:self.resolvedApplicationVersion];
     
     // First, check for any NEW crash report from PLCrashReporter
-    // This will persist it to our crashes directory for offline retry support
+    // The crash-time metadata is embedded in the crash report via customData
     if ([self.crashReporter hasPendingCrashReport]) {
         [self handleNewCrashFromPLCrashReporter];
     }
@@ -159,6 +152,10 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // Then, process any pending crash reports from our crashes directory
     // This includes both new crashes and previously failed uploads
     [self processPendingCrashReports];
+    
+    // Set crash-time metadata on PLCrashReporter BEFORE enabling it
+    // If a crash occurs, this metadata will be saved WITH the crash report
+    [self updateCrashReporterCustomData];
     
     // Enable crash reporter for this session
     NSError *error = nil;
@@ -274,8 +271,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         [self persistAttachments:attachments forCrashFilename:crashFilename];
     }
     
-    // Build and persist metadata
-    // IMPORTANT: Capture crash-time context here - app may be updated before upload
+    // Build and persist metadata for THIS CRASH
+    // The crash-time properties are embedded in the crash report via PLCrashReporter's customData
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
     
     // Use the actual crash time from the crash report, fall back to current time if unavailable
@@ -287,16 +284,63 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *crashTimeISO = [isoFormatter stringFromDate:crashTimestamp];
     metadata[kBugSplatMetaKeyTimestamp] = crashTimeISO;
     
-    // Capture app context at crash time (database, name, version may change with app updates)
-    if (self.bugSplatDatabase) metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
-    metadata[kBugSplatMetaKeyApplicationName] = self.resolvedApplicationName;
-    metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
+    // Extract crash-time properties from PLCrashReporter's customData
+    // This data was set BEFORE the crash occurred and is bundled WITH the crash
+    NSDictionary *crashTimeProperties = nil;
+    if (crashReport.customData) {
+        @try {
+            crashTimeProperties = [NSKeyedUnarchiver unarchivedObjectOfClass:[NSDictionary class]
+                                                                    fromData:crashReport.customData
+                                                                       error:nil];
+        } @catch (NSException *exception) {
+            NSLog(@"BugSplat: Exception deserializing customData: %@ - %@", exception.name, exception.reason);
+        }
+    }
     
-    if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
-    if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
-    if (self.attributes) metadata[kBugSplatMetaKeyAttributes] = self.attributes;
-    if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
-    if (self.notes) metadata[kBugSplatMetaKeyNotes] = self.notes;
+    if (crashTimeProperties) {
+        // Use the properties that were set when the crash occurred
+        if (crashTimeProperties[kBugSplatMetaKeyDatabase]) {
+            metadata[kBugSplatMetaKeyDatabase] = crashTimeProperties[kBugSplatMetaKeyDatabase];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyApplicationName]) {
+            metadata[kBugSplatMetaKeyApplicationName] = crashTimeProperties[kBugSplatMetaKeyApplicationName];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyApplicationVersion]) {
+            metadata[kBugSplatMetaKeyApplicationVersion] = crashTimeProperties[kBugSplatMetaKeyApplicationVersion];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyUserName]) {
+            metadata[kBugSplatMetaKeyUserName] = crashTimeProperties[kBugSplatMetaKeyUserName];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyUserEmail]) {
+            metadata[kBugSplatMetaKeyUserEmail] = crashTimeProperties[kBugSplatMetaKeyUserEmail];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyAppKey]) {
+            metadata[kBugSplatMetaKeyAppKey] = crashTimeProperties[kBugSplatMetaKeyAppKey];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyNotes]) {
+            metadata[kBugSplatMetaKeyNotes] = crashTimeProperties[kBugSplatMetaKeyNotes];
+        }
+        if (crashTimeProperties[kBugSplatMetaKeyAttributes]) {
+            metadata[kBugSplatMetaKeyAttributes] = crashTimeProperties[kBugSplatMetaKeyAttributes];
+        }
+        
+        NSLog(@"BugSplat: Extracted crash-time metadata from crash report - database: %@, app: %@ %@",
+              metadata[kBugSplatMetaKeyDatabase],
+              metadata[kBugSplatMetaKeyApplicationName],
+              metadata[kBugSplatMetaKeyApplicationVersion]);
+    } else {
+        // No customData in crash report - this is an old crash or customData wasn't set
+        // Fall back to current values
+        NSLog(@"BugSplat: No crash-time metadata in crash report, using current values");
+        metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
+        metadata[kBugSplatMetaKeyApplicationName] = self.resolvedApplicationName;
+        metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
+        if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
+        if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
+        if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
+        if (self.notes) metadata[kBugSplatMetaKeyNotes] = self.notes;
+        if (self.attributes) metadata[kBugSplatMetaKeyAttributes] = self.attributes;
+    }
     
     // Get application log from delegate
     @try {
@@ -443,11 +487,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                         crashReportText:(NSString *)crashReportText
                                metadata:(NSDictionary *)metadata
 {
+    // Use ONLY values from the per-crash metadata - no fallbacks to current values
     [self submitPersistedCrashReportWithFilename:crashFilename 
                                  crashReportText:crashReportText 
                                         metadata:metadata 
-                                        userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                       userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                        userName:metadata[kBugSplatMetaKeyUserName]
+                                       userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                         comments:metadata[kBugSplatMetaKeyComments]
                                    isInteractive:NO];
 }
@@ -562,12 +607,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
             }
         } @catch (NSException *exception) {
             NSLog(@"BugSplat: Exception showing crash report dialog: %@ - %@", exception.name, exception.reason);
-            // Fall back to auto-submit if dialog fails
+            // Fall back to auto-submit if dialog fails - use metadata values only
             [self submitPersistedCrashReportWithFilename:crashFilename
                                          crashReportText:crashReportText
                                                 metadata:metadata
-                                                userName:self.userName
-                                               userEmail:self.userEmail
+                                                userName:metadata[kBugSplatMetaKeyUserName]
+                                               userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                                 comments:metadata[kBugSplatMetaKeyComments]
                                            isInteractive:NO];
         }
@@ -624,8 +669,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
                                                     metadata:metadata
-                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    userName:metadata[kBugSplatMetaKeyUserName]
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                                     comments:metadata[kBugSplatMetaKeyComments]
                                                isInteractive:YES];
             }];
@@ -650,8 +695,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
                                                     metadata:metadata
-                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    userName:metadata[kBugSplatMetaKeyUserName]
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                                     comments:metadata[kBugSplatMetaKeyComments]
                                                isInteractive:YES];
             }];
@@ -663,23 +708,23 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                 [presentingViewController presentViewController:alert animated:YES completion:nil];
             } else {
                 NSLog(@"BugSplat: Could not find view controller to present crash report alert, auto-submitting...");
-                // Fall back to auto-submit if no view controller available
+                // Fall back to auto-submit if no view controller available - use metadata values only
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
                                                     metadata:metadata
-                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    userName:metadata[kBugSplatMetaKeyUserName]
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                                     comments:metadata[kBugSplatMetaKeyComments]
                                                isInteractive:NO];
             }
         } @catch (NSException *exception) {
             NSLog(@"BugSplat: Exception showing crash report alert: %@ - %@", exception.name, exception.reason);
-            // Fall back to auto-submit if alert fails
+            // Fall back to auto-submit if alert fails - use metadata values only
             [self submitPersistedCrashReportWithFilename:crashFilename
                                          crashReportText:crashReportText
                                                 metadata:metadata
-                                                userName:self.userName
-                                               userEmail:self.userEmail
+                                                userName:metadata[kBugSplatMetaKeyUserName]
+                                               userEmail:metadata[kBugSplatMetaKeyUserEmail]
                                                 comments:metadata[kBugSplatMetaKeyComments]
                                            isInteractive:NO];
         }
@@ -790,29 +835,20 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // Load attachments from disk for this crash
     NSArray<BugSplatAttachment *> *attachments = [self loadPersistedAttachmentsForCrashFilename:crashFilename];
     
-    // Build upload metadata
+    // Build upload metadata from the per-crash metadata ONLY
+    // The metadata is bundled with this crash and contains all values from when the crash occurred
+    // Do NOT fall back to current BugSplat values - this crash may be uploaded many launches later
     BugSplatCrashMetadata *uploadMetadata = [[BugSplatCrashMetadata alloc] init];
+    
+    // All values come from the per-crash metadata
+    uploadMetadata.database = persistedMetadata[kBugSplatMetaKeyDatabase];
+    uploadMetadata.applicationName = persistedMetadata[kBugSplatMetaKeyApplicationName];
+    uploadMetadata.applicationVersion = persistedMetadata[kBugSplatMetaKeyApplicationVersion];
     uploadMetadata.userName = userName;
     uploadMetadata.userEmail = userEmail;
     uploadMetadata.userDescription = comments;
-    
-    // Use persisted crash time if available, otherwise fall back to current time
-    NSString *crashTimeISO = persistedMetadata[kBugSplatMetaKeyTimestamp];
-    if (!crashTimeISO) {
-        // Fallback: generate ISO timestamp for current time
-        NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-        isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-        crashTimeISO = [isoFormatter stringFromDate:[NSDate date]];
-    }
-    uploadMetadata.crashTime = crashTimeISO;
-    
-    // Use attributes from persisted metadata if current session attributes are nil
-    if (self.attributes) {
-        uploadMetadata.attributes = self.attributes;
-    } else {
-        uploadMetadata.attributes = persistedMetadata[kBugSplatMetaKeyAttributes];
-    }
-    
+    uploadMetadata.crashTime = persistedMetadata[kBugSplatMetaKeyTimestamp];
+    uploadMetadata.attributes = persistedMetadata[kBugSplatMetaKeyAttributes];
     uploadMetadata.applicationLog = persistedMetadata[kBugSplatMetaKeyApplicationLog];
     uploadMetadata.notes = persistedMetadata[kBugSplatMetaKeyNotes];
     uploadMetadata.applicationKey = persistedMetadata[kBugSplatMetaKeyAppKey];
@@ -825,19 +861,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         return;
     }
     
-    // Use crash-time database/appName/appVersion if persisted, otherwise use current values
-    // This ensures the crash is reported against the correct version even if app was updated
-    NSString *database = persistedMetadata[kBugSplatMetaKeyDatabase] ?: self.bugSplatDatabase;
-    NSString *appName = persistedMetadata[kBugSplatMetaKeyApplicationName] ?: self.resolvedApplicationName;
-    NSString *appVersion = persistedMetadata[kBugSplatMetaKeyApplicationVersion] ?: self.resolvedApplicationVersion;
-    
-    // Create upload service with crash-time context
-    // IMPORTANT: Assign to self.uploadService to retain the service during async upload
-    self.uploadService = [[BugSplatUploadService alloc] initWithDatabase:database
-                                                         applicationName:appName
-                                                      applicationVersion:appVersion];
-    
-    NSLog(@"BugSplat: Uploading crash report %@ (app: %@ %@, database: %@)...", crashFilename, appName, appVersion, database);
+    NSLog(@"BugSplat: Uploading crash report %@ (app: %@ %@, database: %@)...", 
+          crashFilename, 
+          uploadMetadata.applicationName, 
+          uploadMetadata.applicationVersion, 
+          uploadMetadata.database);
     
     // Upload (NSURLSession handles this on a background thread)
     [self.uploadService uploadCrashReport:textCrashData
@@ -980,16 +1008,6 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     return @"1.0";
 }
 
-- (NSString *)userID
-{
-    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserID];
-}
-
-- (void)setUserID:(NSString *)userID
-{
-    [NSUserDefaults.standardUserDefaults setObject:userID forKey:kBugSplatUserDefaultsUserID];
-}
-
 - (NSString *)userName
 {
     return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserName];
@@ -998,6 +1016,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)setUserName:(NSString *)userName
 {
     [NSUserDefaults.standardUserDefaults setObject:userName forKey:kBugSplatUserDefaultsUserName];
+    [self updateCrashReporterCustomData];
 }
 
 - (NSString *)userEmail
@@ -1008,26 +1027,21 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)setUserEmail:(NSString *)userEmail
 {
     [NSUserDefaults.standardUserDefaults setObject:userEmail forKey:kBugSplatUserDefaultsUserEmail];
+    [self updateCrashReporterCustomData];
 }
 
-- (NSString *)appKey
-{
-    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsAppKey];
-}
+// appKey and notes use synthesized ivars - setters call updateCrashReporterCustomData
 
 - (void)setAppKey:(NSString *)appKey
 {
-    [NSUserDefaults.standardUserDefaults setObject:appKey forKey:kBugSplatUserDefaultsAppKey];
-}
-
-- (NSString *)notes
-{
-    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsNotes];
+    _appKey = [appKey copy];
+    [self updateCrashReporterCustomData];
 }
 
 - (void)setNotes:(NSString *)notes
 {
-    [NSUserDefaults.standardUserDefaults setObject:notes forKey:kBugSplatUserDefaultsNotes];
+    _notes = [notes copy];
+    [self updateCrashReporterCustomData];
 }
 
 #pragma mark - Attributes
@@ -1038,15 +1052,13 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         return NO;
     }
     
-    NSMutableDictionary<NSString *, NSString *> *mutableAttributes;
-    NSDictionary<NSString *, NSString *> *persistedAttributes = [NSUserDefaults.standardUserDefaults dictionaryForKey:kBugSplatUserDefaultsAttributes];
-    
-    if (persistedAttributes == nil && value == nil) {
+    if (self.attributes == nil && value == nil) {
         return NO;
     }
     
-    if (persistedAttributes) {
-        mutableAttributes = [[NSMutableDictionary alloc] initWithDictionary:persistedAttributes];
+    NSMutableDictionary<NSString *, NSString *> *mutableAttributes;
+    if (self.attributes) {
+        mutableAttributes = [[NSMutableDictionary alloc] initWithDictionary:self.attributes];
     } else {
         mutableAttributes = [NSMutableDictionary dictionary];
     }
@@ -1059,9 +1071,55 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         [mutableAttributes removeObjectForKey:attribute];
     }
     
-    [NSUserDefaults.standardUserDefaults setValue:mutableAttributes forKey:kBugSplatUserDefaultsAttributes];
+    self.attributes = mutableAttributes;
+    [self updateCrashReporterCustomData];
     
     return YES;
+}
+
+#pragma mark - PLCrashReporter Custom Data
+
+/**
+ * Update PLCrashReporter's customData with current BugSplat properties.
+ * This data is saved WITH the crash report when a crash occurs.
+ * When we process the crash, we extract this data to get the crash-time properties.
+ *
+ * Call this method:
+ * - In start(), before enabling the crash reporter
+ * - Whenever a property changes that should be associated with crashes
+ */
+- (void)updateCrashReporterCustomData
+{
+    NSMutableDictionary *crashMetadata = [NSMutableDictionary dictionary];
+    
+    // Required properties (always have values - Info.plist or fallbacks)
+    crashMetadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
+    crashMetadata[kBugSplatMetaKeyApplicationName] = self.resolvedApplicationName;
+    crashMetadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
+    
+    // Optional properties
+    if (self.userName) crashMetadata[kBugSplatMetaKeyUserName] = self.userName;
+    if (self.userEmail) crashMetadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
+    if (self.appKey) crashMetadata[kBugSplatMetaKeyAppKey] = self.appKey;
+    if (self.notes) crashMetadata[kBugSplatMetaKeyNotes] = self.notes;
+    
+    // Attributes
+    if (self.attributes) crashMetadata[kBugSplatMetaKeyAttributes] = self.attributes;
+    
+    // Serialize and set on PLCrashReporter
+    NSError *error = nil;
+    NSData *customData = [NSKeyedArchiver archivedDataWithRootObject:crashMetadata
+                                               requiringSecureCoding:NO
+                                                               error:&error];
+    if (customData && !error) {
+        self.crashReporter.customData = customData;
+        NSLog(@"BugSplat: Set crash-time metadata on PLCrashReporter - database: %@, app: %@ %@",
+              crashMetadata[kBugSplatMetaKeyDatabase],
+              crashMetadata[kBugSplatMetaKeyApplicationName],
+              crashMetadata[kBugSplatMetaKeyApplicationVersion]);
+    } else {
+        NSLog(@"BugSplat: Failed to serialize crash metadata: %@", error);
+    }
 }
 
 #pragma mark - Crash Report Persistence
