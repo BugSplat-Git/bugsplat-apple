@@ -57,20 +57,12 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  * The database name BugSplat will use to construct the BugSplatDatabase URL where crash reports will be submitted.
  *
- * NOTES:
- * By default, the BugSplat database name is pulled from the App's Info.plist.
+ * By default, the BugSplat database name is pulled from the App's Info.plist (BugSplatDatabase key).
  *
- * When a third party library or plugin developer is leveraging BugSplat, but the App developer incorporating
- * the plugin is not using BugSplat, programmatically setting this property would be appropriate.
+ * Set this property to override the Info.plist value or to set the database programmatically.
+ * The value can be changed at any time and will be captured at crash time.
  *
- * Only one BugSplat database can be specified within an App including any third party libraries and plugins.
- * This means if the Info.plist contains a BugSplat database, attempting to change this property will have no effect.
- *
- * Additionally, if the Info.plist does not contain a BugSplat database key and value, the first call to
- * set this property will set the BugSplat database name. Any subsequent calls to set this property will have no effect.
- *
- * Finally, with the above considerations, if programmatic change of this property is desired, it must be set before calling
- * BugSplat `start` method or it will have no effect.
+ * @note If neither Info.plist nor this property is set before calling `start`, an assertion will fail.
  */
 @property (nonatomic, copy, nullable) NSString *bugSplatDatabase;
 
@@ -79,10 +71,8 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * By default, this value is pulled from the App's Info.plist (CFBundleDisplayName or CFBundleName).
  *
- * Set this property to override the default application name. This is useful when you want
- * the crash report to use a different name than what's in the Info.plist.
- *
- * @warning This property must be set before calling `start` to have any effect.
+ * Set this property to override the default application name. The value can be changed at any time
+ * and will be captured at crash time.
  */
 @property (nonatomic, copy, nullable) NSString *applicationName;
 
@@ -91,10 +81,8 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * By default, this value is pulled from the App's Info.plist (CFBundleShortVersionString).
  *
- * Set this property to override the default application version. This is useful when you want
- * the crash report to use a different version than what's in the Info.plist.
- *
- * @warning This property must be set before calling `start` to have any effect.
+ * Set this property to override the default application version. The value can be changed at any time
+ * and will be captured at crash time.
  */
 @property (nonatomic, copy, nullable) NSString *applicationVersion;
 
@@ -146,7 +134,7 @@ NS_ASSUME_NONNULL_BEGIN
  * In the BugSplat dashboard, you can configure custom localized support responses
  * for crash groups based on the appKey value.
  *
- * The value is persisted to NSUserDefaults and captured at crash time.
+ * The value is captured at crash time and included with the crash report.
  */
 @property (nonatomic, copy, nullable) NSString *appKey;
 
@@ -159,7 +147,7 @@ NS_ASSUME_NONNULL_BEGIN
  * - Recent user actions
  * - Debug information
  *
- * The value is persisted to NSUserDefaults and captured at crash time.
+ * The value is captured at crash time and included with the crash report.
  */
 @property (nonatomic, copy, nullable) NSString *notes;
 

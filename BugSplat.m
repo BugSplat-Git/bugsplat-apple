@@ -161,6 +161,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSError *error = nil;
     if (![self.crashReporter enableCrashReporterAndReturnError:&error]) {
         NSLog(@"BugSplat: Failed to enable crash reporter: %@", error);
+        return;
     }
     
     self.isStartInvoked = YES;
@@ -868,18 +869,23 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
           uploadMetadata.database);
     
     // Upload (NSURLSession handles this on a background thread)
+    // Use weak/strong self pattern to avoid retain cycles
+    __weak typeof(self) weakSelf = self;
     [self.uploadService uploadCrashReport:textCrashData
                             crashFilename:@"crash.crashlog"
                               attachments:attachments
                                  metadata:uploadMetadata
                                completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        
         // Completion is called on main queue
         if (success) {
             NSLog(@"BugSplat: Crash report %@ uploaded successfully", crashFilename);
             
             // Only cleanup crash files after SUCCESSFUL upload
-            self.attributes = nil;
-            [self cleanupCrashReportWithFilename:crashFilename];
+            strongSelf.attributes = nil;
+            [strongSelf cleanupCrashReportWithFilename:crashFilename];
             
 #if TARGET_OS_OSX
             // Open infoUrl in browser for interactive submissions on macOS
@@ -894,19 +900,19 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
             
             // Notify delegate
             @try {
-                if ([self.delegate respondsToSelector:@selector(bugSplatDidFinishSendingCrashReport:)]) {
-                    [self.delegate bugSplatDidFinishSendingCrashReport:self];
+                if ([strongSelf.delegate respondsToSelector:@selector(bugSplatDidFinishSendingCrashReport:)]) {
+                    [strongSelf.delegate bugSplatDidFinishSendingCrashReport:strongSelf];
                 }
             } @catch (NSException *exception) {
                 NSLog(@"BugSplat: Exception in bugSplatDidFinishSendingCrashReport delegate: %@ - %@", exception.name, exception.reason);
             }
             
-            self.sendingInProgress = NO;
+            strongSelf.sendingInProgress = NO;
             
             // Process any remaining pending crash reports.
             // Wait 1 second between uploads to avoid throttling by the server.
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [self processPendingCrashReports];
+                [strongSelf processPendingCrashReports];
             });
             
         } else {
@@ -915,14 +921,14 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
             
             // Notify delegate
             @try {
-                if ([self.delegate respondsToSelector:@selector(bugSplat:didFailWithError:)]) {
-                    [self.delegate bugSplat:self didFailWithError:error];
+                if ([strongSelf.delegate respondsToSelector:@selector(bugSplat:didFailWithError:)]) {
+                    [strongSelf.delegate bugSplat:strongSelf didFailWithError:error];
                 }
             } @catch (NSException *exception) {
                 NSLog(@"BugSplat: Exception in bugSplat:didFailWithError: delegate: %@ - %@", exception.name, exception.reason);
             }
             
-            self.sendingInProgress = NO;
+            strongSelf.sendingInProgress = NO;
             
             // Note: We do NOT process remaining crash reports on failure
             // They will all be retried on next app launch when network may be available
@@ -939,21 +945,17 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (NSString *)bugSplatDatabase
 {
-    NSString *plistValue = (NSString *)[self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
-    if (plistValue) {
-        return [plistValue copy];
+    // Programmatic value takes precedence, then fall back to Info.plist
+    if (_bugSplatDatabase) {
+        return _bugSplatDatabase;
     }
-    return _bugSplatDatabase;
+    return (NSString *)[self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
 }
 
 - (void)setBugSplatDatabase:(NSString *)bugSplatDatabase
 {
-    if (self.bugSplatDatabase) {
-        return; // Don't change if already set
-    }
-    if (bugSplatDatabase && !self.isStartInvoked) {
-        _bugSplatDatabase = [bugSplatDatabase copy];
-    }
+    _bugSplatDatabase = [bugSplatDatabase copy];
+    [self updateCrashReporterCustomData];
 }
 
 - (NSString *)applicationName
@@ -963,9 +965,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (void)setApplicationName:(NSString *)applicationName
 {
-    if (!self.isStartInvoked) {
-        _applicationName = [applicationName copy];
-    }
+    _applicationName = [applicationName copy];
+    [self updateCrashReporterCustomData];
 }
 
 - (NSString *)applicationVersion
@@ -975,9 +976,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (void)setApplicationVersion:(NSString *)applicationVersion
 {
-    if (!self.isStartInvoked) {
-        _applicationVersion = [applicationVersion copy];
-    }
+    _applicationVersion = [applicationVersion copy];
+    [self updateCrashReporterCustomData];
 }
 
 - (NSString *)resolvedApplicationName
@@ -1210,31 +1210,33 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }
     
     for (NSUInteger i = 0; i < attachments.count; i++) {
-        BugSplatAttachment *attachment = attachments[i];
-        @try {
-            if (!attachment) {
-                continue;
+        @autoreleasepool {
+            BugSplatAttachment *attachment = attachments[i];
+            @try {
+                if (!attachment) {
+                    continue;
+                }
+                
+                // Use crash filename as prefix so attachments are associated with their crash
+                NSString *filename = [NSString stringWithFormat:@"%@-%lu.%@", 
+                                      crashFilename,
+                                      (unsigned long)i,
+                                      kBugSplatAttachmentFileExtension];
+                NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
+                
+                NSError *error = nil;
+                NSData *archiveData = [NSKeyedArchiver archivedDataWithRootObject:attachment 
+                                                            requiringSecureCoding:YES 
+                                                                            error:&error];
+                if (archiveData && !error) {
+                    [archiveData writeToFile:filePath atomically:YES];
+                    NSLog(@"BugSplat: Persisted attachment to %@", filename);
+                } else {
+                    NSLog(@"BugSplat: Failed to archive attachment: %@", error);
+                }
+            } @catch (NSException *exception) {
+                NSLog(@"BugSplat: Exception persisting attachment: %@ - %@", exception.name, exception.reason);
             }
-            
-            // Use crash filename as prefix so attachments are associated with their crash
-            NSString *filename = [NSString stringWithFormat:@"%@-%lu.%@", 
-                                  crashFilename,
-                                  (unsigned long)i,
-                                  kBugSplatAttachmentFileExtension];
-            NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
-            
-            NSError *error = nil;
-            NSData *archiveData = [NSKeyedArchiver archivedDataWithRootObject:attachment 
-                                                        requiringSecureCoding:YES 
-                                                                        error:&error];
-            if (archiveData && !error) {
-                [archiveData writeToFile:filePath atomically:YES];
-                NSLog(@"BugSplat: Persisted attachment to %@", filename);
-            } else {
-                NSLog(@"BugSplat: Failed to archive attachment: %@", error);
-            }
-        } @catch (NSException *exception) {
-            NSLog(@"BugSplat: Exception persisting attachment: %@ - %@", exception.name, exception.reason);
         }
     }
 }
@@ -1273,30 +1275,32 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
     
     for (NSString *filename in files) {
-        @try {
-            // Only load attachments that belong to this crash
-            if (![filename hasPrefix:attachmentPrefix] || ![filename hasSuffix:attachmentSuffix]) {
-                continue;
+        @autoreleasepool {
+            @try {
+                // Only load attachments that belong to this crash
+                if (![filename hasPrefix:attachmentPrefix] || ![filename hasSuffix:attachmentSuffix]) {
+                    continue;
+                }
+                
+                NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
+                NSData *data = [NSData dataWithContentsOfFile:filePath];
+                if (!data) {
+                    continue;
+                }
+                
+                NSError *unarchiveError = nil;
+                BugSplatAttachment *attachment = [NSKeyedUnarchiver unarchivedObjectOfClass:[BugSplatAttachment class]
+                                                                                   fromData:data
+                                                                                      error:&unarchiveError];
+                if (attachment && !unarchiveError) {
+                    [attachments addObject:attachment];
+                    NSLog(@"BugSplat: Loaded persisted attachment from %@", filename);
+                } else {
+                    NSLog(@"BugSplat: Failed to unarchive attachment: %@", unarchiveError);
+                }
+            } @catch (NSException *exception) {
+                NSLog(@"BugSplat: Exception loading persisted attachment %@: %@ - %@", filename, exception.name, exception.reason);
             }
-            
-            NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
-            NSData *data = [NSData dataWithContentsOfFile:filePath];
-            if (!data) {
-                continue;
-            }
-            
-            NSError *unarchiveError = nil;
-            BugSplatAttachment *attachment = [NSKeyedUnarchiver unarchivedObjectOfClass:[BugSplatAttachment class]
-                                                                               fromData:data
-                                                                                  error:&unarchiveError];
-            if (attachment && !unarchiveError) {
-                [attachments addObject:attachment];
-                NSLog(@"BugSplat: Loaded persisted attachment from %@", filename);
-            } else {
-                NSLog(@"BugSplat: Failed to unarchive attachment: %@", unarchiveError);
-            }
-        } @catch (NSException *exception) {
-            NSLog(@"BugSplat: Exception loading persisted attachment %@: %@ - %@", filename, exception.name, exception.reason);
         }
     }
     
