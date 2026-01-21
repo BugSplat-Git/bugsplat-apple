@@ -10,6 +10,7 @@
 		CC0000022E3FC00000000002 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		CC0000032E3FC00000000003 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		CC0000042E3FC00000000004 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
+		DD0000012E3FD00000000001 /* bugsplat-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = DD0000002E3FD00000000000 /* bugsplat-logo.png */; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		637DF0452D49A49C00DDD8FE /* BugSplatUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */; };
@@ -53,6 +54,7 @@
 
 /* Begin PBXFileReference section */
 		CC0000012E3FC00000000001 /* CrashReporter.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = "Vendor/PLCrashReporter/CrashReporter.xcframework"; sourceTree = SOURCE_ROOT; };
+		DD0000002E3FD00000000000 /* bugsplat-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Resources/bugsplat-logo.png"; sourceTree = SOURCE_ROOT; };
 		6344718C2B9695C500EBEBEB /* BugSplatDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatDelegate.h; sourceTree = "<group>"; };
 		63598C422BA0CCD500770E43 /* BugSplat.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplat.m; sourceTree = "<group>"; };
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */,
+				DD0000002E3FD00000000000 /* bugsplat-logo.png */,
 				63C6E1FE2B9283B000AED3E3 /* BugSplat.h */,
 				63598C422BA0CCD500770E43 /* BugSplat.m */,
 				63D006F92BBF785B00587FBF /* BugSplatMac.h */,
@@ -289,6 +292,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63905E962D83912E009CDBEE /* PrivacyInfo.xcprivacy in Resources */,
+				DD0000012E3FD00000000001 /* bugsplat-logo.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

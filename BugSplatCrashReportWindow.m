@@ -96,6 +96,9 @@ static const CGFloat kDetailsHeight = 200.0;
         [self.bannerImageView.heightAnchor constraintEqualToConstant:110]
     ]];
     
+    // Add extra spacing after banner
+    [self.mainStackView setCustomSpacing:16 afterView:self.bannerImageView];
+    
     // === Message Label ===
     self.messageLabel = [self createLabelWithText:@""];
     self.messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -243,6 +246,10 @@ static const CGFloat kDetailsHeight = 200.0;
     self.commentsPlaceholder.textColor = [NSColor placeholderTextColor];
     self.commentsPlaceholder.font = [NSFont systemFontOfSize:13];
     [self.commentsScrollView addSubview:self.commentsPlaceholder];
+    
+    // Make clicks on placeholder activate the text view
+    NSClickGestureRecognizer *placeholderClick = [[NSClickGestureRecognizer alloc] initWithTarget:self action:@selector(placeholderClicked:)];
+    [self.commentsPlaceholder addGestureRecognizer:placeholderClick];
     
     CGFloat commentsHeight = 120;
     [NSLayoutConstraint activateConstraints:@[
@@ -406,6 +413,19 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (NSImage *)createDefaultBugSplatLogo
 {
+    // Try to load the bundled logo image first
+    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+    NSImage *bundledLogo = [bundle imageForResource:@"bugsplat-logo"];
+    if (bundledLogo) {
+        return bundledLogo;
+    }
+    
+    // Fallback to programmatic logo if bundled image not found
+    return [self createProgrammaticBugSplatLogo];
+}
+
+- (NSImage *)createProgrammaticBugSplatLogo
+{
     CGFloat width = 440;
     CGFloat height = 110;
     
@@ -470,6 +490,9 @@ static const CGFloat kDetailsHeight = 200.0;
     [self showWindow:nil];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
+    
+    // Focus the comments field
+    [self.window makeFirstResponder:self.commentsTextView];
 }
 
 - (void)showModalWithCompletion:(BugSplatCrashReportCompletion)completion
@@ -488,6 +511,10 @@ static const CGFloat kDetailsHeight = 200.0;
     [self prewarmAnimationLayers];
     
     [self.window center];
+    
+    // Focus the comments field
+    [self.window makeFirstResponder:self.commentsTextView];
+    
     [NSApp runModalForWindow:self.window];
 }
 
@@ -528,6 +555,11 @@ static const CGFloat kDetailsHeight = 200.0;
     if (self.completion) {
         self.completion(BugSplatUserActionCancel, nil, nil, nil);
     }
+}
+
+- (void)placeholderClicked:(NSGestureRecognizer *)gesture
+{
+    [self.window makeFirstResponder:self.commentsTextView];
 }
 
 - (void)showDetailsClicked:(id)sender
