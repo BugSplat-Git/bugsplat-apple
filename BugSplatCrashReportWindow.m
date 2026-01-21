@@ -293,6 +293,12 @@ static const CGFloat kDetailsHeight = 200.0;
             self.detailsTextView.font = [NSFont fontWithName:@"Courier" size:11] ?: [NSFont systemFontOfSize:11];
         }
     }
+    // Enable both horizontal and vertical resizing so text view expands to fit content
+    self.detailsTextView.horizontallyResizable = YES;
+    self.detailsTextView.verticallyResizable = YES;
+    self.detailsTextView.minSize = NSMakeSize(contentWidth, kDetailsHeight);
+    self.detailsTextView.maxSize = NSMakeSize(FLT_MAX, FLT_MAX);
+    self.detailsTextView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.detailsTextView.textContainer.widthTracksTextView = NO;
     self.detailsTextView.textContainer.containerSize = NSMakeSize(FLT_MAX, FLT_MAX);
     self.detailsScrollView.documentView = self.detailsTextView;
