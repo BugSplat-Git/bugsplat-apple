@@ -277,7 +277,15 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // Build and persist metadata
     // IMPORTANT: Capture crash-time context here - app may be updated before upload
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
-    metadata[kBugSplatMetaKeyTimestamp] = @([[NSDate date] timeIntervalSince1970]);
+    
+    // Use the actual crash time from the crash report, fall back to current time if unavailable
+    NSDate *crashTimestamp = crashReport.systemInfo.timestamp ?: [NSDate date];
+    
+    // Store as ISO 8601 string for reliable persistence and API compatibility
+    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
+    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    NSString *crashTimeISO = [isoFormatter stringFromDate:crashTimestamp];
+    metadata[kBugSplatMetaKeyTimestamp] = crashTimeISO;
     
     // Capture app context at crash time (database, name, version may change with app updates)
     if (self.bugSplatDatabase) metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
@@ -440,7 +448,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                         metadata:metadata 
                                         userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                        userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                        comments:metadata[kBugSplatMetaKeyComments]];
+                                        comments:metadata[kBugSplatMetaKeyComments]
+                                   isInteractive:NO];
 }
 
 /**
@@ -520,7 +529,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                             metadata:metadata
                                                             userName:userName
                                                            userEmail:userEmail
-                                                            comments:comments];
+                                                            comments:comments
+                                                       isInteractive:YES];
                     } else {
                         // User cancelled - cleanup ALL pending crash reports (following HockeyApp behavior)
                         @try {
@@ -558,7 +568,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                 metadata:metadata
                                                 userName:self.userName
                                                userEmail:self.userEmail
-                                                comments:metadata[kBugSplatMetaKeyComments]];
+                                                comments:metadata[kBugSplatMetaKeyComments]
+                                           isInteractive:NO];
         }
     });
 }
@@ -615,7 +626,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:metadata[kBugSplatMetaKeyComments]];
+                                                    comments:metadata[kBugSplatMetaKeyComments]
+                                               isInteractive:YES];
             }];
             [alert addAction:sendAction];
             
@@ -640,7 +652,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:metadata[kBugSplatMetaKeyComments]];
+                                                    comments:metadata[kBugSplatMetaKeyComments]
+                                               isInteractive:YES];
             }];
             [alert addAction:alwaysSendAction];
             
@@ -656,7 +669,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:metadata[kBugSplatMetaKeyComments]];
+                                                    comments:metadata[kBugSplatMetaKeyComments]
+                                               isInteractive:NO];
             }
         } @catch (NSException *exception) {
             NSLog(@"BugSplat: Exception showing crash report alert: %@ - %@", exception.name, exception.reason);
@@ -666,7 +680,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                 metadata:metadata
                                                 userName:self.userName
                                                userEmail:self.userEmail
-                                                comments:metadata[kBugSplatMetaKeyComments]];
+                                                comments:metadata[kBugSplatMetaKeyComments]
+                                           isInteractive:NO];
         }
     });
 }
@@ -746,6 +761,10 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
  * Submit a persisted crash report.
  * On success, the crash files are deleted and remaining crashes are sent SILENTLY (no dialog).
  * On failure, the crash files are kept for retry on next app launch.
+ *
+ * @param isInteractive YES if this crash was submitted via user interaction (dialog),
+ *                      NO if sent silently. On macOS, interactive submissions will open
+ *                      the infoUrl in the browser if one is returned.
  */
 - (void)submitPersistedCrashReportWithFilename:(NSString *)crashFilename
                                crashReportText:(NSString *)crashReportText
@@ -753,6 +772,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                       userName:(NSString *)userName
                                      userEmail:(NSString *)userEmail
                                       comments:(NSString *)comments
+                                 isInteractive:(BOOL)isInteractive
 {
     // Mark this crash as user-submitted and persist any comments
     // This ensures: 1) comments survive failed uploads, 2) we know to retry silently
@@ -775,7 +795,16 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     uploadMetadata.userName = userName;
     uploadMetadata.userEmail = userEmail;
     uploadMetadata.userDescription = comments;
-    uploadMetadata.crashTime = persistedMetadata[kBugSplatMetaKeyTimestamp];
+    
+    // Use persisted crash time if available, otherwise fall back to current time
+    NSString *crashTimeISO = persistedMetadata[kBugSplatMetaKeyTimestamp];
+    if (!crashTimeISO) {
+        // Fallback: generate ISO timestamp for current time
+        NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
+        isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        crashTimeISO = [isoFormatter stringFromDate:[NSDate date]];
+    }
+    uploadMetadata.crashTime = crashTimeISO;
     
     // Use attributes from persisted metadata if current session attributes are nil
     if (self.attributes) {
@@ -803,18 +832,19 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *appVersion = persistedMetadata[kBugSplatMetaKeyApplicationVersion] ?: self.resolvedApplicationVersion;
     
     // Create upload service with crash-time context
-    BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:database
-                                                                           applicationName:appName
-                                                                        applicationVersion:appVersion];
+    // IMPORTANT: Assign to self.uploadService to retain the service during async upload
+    self.uploadService = [[BugSplatUploadService alloc] initWithDatabase:database
+                                                         applicationName:appName
+                                                      applicationVersion:appVersion];
     
     NSLog(@"BugSplat: Uploading crash report %@ (app: %@ %@, database: %@)...", crashFilename, appName, appVersion, database);
     
     // Upload (NSURLSession handles this on a background thread)
-    [uploadService uploadCrashReport:textCrashData
+    [self.uploadService uploadCrashReport:textCrashData
                             crashFilename:@"crash.crashlog"
                               attachments:attachments
                                  metadata:uploadMetadata
-                               completion:^(BOOL success, NSError *error) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
         // Completion is called on main queue
         if (success) {
             NSLog(@"BugSplat: Crash report %@ uploaded successfully", crashFilename);
@@ -822,6 +852,17 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
             // Only cleanup crash files after SUCCESSFUL upload
             self.attributes = nil;
             [self cleanupCrashReportWithFilename:crashFilename];
+            
+#if TARGET_OS_OSX
+            // Open infoUrl in browser for interactive submissions on macOS
+            if (isInteractive && infoUrl.length > 0) {
+                NSURL *url = [NSURL URLWithString:infoUrl];
+                if (url) {
+                    NSLog(@"BugSplat: Opening crash report URL in browser: %@", infoUrl);
+                    [[NSWorkspace sharedWorkspace] openURL:url];
+                }
+            }
+#endif
             
             // Notify delegate
             @try {

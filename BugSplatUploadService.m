@@ -72,7 +72,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Crash data is empty"}];
-            completion(NO, error);
+            completion(NO, error, nil);
             return;
         }
         
@@ -100,7 +100,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Failed to create ZIP archive"}];
-            completion(NO, error);
+            completion(NO, error, nil);
             return;
         }
         
@@ -109,14 +109,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         // Step 1: Get presigned URL
         [self getPresignedURLForSize:zipData.length completion:^(NSString *presignedURL, NSError *error) {
             if (error) {
-                completion(NO, error);
+                completion(NO, error, nil);
                 return;
             }
             
             // Step 2: Upload to S3
             [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
                 if (!success) {
-                    completion(NO, uploadError);
+                    completion(NO, uploadError, nil);
                     return;
                 }
                 
@@ -132,7 +132,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                              code:BugSplatUploadErrorCodeInvalidData
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
-        completion(NO, error);
+        completion(NO, error, nil);
     }
 }
 
@@ -314,9 +314,8 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     if (metadata.applicationKey.length > 0) {
         [self appendFormField:@"appKey" value:metadata.applicationKey boundary:boundary toData:body];
     }
-    if (metadata.crashTime) {
-        // Send crash time as Unix timestamp string
-        [self appendFormField:@"crashTime" value:[metadata.crashTime stringValue] boundary:boundary toData:body];
+    if (metadata.crashTime.length > 0) {
+        [self appendFormField:@"crashTime" value:metadata.crashTime boundary:boundary toData:body];
     }
     if (metadata.notes.length > 0) {
         [self appendFormField:@"notes" value:metadata.notes boundary:boundary toData:body];
@@ -342,7 +341,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     self.currentTask = [self.urlSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                completion(NO, error);
+                completion(NO, error, nil);
             });
             return;
         }
@@ -354,14 +353,27 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                                        code:BugSplatUploadErrorCodeServerError
                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Commit failed with status %ld: %@", (long)httpResponse.statusCode, responseBody ?: @""]}];
             dispatch_async(dispatch_get_main_queue(), ^{
-                completion(NO, commitError);
+                completion(NO, commitError, nil);
             });
             return;
         }
         
+        // Parse response to extract infoUrl
+        NSString *infoUrl = nil;
+        if (data.length > 0) {
+            NSError *jsonError = nil;
+            NSDictionary *responseJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+            if (!jsonError && [responseJson isKindOfClass:[NSDictionary class]]) {
+                infoUrl = responseJson[@"infoUrl"];
+                if (infoUrl) {
+                    NSLog(@"BugSplat: Crash report info URL: %@", infoUrl);
+                }
+            }
+        }
+        
         NSLog(@"BugSplat: Crash report uploaded successfully");
         dispatch_async(dispatch_get_main_queue(), ^{
-            completion(YES, nil);
+            completion(YES, nil, infoUrl);
         });
     }];
     

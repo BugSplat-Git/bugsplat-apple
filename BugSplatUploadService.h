@@ -23,10 +23,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSDictionary<NSString *, NSString *> *attributes;
 
 /**
- * The time the crash occurred (Unix timestamp).
+ * The time the crash occurred (ISO 8601 formatted string).
  * This may differ from upload time if the crash couldn't be sent immediately.
  */
-@property (nonatomic, strong, nullable) NSNumber *crashTime;
+@property (nonatomic, copy, nullable) NSString *crashTime;
 
 @end
 
@@ -35,8 +35,9 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @param success YES if the upload was successful.
  * @param error Error object if the upload failed, nil otherwise.
+ * @param infoUrl URL to the crash report details page (only provided on success).
  */
-typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error);
+typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error, NSString * _Nullable infoUrl);
 
 /**
  * Service for uploading crash reports to BugSplat servers.
