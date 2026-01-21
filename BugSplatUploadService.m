@@ -61,60 +61,79 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                  metadata:(BugSplatCrashMetadata *)metadata
                completion:(BugSplatUploadCompletion)completion
 {
-    if (!crashData || crashData.length == 0) {
-        NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
-                                             code:BugSplatUploadErrorCodeInvalidData
-                                         userInfo:@{NSLocalizedDescriptionKey: @"Crash data is empty"}];
-        completion(NO, error);
+    // Defensive: ensure completion is not nil
+    if (!completion) {
+        NSLog(@"BugSplat: uploadCrashReport called with nil completion handler");
         return;
     }
     
-    // Create ZIP archive with crash data and attachments
-    NSMutableArray<BugSplatZipEntry *> *zipEntries = [NSMutableArray array];
-    
-    // Add crash data as the primary file
-    [zipEntries addObject:[BugSplatZipEntry entryWithFilename:crashFilename data:crashData]];
-    
-    // Add all attachments to the ZIP
-    for (BugSplatAttachment *attachment in attachments) {
-        if (attachment.attachmentData && attachment.filename) {
-            [zipEntries addObject:[BugSplatZipEntry entryWithFilename:attachment.filename data:attachment.attachmentData]];
-            NSLog(@"BugSplat: Adding attachment to ZIP: %@", attachment.filename);
-        }
-    }
-    
-    NSData *zipData = [BugSplatZipHelper zipEntries:zipEntries];
-    if (!zipData) {
-        NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
-                                             code:BugSplatUploadErrorCodeInvalidData
-                                         userInfo:@{NSLocalizedDescriptionKey: @"Failed to create ZIP archive"}];
-        completion(NO, error);
-        return;
-    }
-    
-    NSString *md5Hash = [BugSplatZipHelper md5HashOfData:zipData];
-    
-    // Step 1: Get presigned URL
-    [self getPresignedURLForSize:zipData.length completion:^(NSString *presignedURL, NSError *error) {
-        if (error) {
+    @try {
+        if (!crashData || crashData.length == 0) {
+            NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                                 code:BugSplatUploadErrorCodeInvalidData
+                                             userInfo:@{NSLocalizedDescriptionKey: @"Crash data is empty"}];
             completion(NO, error);
             return;
         }
         
-        // Step 2: Upload to S3
-        [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
-            if (!success) {
-                completion(NO, uploadError);
+        // Create ZIP archive with crash data and attachments
+        NSMutableArray<BugSplatZipEntry *> *zipEntries = [NSMutableArray array];
+        
+        // Add crash data as the primary file
+        [zipEntries addObject:[BugSplatZipEntry entryWithFilename:crashFilename ?: @"crash.crashlog" data:crashData]];
+        
+        // Add all attachments to the ZIP (wrapped to prevent crashes from bad attachments)
+        for (BugSplatAttachment *attachment in attachments) {
+            @try {
+                if (attachment && attachment.attachmentData && attachment.filename) {
+                    [zipEntries addObject:[BugSplatZipEntry entryWithFilename:attachment.filename data:attachment.attachmentData]];
+                    NSLog(@"BugSplat: Adding attachment to ZIP: %@", attachment.filename);
+                }
+            } @catch (NSException *exception) {
+                NSLog(@"BugSplat: Exception adding attachment to ZIP: %@ - %@", exception.name, exception.reason);
+                // Continue with remaining attachments
+            }
+        }
+        
+        NSData *zipData = [BugSplatZipHelper zipEntries:zipEntries];
+        if (!zipData) {
+            NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                                 code:BugSplatUploadErrorCodeInvalidData
+                                             userInfo:@{NSLocalizedDescriptionKey: @"Failed to create ZIP archive"}];
+            completion(NO, error);
+            return;
+        }
+        
+        NSString *md5Hash = [BugSplatZipHelper md5HashOfData:zipData];
+    
+        // Step 1: Get presigned URL
+        [self getPresignedURLForSize:zipData.length completion:^(NSString *presignedURL, NSError *error) {
+            if (error) {
+                completion(NO, error);
                 return;
             }
             
-            // Step 3: Commit the upload
-            [self commitUploadWithS3Key:presignedURL
-                                md5Hash:md5Hash
-                               metadata:metadata
-                             completion:completion];
+            // Step 2: Upload to S3
+            [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
+                if (!success) {
+                    completion(NO, uploadError);
+                    return;
+                }
+                
+                // Step 3: Commit the upload
+                [self commitUploadWithS3Key:presignedURL
+                                    md5Hash:md5Hash
+                                   metadata:metadata
+                                 completion:completion];
+            }];
         }];
-    }];
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in uploadCrashReport: %@ - %@", exception.name, exception.reason);
+        NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                             code:BugSplatUploadErrorCodeInvalidData
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
+        completion(NO, error);
+    }
 }
 
 - (void)cancelUpload

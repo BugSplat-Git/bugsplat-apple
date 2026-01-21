@@ -7,36 +7,41 @@
 #if TARGET_OS_OSX
 
 #import "BugSplatCrashReportWindow.h"
+#import <QuartzCore/QuartzCore.h>
 
 static const CGFloat kWindowWidth = 540.0;
 static const CGFloat kPadding = 20.0;
 static const CGFloat kFieldHeight = 24.0;
 static const CGFloat kButtonWidth = 100.0;
 static const CGFloat kButtonHeight = 32.0;
+static const CGFloat kDetailsHeight = 200.0;
 
-@interface BugSplatCrashReportWindow () <NSTextViewDelegate>
+@interface BugSplatCrashReportWindow () <NSTextStorageDelegate>
 
+@property (nonatomic, strong) NSStackView *mainStackView;
 @property (nonatomic, strong) NSImageView *bannerImageView;
 @property (nonatomic, strong) NSTextField *messageLabel;
+@property (nonatomic, strong) NSView *userFieldsContainer;
 @property (nonatomic, strong) NSTextField *nameLabel;
 @property (nonatomic, strong) NSTextField *nameField;
 @property (nonatomic, strong) NSTextField *emailLabel;
 @property (nonatomic, strong) NSTextField *emailField;
-@property (nonatomic, strong) NSButton *commentsDisclosure;
+@property (nonatomic, strong) NSView *commentsContainer;
+@property (nonatomic, strong) NSTextField *commentsLabel;
 @property (nonatomic, strong) NSScrollView *commentsScrollView;
 @property (nonatomic, strong) NSTextView *commentsTextView;
+@property (nonatomic, strong) NSTextField *commentsPlaceholder;
+@property (nonatomic, strong) NSView *detailsContainer;
+@property (nonatomic, strong) NSScrollView *detailsScrollView;
+@property (nonatomic, strong) NSTextView *detailsTextView;
+@property (nonatomic, strong) NSView *buttonsContainer;
 @property (nonatomic, strong) NSButton *showDetailsButton;
 @property (nonatomic, strong) NSButton *cancelButton;
 @property (nonatomic, strong) NSButton *sendButton;
 @property (nonatomic, strong) NSTextField *footerLabel;
-@property (nonatomic, strong) NSView *detailsContainer;
-@property (nonatomic, strong) NSScrollView *detailsScrollView;
-@property (nonatomic, strong) NSTextView *detailsTextView;
 
 @property (nonatomic, copy) BugSplatCrashReportCompletion completion;
-@property (nonatomic, assign) BOOL commentsExpanded;
-@property (nonatomic, assign) BOOL detailsVisible;
-@property (nonatomic, assign) BOOL showingPlaceholder;
+@property (nonatomic, strong) NSLayoutConstraint *detailsHeightConstraint;
 
 @end
 
@@ -52,8 +57,6 @@ static const CGFloat kButtonHeight = 32.0;
     self = [super initWithWindow:window];
     if (self) {
         _askUserDetails = YES;
-        _commentsExpanded = YES;
-        _detailsVisible = NO;
         
         [self setupUI];
     }
@@ -63,62 +66,159 @@ static const CGFloat kButtonHeight = 32.0;
 - (void)setupUI
 {
     NSView *contentView = self.window.contentView;
-    contentView.wantsLayer = YES;
-    
-    CGFloat yOffset = 0;
     CGFloat contentWidth = kWindowWidth - (kPadding * 2);
     
-    // Calculate layout from bottom to top
+    // Create main vertical stack view
+    self.mainStackView = [[NSStackView alloc] init];
+    self.mainStackView.orientation = NSUserInterfaceLayoutOrientationVertical;
+    self.mainStackView.alignment = NSLayoutAttributeLeading;
+    self.mainStackView.spacing = 8;
+    self.mainStackView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.mainStackView.edgeInsets = NSEdgeInsetsMake(kPadding, kPadding, kPadding, kPadding);
+    [contentView addSubview:self.mainStackView];
     
-    // Footer label
+    // Pin stack view to window edges
+    [NSLayoutConstraint activateConstraints:@[
+        [self.mainStackView.topAnchor constraintEqualToAnchor:contentView.topAnchor],
+        [self.mainStackView.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
+        [self.mainStackView.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
+        [self.mainStackView.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor]
+    ]];
+    
+    // === Banner Image ===
+    self.bannerImageView = [[NSImageView alloc] init];
+    self.bannerImageView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.bannerImageView.imageScaling = NSImageScaleProportionallyDown;
+    self.bannerImageView.imageAlignment = NSImageAlignCenter;
+    [self.mainStackView addArrangedSubview:self.bannerImageView];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.bannerImageView.widthAnchor constraintEqualToConstant:contentWidth],
+        [self.bannerImageView.heightAnchor constraintEqualToConstant:110]
+    ]];
+    
+    // === Message Label ===
+    self.messageLabel = [self createLabelWithText:@""];
+    self.messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.messageLabel.font = [NSFont systemFontOfSize:13];
+    self.messageLabel.lineBreakMode = NSLineBreakByWordWrapping;
+    self.messageLabel.maximumNumberOfLines = 2;
+    [self.mainStackView addArrangedSubview:self.messageLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.messageLabel.widthAnchor constraintEqualToConstant:contentWidth],
+        [self.messageLabel.heightAnchor constraintEqualToConstant:40]
+    ]];
+    
+    // === User Fields Container (Name/Email) ===
+    [self setupUserFieldsContainer:contentWidth];
+    [self.mainStackView addArrangedSubview:self.userFieldsContainer];
+    
+    // === Comments Container ===
+    [self setupCommentsContainer:contentWidth];
+    [self.mainStackView addArrangedSubview:self.commentsContainer];
+    
+    // === Details Container (collapsible) ===
+    [self setupDetailsContainer:contentWidth];
+    [self.mainStackView addArrangedSubview:self.detailsContainer];
+    // Start collapsed - use height=0 and alpha=0 (not hidden)
+    // This ensures the view always participates in layout, avoiding first-animation jank
+    self.detailsHeightConstraint.constant = 0;
+    self.detailsContainer.alphaValue = 0;
+    
+    // === Buttons Container ===
+    [self setupButtonsContainer:contentWidth];
+    [self.mainStackView addArrangedSubview:self.buttonsContainer];
+    
+    // === Footer Label ===
     self.footerLabel = [self createLabelWithText:@"Only the presented data will be sent with this report."];
+    self.footerLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.footerLabel.font = [NSFont systemFontOfSize:11];
     self.footerLabel.textColor = [NSColor secondaryLabelColor];
-    [contentView addSubview:self.footerLabel];
-    yOffset = kPadding;
-    self.footerLabel.frame = NSMakeRect(kPadding, yOffset, contentWidth, 16);
-    yOffset += 20;
+    [self.mainStackView addArrangedSubview:self.footerLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.footerLabel.widthAnchor constraintEqualToConstant:contentWidth]
+    ]];
+}
+
+- (void)setupUserFieldsContainer:(CGFloat)contentWidth
+{
+    self.userFieldsContainer = [[NSView alloc] init];
+    self.userFieldsContainer.translatesAutoresizingMaskIntoConstraints = NO;
     
-    // Buttons row
-    self.sendButton = [self createButtonWithTitle:@"Send" action:@selector(sendClicked:)];
-    self.sendButton.keyEquivalent = @"\r";
-    self.sendButton.bezelStyle = NSBezelStyleRounded;
-    [contentView addSubview:self.sendButton];
+    CGFloat fieldWidth = (contentWidth - 20) / 2;
     
-    self.cancelButton = [self createButtonWithTitle:@"Cancel" action:@selector(cancelClicked:)];
-    self.cancelButton.keyEquivalent = @"\033";
-    self.cancelButton.bezelStyle = NSBezelStyleRounded;
-    [contentView addSubview:self.cancelButton];
+    // Name label
+    self.nameLabel = [self createLabelWithText:@"Name"];
+    self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.nameLabel.font = [NSFont systemFontOfSize:13];
+    [self.userFieldsContainer addSubview:self.nameLabel];
     
-    self.showDetailsButton = [self createButtonWithTitle:@"Show Details" action:@selector(showDetailsClicked:)];
-    self.showDetailsButton.bezelStyle = NSBezelStyleRounded;
-    [contentView addSubview:self.showDetailsButton];
+    // Name field
+    self.nameField = [[NSTextField alloc] init];
+    self.nameField.translatesAutoresizingMaskIntoConstraints = NO;
+    self.nameField.placeholderString = @"";
+    self.nameField.bezelStyle = NSTextFieldRoundedBezel;
+    self.nameField.font = [NSFont systemFontOfSize:13];
+    [self.userFieldsContainer addSubview:self.nameField];
     
-    CGFloat buttonY = yOffset;
-    self.sendButton.frame = NSMakeRect(kWindowWidth - kPadding - kButtonWidth, buttonY, kButtonWidth, kButtonHeight);
-    self.cancelButton.frame = NSMakeRect(kWindowWidth - kPadding - kButtonWidth * 2 - 10, buttonY, kButtonWidth, kButtonHeight);
-    self.showDetailsButton.frame = NSMakeRect(kPadding, buttonY, 120, kButtonHeight);
-    yOffset += kButtonHeight + kPadding;
+    // Email label
+    self.emailLabel = [self createLabelWithText:@"Email"];
+    self.emailLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.emailLabel.font = [NSFont systemFontOfSize:13];
+    [self.userFieldsContainer addSubview:self.emailLabel];
     
-    // Comments section
-    self.commentsDisclosure = [[NSButton alloc] initWithFrame:NSZeroRect];
-    self.commentsDisclosure.bezelStyle = NSBezelStyleDisclosure;
-    self.commentsDisclosure.title = @"";
-    self.commentsDisclosure.state = NSControlStateValueOn;
-    self.commentsDisclosure.target = self;
-    self.commentsDisclosure.action = @selector(commentsDisclosureClicked:);
-    [contentView addSubview:self.commentsDisclosure];
+    // Email field
+    self.emailField = [[NSTextField alloc] init];
+    self.emailField.translatesAutoresizingMaskIntoConstraints = NO;
+    self.emailField.placeholderString = @"";
+    self.emailField.bezelStyle = NSTextFieldRoundedBezel;
+    self.emailField.font = [NSFont systemFontOfSize:13];
+    [self.userFieldsContainer addSubview:self.emailField];
     
-    NSTextField *commentsLabel = [self createLabelWithText:@"Comments"];
-    commentsLabel.font = [NSFont systemFontOfSize:13];
-    [contentView addSubview:commentsLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.userFieldsContainer.widthAnchor constraintEqualToConstant:contentWidth],
+        [self.userFieldsContainer.heightAnchor constraintEqualToConstant:kFieldHeight + 22],
+        
+        [self.nameLabel.topAnchor constraintEqualToAnchor:self.userFieldsContainer.topAnchor],
+        [self.nameLabel.leadingAnchor constraintEqualToAnchor:self.userFieldsContainer.leadingAnchor],
+        [self.nameLabel.widthAnchor constraintEqualToConstant:fieldWidth],
+        
+        [self.emailLabel.topAnchor constraintEqualToAnchor:self.userFieldsContainer.topAnchor],
+        [self.emailLabel.leadingAnchor constraintEqualToAnchor:self.nameLabel.trailingAnchor constant:20],
+        [self.emailLabel.widthAnchor constraintEqualToConstant:fieldWidth],
+        
+        [self.nameField.topAnchor constraintEqualToAnchor:self.nameLabel.bottomAnchor constant:4],
+        [self.nameField.leadingAnchor constraintEqualToAnchor:self.userFieldsContainer.leadingAnchor],
+        [self.nameField.widthAnchor constraintEqualToConstant:fieldWidth],
+        [self.nameField.heightAnchor constraintEqualToConstant:kFieldHeight],
+        
+        [self.emailField.topAnchor constraintEqualToAnchor:self.emailLabel.bottomAnchor constant:4],
+        [self.emailField.leadingAnchor constraintEqualToAnchor:self.nameField.trailingAnchor constant:20],
+        [self.emailField.widthAnchor constraintEqualToConstant:fieldWidth],
+        [self.emailField.heightAnchor constraintEqualToConstant:kFieldHeight]
+    ]];
+}
+
+- (void)setupCommentsContainer:(CGFloat)contentWidth
+{
+    self.commentsContainer = [[NSView alloc] init];
+    self.commentsContainer.translatesAutoresizingMaskIntoConstraints = NO;
     
-    self.commentsScrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
+    // Comments label
+    self.commentsLabel = [self createLabelWithText:@"Comments"];
+    self.commentsLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.commentsLabel.font = [NSFont systemFontOfSize:13];
+    [self.commentsContainer addSubview:self.commentsLabel];
+    
+    // Comments scroll view
+    self.commentsScrollView = [[NSScrollView alloc] init];
+    self.commentsScrollView.translatesAutoresizingMaskIntoConstraints = NO;
     self.commentsScrollView.hasVerticalScroller = YES;
     self.commentsScrollView.hasHorizontalScroller = NO;
     self.commentsScrollView.autohidesScrollers = YES;
     self.commentsScrollView.borderType = NSBezelBorder;
+    [self.commentsContainer addSubview:self.commentsScrollView];
     
+    // Comments text view
     self.commentsTextView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, contentWidth - 20, 100)];
     self.commentsTextView.minSize = NSMakeSize(0, 100);
     self.commentsTextView.maxSize = NSMakeSize(FLT_MAX, FLT_MAX);
@@ -127,93 +227,59 @@ static const CGFloat kButtonHeight = 32.0;
     self.commentsTextView.autoresizingMask = NSViewWidthSizable;
     self.commentsTextView.textContainer.containerSize = NSMakeSize(contentWidth - 20, FLT_MAX);
     self.commentsTextView.textContainer.widthTracksTextView = YES;
+    self.commentsTextView.textContainerInset = NSMakeSize(0, 4);
     self.commentsTextView.font = [NSFont systemFontOfSize:13];
-    
-    self.commentsTextView.delegate = self;
-    
+    self.commentsTextView.textColor = [NSColor textColor];
+    self.commentsTextView.textStorage.delegate = self;
     self.commentsScrollView.documentView = self.commentsTextView;
-    [contentView addSubview:self.commentsScrollView];
+    
+    // Placeholder label - use frame-based positioning (Auto Layout doesn't work well inside scroll views)
+    self.commentsPlaceholder = [[NSTextField alloc] initWithFrame:NSMakeRect(5, 4, contentWidth - 10, 18)];
+    self.commentsPlaceholder.stringValue = @"Please describe any steps needed to trigger the problem";
+    self.commentsPlaceholder.bordered = NO;
+    self.commentsPlaceholder.editable = NO;
+    self.commentsPlaceholder.selectable = NO;
+    self.commentsPlaceholder.drawsBackground = NO;
+    self.commentsPlaceholder.textColor = [NSColor placeholderTextColor];
+    self.commentsPlaceholder.font = [NSFont systemFontOfSize:13];
+    [self.commentsScrollView addSubview:self.commentsPlaceholder];
     
     CGFloat commentsHeight = 120;
-    self.commentsScrollView.frame = NSMakeRect(kPadding, yOffset, contentWidth, commentsHeight);
-    yOffset += commentsHeight + 8;
-    
-    self.commentsDisclosure.frame = NSMakeRect(kPadding - 4, yOffset, 20, 20);
-    commentsLabel.frame = NSMakeRect(kPadding + 16, yOffset, 100, 20);
-    yOffset += 28;
-    
-    // Email field
-    self.emailLabel = [self createLabelWithText:@"Email"];
-    self.emailLabel.font = [NSFont systemFontOfSize:13];
-    [contentView addSubview:self.emailLabel];
-    
-    self.emailField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.emailField.placeholderString = @"";
-    self.emailField.bezelStyle = NSTextFieldRoundedBezel;
-    self.emailField.font = [NSFont systemFontOfSize:13];
-    [contentView addSubview:self.emailField];
-    
-    // Name field
-    self.nameLabel = [self createLabelWithText:@"Name"];
-    self.nameLabel.font = [NSFont systemFontOfSize:13];
-    [contentView addSubview:self.nameLabel];
-    
-    self.nameField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.nameField.placeholderString = @"";
-    self.nameField.bezelStyle = NSTextFieldRoundedBezel;
-    self.nameField.font = [NSFont systemFontOfSize:13];
-    [contentView addSubview:self.nameField];
-    
-    CGFloat fieldWidth = (contentWidth - 20) / 2;
-    self.nameLabel.frame = NSMakeRect(kPadding, yOffset + kFieldHeight + 4, fieldWidth, 18);
-    self.emailLabel.frame = NSMakeRect(kPadding + fieldWidth + 20, yOffset + kFieldHeight + 4, fieldWidth, 18);
-    self.nameField.frame = NSMakeRect(kPadding, yOffset, fieldWidth, kFieldHeight);
-    self.emailField.frame = NSMakeRect(kPadding + fieldWidth + 20, yOffset, fieldWidth, kFieldHeight);
-    yOffset += kFieldHeight + 26;
-    
-    // Message label
-    self.messageLabel = [self createLabelWithText:@""];
-    self.messageLabel.font = [NSFont systemFontOfSize:13];
-    self.messageLabel.lineBreakMode = NSLineBreakByWordWrapping;
-    self.messageLabel.maximumNumberOfLines = 2;
-    [contentView addSubview:self.messageLabel];
-    self.messageLabel.frame = NSMakeRect(kPadding, yOffset, contentWidth, 40);
-    yOffset += 48;
-    
-    // Banner image
-    self.bannerImageView = [[NSImageView alloc] initWithFrame:NSZeroRect];
-    self.bannerImageView.imageScaling = NSImageScaleProportionallyDown;
-    self.bannerImageView.imageAlignment = NSImageAlignCenter;
-    [contentView addSubview:self.bannerImageView];
-    self.bannerImageView.frame = NSMakeRect(kPadding, yOffset, contentWidth, 110);
-    yOffset += 110 + kPadding;
-    
-    // Set window height
-    NSRect windowFrame = self.window.frame;
-    windowFrame.size.height = yOffset;
-    [self.window setFrame:windowFrame display:NO];
-    
-    // Details container (initially hidden)
-    [self setupDetailsContainer];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.commentsContainer.widthAnchor constraintEqualToConstant:contentWidth],
+        [self.commentsContainer.heightAnchor constraintEqualToConstant:commentsHeight + 28],
+        
+        [self.commentsLabel.topAnchor constraintEqualToAnchor:self.commentsContainer.topAnchor],
+        [self.commentsLabel.leadingAnchor constraintEqualToAnchor:self.commentsContainer.leadingAnchor],
+        
+        [self.commentsScrollView.topAnchor constraintEqualToAnchor:self.commentsLabel.bottomAnchor constant:8],
+        [self.commentsScrollView.leadingAnchor constraintEqualToAnchor:self.commentsContainer.leadingAnchor],
+        [self.commentsScrollView.trailingAnchor constraintEqualToAnchor:self.commentsContainer.trailingAnchor],
+        [self.commentsScrollView.heightAnchor constraintEqualToConstant:commentsHeight]
+    ]];
 }
 
-- (void)setupDetailsContainer
+- (void)setupDetailsContainer:(CGFloat)contentWidth
 {
-    self.detailsContainer = [[NSView alloc] initWithFrame:NSZeroRect];
-    self.detailsContainer.hidden = YES;
-    [self.window.contentView addSubview:self.detailsContainer];
+    self.detailsContainer = [[NSView alloc] init];
+    self.detailsContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    self.detailsContainer.wantsLayer = YES;
+    self.detailsContainer.layer.masksToBounds = YES; // Clip content when collapsed
     
-    self.detailsScrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
+    // Details scroll view
+    self.detailsScrollView = [[NSScrollView alloc] init];
+    self.detailsScrollView.translatesAutoresizingMaskIntoConstraints = NO;
     self.detailsScrollView.hasVerticalScroller = YES;
     self.detailsScrollView.hasHorizontalScroller = YES;
     self.detailsScrollView.autohidesScrollers = YES;
     self.detailsScrollView.borderType = NSBezelBorder;
+    [self.detailsContainer addSubview:self.detailsScrollView];
     
-    self.detailsTextView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 400, 200)];
+    // Details text view
+    self.detailsTextView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, contentWidth, kDetailsHeight)];
     self.detailsTextView.editable = NO;
     self.detailsTextView.font = [NSFont fontWithName:@"Menlo" size:11];
     if (!self.detailsTextView.font) {
-        // Fallback for when Menlo isn't available
         if (@available(macOS 10.15, *)) {
             self.detailsTextView.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
         } else {
@@ -222,9 +288,64 @@ static const CGFloat kButtonHeight = 32.0;
     }
     self.detailsTextView.textContainer.widthTracksTextView = NO;
     self.detailsTextView.textContainer.containerSize = NSMakeSize(FLT_MAX, FLT_MAX);
-    
     self.detailsScrollView.documentView = self.detailsTextView;
-    [self.detailsContainer addSubview:self.detailsScrollView];
+    
+    self.detailsHeightConstraint = [self.detailsContainer.heightAnchor constraintEqualToConstant:kDetailsHeight];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.detailsContainer.widthAnchor constraintEqualToConstant:contentWidth],
+        self.detailsHeightConstraint,
+        
+        [self.detailsScrollView.topAnchor constraintEqualToAnchor:self.detailsContainer.topAnchor],
+        [self.detailsScrollView.leadingAnchor constraintEqualToAnchor:self.detailsContainer.leadingAnchor],
+        [self.detailsScrollView.trailingAnchor constraintEqualToAnchor:self.detailsContainer.trailingAnchor],
+        [self.detailsScrollView.bottomAnchor constraintEqualToAnchor:self.detailsContainer.bottomAnchor]
+    ]];
+}
+
+- (void)setupButtonsContainer:(CGFloat)contentWidth
+{
+    self.buttonsContainer = [[NSView alloc] init];
+    self.buttonsContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    
+    // Show Details button
+    self.showDetailsButton = [self createButtonWithTitle:@"Show Details" action:@selector(showDetailsClicked:)];
+    self.showDetailsButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.showDetailsButton.bezelStyle = NSBezelStyleRounded;
+    [self.buttonsContainer addSubview:self.showDetailsButton];
+    
+    // Cancel button
+    self.cancelButton = [self createButtonWithTitle:@"Cancel" action:@selector(cancelClicked:)];
+    self.cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.cancelButton.keyEquivalent = @"\033";
+    self.cancelButton.bezelStyle = NSBezelStyleRounded;
+    [self.buttonsContainer addSubview:self.cancelButton];
+    
+    // Send button
+    self.sendButton = [self createButtonWithTitle:@"Send" action:@selector(sendClicked:)];
+    self.sendButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.sendButton.keyEquivalent = @"\r";
+    self.sendButton.bezelStyle = NSBezelStyleRounded;
+    [self.buttonsContainer addSubview:self.sendButton];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [self.buttonsContainer.widthAnchor constraintEqualToConstant:contentWidth],
+        [self.buttonsContainer.heightAnchor constraintEqualToConstant:kButtonHeight],
+        
+        [self.showDetailsButton.leadingAnchor constraintEqualToAnchor:self.buttonsContainer.leadingAnchor],
+        [self.showDetailsButton.centerYAnchor constraintEqualToAnchor:self.buttonsContainer.centerYAnchor],
+        [self.showDetailsButton.widthAnchor constraintEqualToConstant:120],
+        [self.showDetailsButton.heightAnchor constraintEqualToConstant:kButtonHeight],
+        
+        [self.sendButton.trailingAnchor constraintEqualToAnchor:self.buttonsContainer.trailingAnchor],
+        [self.sendButton.centerYAnchor constraintEqualToAnchor:self.buttonsContainer.centerYAnchor],
+        [self.sendButton.widthAnchor constraintEqualToConstant:kButtonWidth],
+        [self.sendButton.heightAnchor constraintEqualToConstant:kButtonHeight],
+        
+        [self.cancelButton.trailingAnchor constraintEqualToAnchor:self.sendButton.leadingAnchor constant:-10],
+        [self.cancelButton.centerYAnchor constraintEqualToAnchor:self.buttonsContainer.centerYAnchor],
+        [self.cancelButton.widthAnchor constraintEqualToConstant:kButtonWidth],
+        [self.cancelButton.heightAnchor constraintEqualToConstant:kButtonHeight]
+    ]];
 }
 
 - (NSTextField *)createLabelWithText:(NSString *)text
@@ -256,7 +377,7 @@ static const CGFloat kButtonHeight = 32.0;
     // Update message
     self.messageLabel.stringValue = [NSString stringWithFormat:@"%@ unexpectedly quit. Would you like to send a report so we can fix the problem?", self.applicationName ?: @"The application"];
     
-    // Update banner image - use custom image or default BugSplat logo
+    // Update banner image
     if (self.bannerImage) {
         self.bannerImageView.image = self.bannerImage;
     } else {
@@ -264,10 +385,7 @@ static const CGFloat kButtonHeight = 32.0;
     }
     
     // Update name/email fields visibility
-    self.nameLabel.hidden = !self.askUserDetails;
-    self.nameField.hidden = !self.askUserDetails;
-    self.emailLabel.hidden = !self.askUserDetails;
-    self.emailField.hidden = !self.askUserDetails;
+    self.userFieldsContainer.hidden = !self.askUserDetails;
     
     // Pre-fill fields
     if (self.prefillUserName) {
@@ -282,8 +400,8 @@ static const CGFloat kButtonHeight = 32.0;
         self.detailsTextView.string = self.crashReportText;
     }
     
-    // Update placeholder
-    [self updateCommentsPlaceholder];
+    // Update placeholder visibility
+    [self updatePlaceholderVisibility];
 }
 
 - (NSImage *)createDefaultBugSplatLogo
@@ -294,18 +412,15 @@ static const CGFloat kButtonHeight = 32.0;
     NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(width, height)];
     [image lockFocus];
     
-    // Draw background (transparent)
     [[NSColor clearColor] setFill];
     NSRectFill(NSMakeRect(0, 0, width, height));
     
-    // Draw BugSplat text
     NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
     paragraphStyle.alignment = NSTextAlignmentCenter;
     
-    // Main "BugSplat" text
     NSDictionary *mainAttrs = @{
         NSFontAttributeName: [NSFont boldSystemFontOfSize:42],
-        NSForegroundColorAttributeName: [NSColor colorWithRed:0.2 green:0.6 blue:0.86 alpha:1.0], // BugSplat blue
+        NSForegroundColorAttributeName: [NSColor colorWithRed:0.2 green:0.6 blue:0.86 alpha:1.0],
         NSParagraphStyleAttributeName: paragraphStyle
     };
     
@@ -314,7 +429,6 @@ static const CGFloat kButtonHeight = 32.0;
     NSRect mainRect = NSMakeRect(0, (height - mainSize.height) / 2 + 10, width, mainSize.height);
     [mainText drawInRect:mainRect withAttributes:mainAttrs];
     
-    // Tagline
     NSDictionary *taglineAttrs = @{
         NSFontAttributeName: [NSFont systemFontOfSize:14],
         NSForegroundColorAttributeName: [NSColor secondaryLabelColor],
@@ -331,29 +445,27 @@ static const CGFloat kButtonHeight = 32.0;
     return image;
 }
 
-- (void)updateCommentsPlaceholder
+- (void)updatePlaceholderVisibility
 {
-    if (self.commentsTextView.string.length == 0 || self.showingPlaceholder) {
-        self.showingPlaceholder = YES;
-        self.commentsTextView.string = @"Please describe any steps needed to trigger the problem";
-        self.commentsTextView.textColor = [NSColor placeholderTextColor];
-    }
-}
-
-- (void)clearPlaceholderIfNeeded
-{
-    if (self.showingPlaceholder) {
-        self.showingPlaceholder = NO;
-        self.commentsTextView.string = @"";
-        self.commentsTextView.textColor = [NSColor textColor];
-    }
+    BOOL hasText = self.commentsTextView.string.length > 0;
+    self.commentsPlaceholder.hidden = hasText;
 }
 
 - (void)showWithCompletion:(BugSplatCrashReportCompletion)completion
 {
     self.completion = completion;
     [self updateUI];
-    [self relayoutWindow];
+    
+    // Let Auto Layout calculate the size
+    [self.window layoutIfNeeded];
+    CGFloat height = self.mainStackView.fittingSize.height;
+    NSRect frame = self.window.frame;
+    frame.size.height = height;
+    [self.window setFrame:frame display:NO];
+    
+    // Pre-warm Core Animation to avoid first-animation jank
+    [self prewarmAnimationLayers];
+    
     [self.window center];
     [self showWindow:nil];
     [self.window makeKeyAndOrderFront:nil];
@@ -364,18 +476,41 @@ static const CGFloat kButtonHeight = 32.0;
 {
     self.completion = completion;
     [self updateUI];
-    [self relayoutWindow];
+    
+    // Let Auto Layout calculate the size
+    [self.window layoutIfNeeded];
+    CGFloat height = self.mainStackView.fittingSize.height;
+    NSRect frame = self.window.frame;
+    frame.size.height = height;
+    [self.window setFrame:frame display:NO];
+    
+    // Pre-warm Core Animation to avoid first-animation jank
+    [self prewarmAnimationLayers];
+    
     [self.window center];
     [NSApp runModalForWindow:self.window];
+}
+
+- (void)prewarmAnimationLayers
+{
+    // Force layer-backed rendering for smooth animations
+    self.window.contentView.wantsLayer = YES;
+    
+    // Ensure the details container (which will animate) has its layer ready
+    self.detailsContainer.wantsLayer = YES;
+    self.detailsContainer.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
+    
+    // Force complete layout pass
+    [self.window.contentView layoutSubtreeIfNeeded];
 }
 
 #pragma mark - Actions
 
 - (void)sendClicked:(id)sender
 {
-    NSString *name = self.nameField.stringValue;
-    NSString *email = self.emailField.stringValue;
-    NSString *comments = self.showingPlaceholder ? @"" : self.commentsTextView.string;
+    NSString *name = self.nameField.stringValue ?: @"";
+    NSString *email = self.emailField.stringValue ?: @"";
+    NSString *comments = self.commentsTextView.string ?: @"";
     
     [self.window close];
     [NSApp stopModal];
@@ -395,119 +530,40 @@ static const CGFloat kButtonHeight = 32.0;
     }
 }
 
-- (void)commentsDisclosureClicked:(id)sender
-{
-    self.commentsExpanded = !self.commentsExpanded;
-    self.commentsDisclosure.state = self.commentsExpanded ? NSControlStateValueOn : NSControlStateValueOff;
-    self.commentsScrollView.hidden = !self.commentsExpanded;
-    
-    [self relayoutWindow];
-}
-
 - (void)showDetailsClicked:(id)sender
 {
-    self.detailsVisible = !self.detailsVisible;
-    self.showDetailsButton.title = self.detailsVisible ? @"Hide Details" : @"Show Details";
-    self.detailsContainer.hidden = !self.detailsVisible;
+    BOOL isCurrentlyCollapsed = (self.detailsHeightConstraint.constant == 0);
     
-    [self relayoutWindow];
+    self.showDetailsButton.title = isCurrentlyCollapsed ? @"Hide Details" : @"Show Details";
+    
+    CGFloat targetDetailsHeight = isCurrentlyCollapsed ? kDetailsHeight : 0;
+    CGFloat heightDelta = targetDetailsHeight - self.detailsHeightConstraint.constant;
+    
+    // Animate everything together
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.25;
+        context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        
+        // Animate the height constraint
+        self.detailsHeightConstraint.animator.constant = targetDetailsHeight;
+        
+        // Animate the alpha
+        self.detailsContainer.animator.alphaValue = isCurrentlyCollapsed ? 1.0 : 0.0;
+        
+        // Animate window frame - keep top edge fixed
+        NSRect frame = self.window.frame;
+        frame.origin.y -= heightDelta;
+        frame.size.height += heightDelta;
+        [self.window.animator setFrame:frame display:YES];
+        
+    } completionHandler:nil];
 }
 
-- (void)relayoutWindow
-{
-    CGFloat contentWidth = kWindowWidth - (kPadding * 2);
-    CGFloat yOffset = kPadding;
-    
-    // Layout from bottom to top:
-    // Footer -> Buttons -> Details (if visible) -> Comments -> Name/Email -> Message -> Banner
-    
-    // Footer at bottom
-    self.footerLabel.frame = NSMakeRect(kPadding, yOffset, contentWidth, 16);
-    yOffset += 20;
-    
-    // Buttons row (above footer)
-    self.sendButton.frame = NSMakeRect(kWindowWidth - kPadding - kButtonWidth, yOffset, kButtonWidth, kButtonHeight);
-    self.cancelButton.frame = NSMakeRect(kWindowWidth - kPadding - kButtonWidth * 2 - 10, yOffset, kButtonWidth, kButtonHeight);
-    self.showDetailsButton.frame = NSMakeRect(kPadding, yOffset, 120, kButtonHeight);
-    yOffset += kButtonHeight + kPadding;
-    
-    // Details section (if visible) - between buttons and comments
-    if (self.detailsVisible) {
-        CGFloat detailsHeight = 200;
-        self.detailsContainer.frame = NSMakeRect(0, yOffset, kWindowWidth, detailsHeight);
-        self.detailsScrollView.frame = NSMakeRect(kPadding, 5, contentWidth, detailsHeight - 10);
-        yOffset += detailsHeight + kPadding;
-    }
-    
-    // Comments section
-    if (self.commentsExpanded) {
-        CGFloat commentsHeight = 120;
-        self.commentsScrollView.frame = NSMakeRect(kPadding, yOffset, contentWidth, commentsHeight);
-        yOffset += commentsHeight + 8;
-    }
-    
-    // Comments label and disclosure
-    NSView *commentsLabel = nil;
-    for (NSView *subview in self.window.contentView.subviews) {
-        if ([subview isKindOfClass:[NSTextField class]]) {
-            NSTextField *tf = (NSTextField *)subview;
-            if ([tf.stringValue isEqualToString:@"Comments"]) {
-                commentsLabel = tf;
-                break;
-            }
-        }
-    }
-    self.commentsDisclosure.frame = NSMakeRect(kPadding - 4, yOffset, 20, 20);
-    if (commentsLabel) {
-        commentsLabel.frame = NSMakeRect(kPadding + 16, yOffset, 100, 20);
-    }
-    yOffset += 28;
-    
-    // Name/Email fields
-    CGFloat fieldWidth = (contentWidth - 20) / 2;
-    self.nameLabel.frame = NSMakeRect(kPadding, yOffset + kFieldHeight + 4, fieldWidth, 18);
-    self.emailLabel.frame = NSMakeRect(kPadding + fieldWidth + 20, yOffset + kFieldHeight + 4, fieldWidth, 18);
-    self.nameField.frame = NSMakeRect(kPadding, yOffset, fieldWidth, kFieldHeight);
-    self.emailField.frame = NSMakeRect(kPadding + fieldWidth + 20, yOffset, fieldWidth, kFieldHeight);
-    yOffset += kFieldHeight + 26;
-    
-    // Message label
-    self.messageLabel.frame = NSMakeRect(kPadding, yOffset, contentWidth, 40);
-    yOffset += 48;
-    
-    // Banner image (always visible - use default if no custom image)
-    self.bannerImageView.frame = NSMakeRect(kPadding, yOffset, contentWidth, 110);
-    yOffset += 110 + kPadding;
-    
-    // Resize window
-    NSRect frame = self.window.frame;
-    CGFloat heightDiff = yOffset - frame.size.height;
-    frame.size.height = yOffset;
-    frame.origin.y -= heightDiff;
-    
-    [self.window setFrame:frame display:YES animate:YES];
-}
+#pragma mark - NSTextStorageDelegate
 
-#pragma mark - NSTextViewDelegate
-
-- (BOOL)textView:(NSTextView *)textView shouldChangeTextInRange:(NSRange)affectedCharRange replacementString:(NSString *)replacementString
+- (void)textStorage:(NSTextStorage *)textStorage didProcessEditing:(NSTextStorageEditActions)editedMask range:(NSRange)editedRange changeInLength:(NSInteger)delta
 {
-    // Placeholder is now cleared in textDidBeginEditing: when the field gets focus
-    return YES;
-}
-
-- (void)textDidBeginEditing:(NSNotification *)notification
-{
-    if (notification.object == self.commentsTextView) {
-        [self clearPlaceholderIfNeeded];
-    }
-}
-
-- (void)textDidEndEditing:(NSNotification *)notification
-{
-    if (notification.object == self.commentsTextView && self.commentsTextView.string.length == 0) {
-        [self updateCommentsPlaceholder];
-    }
+    [self updatePlaceholderVisibility];
 }
 
 @end
