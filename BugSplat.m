@@ -40,6 +40,7 @@ static NSString *const kBugSplatMetaKeyAttributes = @"attributes";
 static NSString *const kBugSplatMetaKeyApplicationLog = @"applicationLog";
 static NSString *const kBugSplatMetaKeyApplicationKey = @"applicationKey";
 static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
+static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
 
 @interface BugSplat ()
 
@@ -314,21 +315,14 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
  * Process any pending crash reports from our crashes directory.
  * This handles both new crashes and previously failed uploads (offline retry).
  *
- * Following HockeyApp's behavior:
- * - Shows dialog only for the FIRST pending crash (if autoSubmitCrashReport is NO)
- * - After user approves, remaining crashes are sent silently
- * - If autoSubmitCrashReport is YES, all crashes are sent silently
+ * For each crash:
+ * - If user already submitted it (failed upload) → retry silently
+ * - If autoSubmitCrashReport is YES → send silently
+ * - If crash is expired (macOS) → send silently
+ * - If user chose "Always Send" (iOS) → send silently
+ * - Otherwise → show dialog for user to approve
  */
 - (void)processPendingCrashReports
-{
-    [self processPendingCrashReportsShowingDialog:!self.autoSubmitCrashReport];
-}
-
-/**
- * Process pending crash reports with control over whether to show a dialog.
- * @param showDialog If YES, shows dialog for the first crash. If NO, sends silently.
- */
-- (void)processPendingCrashReportsShowingDialog:(BOOL)showDialog
 {
     if (self.sendingInProgress) {
         NSLog(@"BugSplat: Sending already in progress, skipping");
@@ -358,8 +352,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
         NSLog(@"BugSplat: Failed to load crash report from %@, cleaning up", crashFilename);
         [self cleanupCrashReportWithFilename:crashFilename];
         self.sendingInProgress = NO;
-        // Try next crash report (silently, since we're past the first one)
-        [self processPendingCrashReportsShowingDialog:NO];
+        [self processPendingCrashReports];
         return;
     }
     
@@ -368,7 +361,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
         NSLog(@"BugSplat: Failed to decode crash report text, cleaning up");
         [self cleanupCrashReportWithFilename:crashFilename];
         self.sendingInProgress = NO;
-        [self processPendingCrashReportsShowingDialog:NO];
+        [self processPendingCrashReports];
         return;
     }
     
@@ -377,63 +370,79 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
     NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
     
-    // Check expiration (macOS only) - expired crashes are auto-submitted silently
+    // Determine if we should send silently or show a dialog
+    BOOL sendSilently = [self shouldSendCrashSilently:metadata];
+    
+    if (sendSilently) {
+        NSLog(@"BugSplat: Sending crash %@ silently", crashFilename);
+        [self submitCrashSilentlyWithFilename:crashFilename
+                              crashReportText:crashReportText
+                                     metadata:metadata];
+    } else {
 #if TARGET_OS_OSX
+        [self showCrashReportDialogForFilename:crashFilename 
+                               crashReportText:crashReportText 
+                                      metadata:metadata];
+#else
+        [self showCrashReportAlertForFilename:crashFilename 
+                              crashReportText:crashReportText 
+                                     metadata:metadata];
+#endif
+    }
+}
+
+/**
+ * Determine if a crash should be sent silently (without showing a dialog).
+ */
+- (BOOL)shouldSendCrashSilently:(NSDictionary *)metadata
+{
+    // User already submitted this crash (retrying after failed upload)
+    if ([metadata[kBugSplatMetaKeyUserSubmitted] boolValue]) {
+        return YES;
+    }
+    
+    // Auto-submit is enabled
+    if (self.autoSubmitCrashReport) {
+        return YES;
+    }
+    
+#if TARGET_OS_OSX
+    // Crash report has expired
     @try {
         NSNumber *timestamp = metadata[kBugSplatMetaKeyTimestamp];
         if (self.expirationTimeInterval > 0 && timestamp) {
             NSTimeInterval timeSinceCrash = [[NSDate date] timeIntervalSince1970] - timestamp.doubleValue;
             if (timeSinceCrash > self.expirationTimeInterval) {
-                NSLog(@"BugSplat: Crash report expired (%.0f seconds old), auto-submitting...", timeSinceCrash);
-                [self submitPersistedCrashReportWithFilename:crashFilename 
-                                             crashReportText:crashReportText 
-                                                    metadata:metadata 
-                                                    userName:self.userName 
-                                                   userEmail:self.userEmail 
-                                                    comments:nil];
-                return;
+                NSLog(@"BugSplat: Crash report expired (%.0f seconds old)", timeSinceCrash);
+                return YES;
             }
         }
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception checking crash report expiration: %@ - %@", exception.name, exception.reason);
     }
-#endif
-    
-    // Determine whether to show dialog or auto-submit
-#if TARGET_OS_OSX
-    if (showDialog) {
-        // Show dialog only for the first crash - remaining will be sent silently after user approves
-        [self showCrashReportDialogForFilename:crashFilename 
-                               crashReportText:crashReportText 
-                                      metadata:metadata];
-    } else {
-        // Send silently (either auto-submit is on, or this is a subsequent crash after user approved the first)
-        [self submitPersistedCrashReportWithFilename:crashFilename 
-                                     crashReportText:crashReportText 
-                                            metadata:metadata 
-                                            userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                           userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                            comments:nil];
-    }
 #else
-    // iOS: Check if user has chosen "Always Send" or if we should show the alert
-    BOOL alwaysSend = [[NSUserDefaults standardUserDefaults] boolForKey:kBugSplatUserDefaultsAlwaysSend];
-    
-    if (showDialog && !alwaysSend) {
-        // Show alert only for the first crash - remaining will be sent silently after user approves
-        [self showCrashReportAlertForFilename:crashFilename 
-                              crashReportText:crashReportText 
-                                     metadata:metadata];
-    } else {
-        // Send silently (auto-submit is on, user chose "Always Send", or this is a subsequent crash)
-        [self submitPersistedCrashReportWithFilename:crashFilename 
-                                     crashReportText:crashReportText 
-                                            metadata:metadata 
-                                            userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                           userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                            comments:nil];
+    // iOS: User chose "Always Send"
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kBugSplatUserDefaultsAlwaysSend]) {
+        return YES;
     }
 #endif
+    
+    return NO;
+}
+
+/**
+ * Submit a crash report silently (without user interaction).
+ */
+- (void)submitCrashSilentlyWithFilename:(NSString *)crashFilename
+                        crashReportText:(NSString *)crashReportText
+                               metadata:(NSDictionary *)metadata
+{
+    [self submitPersistedCrashReportWithFilename:crashFilename 
+                                 crashReportText:crashReportText 
+                                        metadata:metadata 
+                                        userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
+                                       userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                        comments:metadata[kBugSplatMetaKeyComments]];
 }
 
 /**
@@ -551,7 +560,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                 metadata:metadata
                                                 userName:self.userName
                                                userEmail:self.userEmail
-                                                comments:nil];
+                                                comments:metadata[kBugSplatMetaKeyComments]];
         }
     });
 }
@@ -608,7 +617,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:nil];
+                                                    comments:metadata[kBugSplatMetaKeyComments]];
             }];
             [alert addAction:sendAction];
             
@@ -633,7 +642,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:nil];
+                                                    comments:metadata[kBugSplatMetaKeyComments]];
             }];
             [alert addAction:alwaysSendAction];
             
@@ -649,7 +658,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                     metadata:metadata
                                                     userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
                                                    userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                                    comments:nil];
+                                                    comments:metadata[kBugSplatMetaKeyComments]];
             }
         } @catch (NSException *exception) {
             NSLog(@"BugSplat: Exception showing crash report alert: %@ - %@", exception.name, exception.reason);
@@ -659,7 +668,7 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                 metadata:metadata
                                                 userName:self.userName
                                                userEmail:self.userEmail
-                                                comments:nil];
+                                                comments:metadata[kBugSplatMetaKeyComments]];
         }
     });
 }
@@ -747,6 +756,10 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                      userEmail:(NSString *)userEmail
                                       comments:(NSString *)comments
 {
+    // Mark this crash as user-submitted and persist any comments
+    // This ensures: 1) comments survive failed uploads, 2) we know to retry silently
+    [self markCrashAsSubmittedWithComments:comments userName:userName userEmail:userEmail forCrashFilename:crashFilename];
+    
     // Notify delegate (wrapped to prevent crashes)
     @try {
         if ([self.delegate respondsToSelector:@selector(bugSplatWillSendCrashReport:)]) {
@@ -810,12 +823,10 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
             
             self.sendingInProgress = NO;
             
-            // Process any remaining pending crash reports SILENTLY (no dialog)
-            // This matches HockeyApp behavior: show dialog only for first crash,
-            // then send remaining crashes silently after user approves.
+            // Process any remaining pending crash reports.
             // Wait 1 second between uploads to avoid throttling by the server.
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [self processPendingCrashReportsShowingDialog:NO];
+                [self processPendingCrashReports];
             });
             
         } else {
@@ -982,6 +993,58 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
 }
 
 #pragma mark - Crash Report Persistence
+
+/**
+ * Mark a crash as submitted by the user and persist any comments/user info.
+ * This ensures:
+ * 1. User-entered comments survive failed uploads and app restarts
+ * 2. The crash will be retried silently (no dialog) on future launches
+ */
+- (void)markCrashAsSubmittedWithComments:(NSString *)comments
+                                userName:(NSString *)userName
+                               userEmail:(NSString *)userEmail
+                        forCrashFilename:(NSString *)crashFilename
+{
+    if (!crashFilename) {
+        return;
+    }
+    
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return;
+    }
+    
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:crashFilename] 
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+    
+    // Load existing metadata or create new dictionary
+    NSMutableDictionary *metadata = nil;
+    NSDictionary *existingMetadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
+    if (existingMetadata) {
+        metadata = [existingMetadata mutableCopy];
+    } else {
+        metadata = [NSMutableDictionary dictionary];
+    }
+    
+    // Mark as user-submitted so we retry silently on future launches
+    metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+    NSLog(@"BugSplat: Marked crash %@ as user-submitted", crashFilename);
+    
+    // Update with new values if provided
+    if (comments.length > 0) {
+        metadata[kBugSplatMetaKeyComments] = comments;
+        NSLog(@"BugSplat: Persisted comments for crash %@", crashFilename);
+    }
+    if (userName.length > 0) {
+        metadata[kBugSplatMetaKeyUserName] = userName;
+    }
+    if (userEmail.length > 0) {
+        metadata[kBugSplatMetaKeyUserEmail] = userEmail;
+    }
+    
+    // Write back to disk
+    [metadata writeToFile:metaFilePath atomically:YES];
+}
 
 - (NSString *)crashesDirectoryPath
 {

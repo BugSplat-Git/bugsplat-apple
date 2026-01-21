@@ -26,8 +26,6 @@
     // Initialize BugSplat
     [[BugSplat shared] setDelegate:self];
     [[BugSplat shared] setAutoSubmitCrashReport:NO];
-    [[BugSplat shared] setApplicationVersion:@"1.2.3"];
-    [[BugSplat shared] setApplicationName:@"MyNewAppleCrasher"];
 
     // if user enters name and email, store in in NSUserDefaults for use on subsequent crahes
     [[BugSplat shared] setPersistUserDetails:YES];
