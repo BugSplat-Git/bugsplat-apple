@@ -315,12 +315,9 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
  * Process any pending crash reports from our crashes directory.
  * This handles both new crashes and previously failed uploads (offline retry).
  *
- * For each crash:
- * - If user already submitted it (failed upload) → retry silently
- * - If autoSubmitCrashReport is YES → send silently
- * - If crash is expired (macOS) → send silently
- * - If user chose "Always Send" (iOS) → send silently
- * - Otherwise → show dialog for user to approve
+ * Processes newest-first so:
+ * - The most recent crash (likely needing a dialog) is shown to the user first
+ * - Older crashes (already submitted, retrying) are sent silently after
  */
 - (void)processPendingCrashReports
 {
@@ -338,8 +335,9 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
     NSLog(@"BugSplat: Found %lu pending crash report(s)", (unsigned long)pendingCrashFiles.count);
     self.sendingInProgress = YES;
     
-    // Process the first (oldest) pending crash report
-    NSString *crashFilename = pendingCrashFiles.firstObject;
+    // Process the newest crash first (last in the sorted array)
+    // When crashes stack up we want to show the dialog for the newest crash immediately instead of waiting for older crashes to be processed.
+    NSString *crashFilename = pendingCrashFiles.lastObject;
     self.currentCrashFilename = crashFilename;
     
     NSString *crashesDir = [self crashesDirectoryPath];
