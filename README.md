@@ -37,11 +37,11 @@ https://github.com/BugSplat-Git/bugsplat-apple
 
 ### Manually Add xcframeworks
 
-To manually integrate BugSplat into your Xcode project, three xcframeworks (BugSplat.xcframework, HockeySDK.xcframework, and CrashReporter.xcframework) need to be added and configured within Xcode.
+To manually integrate BugSplat into your Xcode project, BugSplat.xcframework needs to be added and configured within Xcode.
 
-1. Download the latest released xcframeworks (BugSplat.xcframework.zip, HockeySDK.xcframework.zip, and CrashReporter.xcframework.zip) from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. Each zip will contain the corresponding xcframework.
-2. Unzip each archive.
-3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to where you unzipped the three archives in step 2. Select BugSplat.xcframework, HockeySDK.xcframework, and CrashReporter.xcframework, then tap the "Add" button. Once added, select Embed & Sign for each xcframework.
+1. Download the latest released xcframework (BugSplat.xcframework.zip) from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The zip will contain BugSplat.xcframework.
+2. Unzip the archive.
+3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to where you unzipped the archive in step 2. Select BugSplat.xcframework, then tap the "Add" button. Once added, select Embed & Sign for the xcframework.
 
 ## Usage 🧑‍💻
 
@@ -335,7 +335,7 @@ For macOS, the BugSplat crash dialogue can be localized and supports eight langu
 7. Norwegian
 8. Swedish
 
-Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplatMac.framework/Versions/A/Frameworks/HockeySDK.framework/Resources/`
+Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplatMac.framework/Versions/A/Resources/`
 
 ## Sample Applications 🧑‍🏫
 
@@ -359,60 +359,22 @@ BugSplat is an open-source project, and we welcome contributions from the commun
 
 ### Building
 
-Clone this repository and all of the dependencies into a new `BugSplat` folder.
+Clone this repository:
 
 ```sh
-mkdir BugSplat
-cd BugSplat
 git clone https://github.com/BugSplat-Git/bugsplat-apple
-git clone https://github.com/BugSplat-Git/HockeySDK-Mac
-git clone https://github.com/BugSplat-Git/HockeySDK-iOS
-git clone https://github.com/BugSplat-Git/plCrashReporter
-```
-
-Next, in the prescribed order, build each repo. If an error occurs in a specific repo, it
-must be resolved before you can move to the next repo. This process was verified with
-a specific Apple Developer account for code signing. A different Apple Developer account
-requires adjusting the code signing within a given project.
-
-1. Build PlCrashReporter
-
-```sh
-cd plcrashreporter
-./makeXCFramework.sh
-...
-xcframework successfully written out to: .../BugSplat/plcrashreporter/xcframeworks/CrashReporter.xcframework
-```
-
-2. Build HockeySDK-Mac
-
-```sh
-cd HockeySDK-Mac
-./makeXCFramework.sh
-...
-xcframework successfully written out to: .../BugSplat/HockeySDK-Mac/xcframeworks/HockeySDK-macOS.xcframework
-```
-
-3. Build HockeySDK-iOS
-
-```sh
-cd HockeySDK-iOS
-./makeXCFramework.sh
-...
-xcframework successfully written out to: .../BugSplat/HockeySDK-iOS/xcframeworks/HockeySDK.xcframework
-```
-
-4. Build bugsplat-apple
-
-```sh
 cd bugsplat-apple
-./makeXCFramework.sh
-...
-xcframework successfully written out to: .../BugSplat/bugsplat-apple/xcframeworks/BugSplat.xcframework
 ```
 
-If all goes smoothly, `BugSplat.xcframework` will be the result in the xcframeworks folder
-of the bugsplat-apple repo.
+Build BugSplat.xcframework:
+
+```sh
+./makeXCFramework.sh
+...
+xcframework successfully written out to: .../bugsplat-apple/xcframeworks/BugSplat.xcframework
+```
+
+If all goes smoothly, `BugSplat.xcframework` will be the result in the xcframeworks folder.
 
 ### Releasing
 
