@@ -9,8 +9,6 @@
 /* Begin PBXBuildFile section */
 		637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF0D72D72A69C00DDD8FE /* AppKit.framework */; };
 		63E96A372D97423B00C0C026 /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */; };
-		63E96A3C2D97423F00C0C026 /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A302D97418800C0C026 /* HockeySDK.xcframework */; };
-		63E96A3E2D9742A200C0C026 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A312D97418800C0C026 /* CrashReporter.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,8 +27,6 @@
 		637DF0622D6CE56800DDD8FE /* BugSplatTest-macOS-Tool-CPlusPlus */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "BugSplatTest-macOS-Tool-CPlusPlus"; sourceTree = BUILT_PRODUCTS_DIR; };
 		637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
 		637DF0D72D72A69C00DDD8FE /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
-		63E96A302D97418800C0C026 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = ../../Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
-		63E96A312D97418800C0C026 /* CrashReporter.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = ../../Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -46,8 +42,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63E96A3E2D9742A200C0C026 /* CrashReporter.xcframework in Frameworks */,
-				63E96A3C2D97423F00C0C026 /* HockeySDK.xcframework in Frameworks */,
 				63E96A372D97423B00C0C026 /* BugSplat.xcframework in Frameworks */,
 				637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */,
 			);
@@ -76,8 +70,6 @@
 		637DF06C2D6CE5D500DDD8FE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				63E96A312D97418800C0C026 /* CrashReporter.xcframework */,
-				63E96A302D97418800C0C026 /* HockeySDK.xcframework */,
 				637DF0D72D72A69C00DDD8FE /* AppKit.framework */,
 				637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */,
 			);
@@ -181,7 +173,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Manually Codesign dependency frameworks. Team ID for cert must match app Team ID.\n# Path to your frameworks\nCRASHREPORTER_PATH=\"${BUILT_PRODUCTS_DIR}/CrashReporter.framework\"\nHOCKEYSDK_PATH=\"${BUILT_PRODUCTS_DIR}/HockeySDK.framework\"\nBUGSPLAT_PATH=\"${BUILT_PRODUCTS_DIR}/BugSplatMac.framework\"\n\n# Sign the frameworks\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$CRASHREPORTER_PATH\"\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$HOCKEYSDK_PATH\"\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$BUGSPLAT_PATH\"\n";
+			shellScript = "# Manually Codesign dependency frameworks. Team ID for cert must match app Team ID.\n# Path to your frameworks\nBUGSPLAT_PATH=\"${BUILT_PRODUCTS_DIR}/BugSplat.framework\"\n\n# Sign the frameworks\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$BUGSPLAT_PATH\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
