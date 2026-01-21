@@ -40,7 +40,7 @@
 		6383C72B2BDB1BF100ABC887 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6383C72E2BDB1BF100ABC887 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		6383C7302BDB1BF100ABC887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */

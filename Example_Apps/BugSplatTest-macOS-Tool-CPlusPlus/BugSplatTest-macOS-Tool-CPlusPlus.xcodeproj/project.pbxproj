@@ -25,7 +25,7 @@
 
 /* Begin PBXFileReference section */
 		637DF0622D6CE56800DDD8FE /* BugSplatTest-macOS-Tool-CPlusPlus */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "BugSplatTest-macOS-Tool-CPlusPlus"; sourceTree = BUILT_PRODUCTS_DIR; };
-		637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		637DF06D2D6CE5D600DDD8FE /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
 		637DF0D72D72A69C00DDD8FE /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 

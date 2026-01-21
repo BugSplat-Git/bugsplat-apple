@@ -36,7 +36,7 @@
 		63D006E32BBF4A5500587FBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		63D006F12BBF4C3700587FBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "BugSplatTest-SwiftUI/Assets.xcassets"; sourceTree = "<group>"; };
-		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
