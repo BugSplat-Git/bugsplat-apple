@@ -314,6 +314,38 @@ BugSplat.shared().start()
 > [!NOTE]
 > These values must be set before calling `start`. Any changes made after `start` is invoked will be ignored.
 
+#### Application Key
+
+Set an `appKey` to identify your application build, environment, or user locale. In the BugSplat dashboard, you can configure custom localized support responses for crash groups based on the `appKey` value using the "Support Response" button on the Crash Group page. See [Support Responses](https://docs.bugsplat.com/introduction/production/setting-up-custom-support-responses) for more information.
+
+**Swift:**
+
+```swift
+BugSplat.shared().appKey = "en-US"
+```
+
+**Obj-C:**
+
+```objc
+[[BugSplat shared] setAppKey:@"en-US"];
+```
+
+#### Notes
+
+Add arbitrary additional data to include with crash reports. Notes can also be modified in the BugSplat dashboard after a crash is submitted.
+
+**Swift:**
+
+```swift
+BugSplat.shared().notes = "Debug build, feature-x enabled"
+```
+
+**Obj-C:**
+
+```objc
+[[BugSplat shared] setNotes:@"Debug build, feature-x enabled"];
+```
+
 #### Attachments
 
 Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Currently, iOS supports only one attachment with crash reports. See additional iOS attachment limitation when using Attributes.

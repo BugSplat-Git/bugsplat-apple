@@ -155,6 +155,35 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, nullable) NSString *userEmail;
 
+/**
+ * An application-defined key that will be included with crash reports.
+ *
+ * Use this for any identifier meaningful to your application, such as:
+ * - License keys
+ * - Build identifiers
+ * - User segments
+ * - Environment identifiers (dev/staging/prod)
+ *
+ * In the BugSplat dashboard, you can configure custom localized support responses
+ * for crash groups based on the appKey value.
+ *
+ * The value is persisted to NSUserDefaults and captured at crash time.
+ */
+@property (nonatomic, copy, nullable) NSString *appKey;
+
+/**
+ * Additional notes to include with crash reports.
+ *
+ * Use this for any additional context about the crash, such as:
+ * - Build configuration details
+ * - Feature flags enabled
+ * - Recent user actions
+ * - Debug information
+ *
+ * The value is persisted to NSUserDefaults and captured at crash time.
+ */
+@property (nonatomic, copy, nullable) NSString *notes;
+
 /*!
  *  Submit crash reports without asking the user
  *

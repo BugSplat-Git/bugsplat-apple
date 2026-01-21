@@ -26,6 +26,8 @@ NSString *const kBugSplatUserDefaultsUserName = @"com.bugsplat.userName";
 NSString *const kBugSplatUserDefaultsUserEmail = @"com.bugsplat.userEmail";
 NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
 NSString *const kBugSplatUserDefaultsAlwaysSend = @"com.bugsplat.alwaysSend";
+NSString *const kBugSplatUserDefaultsAppKey = @"com.bugsplat.appKey";
+NSString *const kBugSplatUserDefaultsNotes = @"com.bugsplat.notes";
 
 // File extensions for persisted crash data
 static NSString *const kBugSplatCrashFileExtension = @"crash";
@@ -38,9 +40,14 @@ static NSString *const kBugSplatMetaKeyUserEmail = @"userEmail";
 static NSString *const kBugSplatMetaKeyComments = @"comments";
 static NSString *const kBugSplatMetaKeyAttributes = @"attributes";
 static NSString *const kBugSplatMetaKeyApplicationLog = @"applicationLog";
-static NSString *const kBugSplatMetaKeyApplicationKey = @"applicationKey";
 static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
 static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
+// Crash-time context (may differ from current app if updated before upload)
+static NSString *const kBugSplatMetaKeyDatabase = @"database";
+static NSString *const kBugSplatMetaKeyApplicationName = @"applicationName";
+static NSString *const kBugSplatMetaKeyApplicationVersion = @"applicationVersion";
+static NSString *const kBugSplatMetaKeyAppKey = @"appKey";
+static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 @interface BugSplat ()
 
@@ -268,12 +275,20 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
     }
     
     // Build and persist metadata
+    // IMPORTANT: Capture crash-time context here - app may be updated before upload
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
     metadata[kBugSplatMetaKeyTimestamp] = @([[NSDate date] timeIntervalSince1970]);
+    
+    // Capture app context at crash time (database, name, version may change with app updates)
+    if (self.bugSplatDatabase) metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
+    metadata[kBugSplatMetaKeyApplicationName] = self.resolvedApplicationName;
+    metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
     
     if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
     if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
     if (self.attributes) metadata[kBugSplatMetaKeyAttributes] = self.attributes;
+    if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
+    if (self.notes) metadata[kBugSplatMetaKeyNotes] = self.notes;
     
     // Get application log from delegate
     @try {
@@ -284,21 +299,6 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception in applicationLogForBugSplat delegate: %@ - %@", exception.name, exception.reason);
     }
-    
-#if TARGET_OS_OSX
-    // Get application key from delegate (macOS only)
-    @try {
-        if ([self.delegate respondsToSelector:@selector(applicationKeyForBugSplat:signal:exceptionName:exceptionReason:)]) {
-            NSString *signal = crashReport.signalInfo.name;
-            NSString *exceptionName = crashReport.hasExceptionInfo ? crashReport.exceptionInfo.exceptionName : nil;
-            NSString *exceptionReason = crashReport.hasExceptionInfo ? crashReport.exceptionInfo.exceptionReason : nil;
-            NSString *appKey = [self.delegate applicationKeyForBugSplat:self signal:signal exceptionName:exceptionName exceptionReason:exceptionReason];
-            if (appKey) metadata[kBugSplatMetaKeyApplicationKey] = appKey;
-        }
-    } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception in applicationKeyForBugSplat delegate: %@ - %@", exception.name, exception.reason);
-    }
-#endif
     
     // Persist metadata
     NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:crashFilename] 
@@ -775,6 +775,7 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
     uploadMetadata.userName = userName;
     uploadMetadata.userEmail = userEmail;
     uploadMetadata.userDescription = comments;
+    uploadMetadata.crashTime = persistedMetadata[kBugSplatMetaKeyTimestamp];
     
     // Use attributes from persisted metadata if current session attributes are nil
     if (self.attributes) {
@@ -784,7 +785,8 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
     }
     
     uploadMetadata.applicationLog = persistedMetadata[kBugSplatMetaKeyApplicationLog];
-    uploadMetadata.applicationKey = persistedMetadata[kBugSplatMetaKeyApplicationKey];
+    uploadMetadata.notes = persistedMetadata[kBugSplatMetaKeyNotes];
+    uploadMetadata.applicationKey = persistedMetadata[kBugSplatMetaKeyAppKey];
     
     // Convert text report to data for upload
     NSData *textCrashData = [crashReportText dataUsingEncoding:NSUTF8StringEncoding];
@@ -794,10 +796,21 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
         return;
     }
     
-    NSLog(@"BugSplat: Uploading crash report %@...", crashFilename);
+    // Use crash-time database/appName/appVersion if persisted, otherwise use current values
+    // This ensures the crash is reported against the correct version even if app was updated
+    NSString *database = persistedMetadata[kBugSplatMetaKeyDatabase] ?: self.bugSplatDatabase;
+    NSString *appName = persistedMetadata[kBugSplatMetaKeyApplicationName] ?: self.resolvedApplicationName;
+    NSString *appVersion = persistedMetadata[kBugSplatMetaKeyApplicationVersion] ?: self.resolvedApplicationVersion;
+    
+    // Create upload service with crash-time context
+    BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:database
+                                                                           applicationName:appName
+                                                                        applicationVersion:appVersion];
+    
+    NSLog(@"BugSplat: Uploading crash report %@ (app: %@ %@, database: %@)...", crashFilename, appName, appVersion, database);
     
     // Upload (NSURLSession handles this on a background thread)
-    [self.uploadService uploadCrashReport:textCrashData
+    [uploadService uploadCrashReport:textCrashData
                             crashFilename:@"crash.crashlog"
                               attachments:attachments
                                  metadata:uploadMetadata
@@ -954,6 +967,26 @@ static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
 - (void)setUserEmail:(NSString *)userEmail
 {
     [NSUserDefaults.standardUserDefaults setObject:userEmail forKey:kBugSplatUserDefaultsUserEmail];
+}
+
+- (NSString *)appKey
+{
+    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsAppKey];
+}
+
+- (void)setAppKey:(NSString *)appKey
+{
+    [NSUserDefaults.standardUserDefaults setObject:appKey forKey:kBugSplatUserDefaultsAppKey];
+}
+
+- (NSString *)notes
+{
+    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsNotes];
+}
+
+- (void)setNotes:(NSString *)notes
+{
+    [NSUserDefaults.standardUserDefaults setObject:notes forKey:kBugSplatUserDefaultsNotes];
 }
 
 #pragma mark - Attributes

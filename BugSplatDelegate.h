@@ -76,15 +76,6 @@ NS_ASSUME_NONNULL_BEGIN
 // MARK: - BugSplatDelegate (MacOS)
 #if TARGET_OS_OSX
 
-/** Return any string based data the crash report being processed should contain
- *
- * @param bugSplat The `BugSplat` instance invoking this delegate
- * @param signal The system crash signal
- * @param exceptionName The exception name.  Only provided if crash is the result of an uncaught exception
- * @param exceptionReason The exception reason.  Only provided if crash is the result of an uncaught exception
- */
-- (NSString *)applicationKeyForBugSplat:(BugSplat *)bugSplat signal:(NSString *)signal exceptionName:(NSString *)exceptionName exceptionReason:(NSString *)exceptionReason API_AVAILABLE(macosx(10.13));
-
 /** Return a collection of BugsplatAttachment objects providing an NSData object the crash report being processed should contain
 
  Example implementation:

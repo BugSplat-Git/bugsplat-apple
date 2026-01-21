@@ -19,7 +19,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *userDescription;
 @property (nonatomic, copy, nullable) NSString *applicationLog;
 @property (nonatomic, copy, nullable) NSString *applicationKey;
+@property (nonatomic, copy, nullable) NSString *notes;
 @property (nonatomic, copy, nullable) NSDictionary<NSString *, NSString *> *attributes;
+
+/**
+ * The time the crash occurred (Unix timestamp).
+ * This may differ from upload time if the crash couldn't be sent immediately.
+ */
+@property (nonatomic, strong, nullable) NSNumber *crashTime;
 
 @end
 

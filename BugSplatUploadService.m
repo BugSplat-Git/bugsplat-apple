@@ -314,6 +314,13 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     if (metadata.applicationKey.length > 0) {
         [self appendFormField:@"appKey" value:metadata.applicationKey boundary:boundary toData:body];
     }
+    if (metadata.crashTime) {
+        // Send crash time as Unix timestamp string
+        [self appendFormField:@"crashTime" value:[metadata.crashTime stringValue] boundary:boundary toData:body];
+    }
+    if (metadata.notes.length > 0) {
+        [self appendFormField:@"notes" value:metadata.notes boundary:boundary toData:body];
+    }
     
     // Attributes as JSON string
     if (metadata.attributes.count > 0) {
