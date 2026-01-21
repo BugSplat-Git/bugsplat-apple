@@ -102,7 +102,12 @@ NS_ASSUME_NONNULL_BEGIN
 // MARK: - BugSplatDelegate (iOS)
 #else
 
-/** Invoked after the user did choose to send crashes always in the alert
+/** Invoked after the user chose "Always Send" in the crash report alert.
+ 
+ When the user selects "Always Send", the crash report is sent and future crash reports
+ will be submitted automatically without prompting (unless the app clears NSUserDefaults).
+ 
+ Use this delegate method to update your app's UI or settings to reflect the user's choice.
 
  @param bugSplat The `BugSplat` instance invoking this delegate
  */

@@ -159,7 +159,12 @@ NS_ASSUME_NONNULL_BEGIN
  *  Submit crash reports without asking the user
  *
  *  _YES_: The crash report will be submitted without asking the user
- *  _NO_: The user will be asked if the crash report can be submitted (default)
+ *  _NO_: The user will be asked if the crash report can be submitted
+ *
+ *  On iOS, when set to NO, the user is presented with an alert with options:
+ *  - "Send" - sends this crash report
+ *  - "Don't Send" - discards all pending crash reports
+ *  - "Always Send" - sends this crash report and enables auto-submit for future crashes
  *
  *  Default: iOS: _YES_, macOS: _NO_
  */

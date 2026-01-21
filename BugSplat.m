@@ -17,12 +17,15 @@
 
 #if TARGET_OS_OSX
 #import "BugSplatCrashReportWindow.h"
+#else
+#import <UIKit/UIKit.h>
 #endif
 
 NSString *const kBugSplatUserDefaultsUserID = @"com.bugsplat.userID";
 NSString *const kBugSplatUserDefaultsUserName = @"com.bugsplat.userName";
 NSString *const kBugSplatUserDefaultsUserEmail = @"com.bugsplat.userEmail";
 NSString *const kBugSplatUserDefaultsAttributes = @"com.bugsplat.attributes";
+NSString *const kBugSplatUserDefaultsAlwaysSend = @"com.bugsplat.alwaysSend";
 
 // File extensions for persisted crash data
 static NSString *const kBugSplatCrashFileExtension = @"crash";
@@ -106,6 +109,8 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
             _bannerImage = bannerImage;
         }
 #else
+        // iOS: Default to silent crash reporting (no user prompt)
+        // Set to NO to prompt users with Send/Don't Send/Always Send options
         _autoSubmitCrashReport = YES;
 #endif
     }
@@ -411,13 +416,23 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                             comments:nil];
     }
 #else
-    // iOS always auto-submits
-    [self submitPersistedCrashReportWithFilename:crashFilename 
-                                 crashReportText:crashReportText 
-                                        metadata:metadata 
-                                        userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
-                                       userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
-                                        comments:nil];
+    // iOS: Check if user has chosen "Always Send" or if we should show the alert
+    BOOL alwaysSend = [[NSUserDefaults standardUserDefaults] boolForKey:kBugSplatUserDefaultsAlwaysSend];
+    
+    if (showDialog && !alwaysSend) {
+        // Show alert only for the first crash - remaining will be sent silently after user approves
+        [self showCrashReportAlertForFilename:crashFilename 
+                              crashReportText:crashReportText 
+                                     metadata:metadata];
+    } else {
+        // Send silently (auto-submit is on, user chose "Always Send", or this is a subsequent crash)
+        [self submitPersistedCrashReportWithFilename:crashFilename 
+                                     crashReportText:crashReportText 
+                                            metadata:metadata 
+                                            userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
+                                           userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                            comments:nil];
+    }
 #endif
 }
 
@@ -539,6 +554,184 @@ static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
                                                 comments:nil];
         }
     });
+}
+#else
+// iOS crash report alert implementation
+- (void)showCrashReportAlertForFilename:(NSString *)crashFilename
+                        crashReportText:(NSString *)crashReportText
+                               metadata:(NSDictionary *)metadata
+{
+    // Notify delegate (wrapped to prevent crashes in crash handler)
+    @try {
+        if ([self.delegate respondsToSelector:@selector(bugSplatWillShowSubmitCrashReportAlert:)]) {
+            [self.delegate bugSplatWillShowSubmitCrashReportAlert:self];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in bugSplatWillShowSubmitCrashReportAlert delegate: %@ - %@", exception.name, exception.reason);
+    }
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            NSString *appName = self.resolvedApplicationName;
+            NSString *title = [NSString stringWithFormat:@"%@ Quit Unexpectedly", appName];
+            NSString *message = @"Would you like to send a crash report so we can fix the problem?";
+            
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                           message:message
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            
+            // "Don't Send" action
+            UIAlertAction *dontSendAction = [UIAlertAction actionWithTitle:@"Don't Send"
+                                                                     style:UIAlertActionStyleCancel
+                                                                   handler:^(UIAlertAction *action) {
+                @try {
+                    if ([self.delegate respondsToSelector:@selector(bugSplatWillCancelSendingCrashReport:)]) {
+                        [self.delegate bugSplatWillCancelSendingCrashReport:self];
+                    }
+                } @catch (NSException *exception) {
+                    NSLog(@"BugSplat: Exception in bugSplatWillCancelSendingCrashReport delegate: %@ - %@", exception.name, exception.reason);
+                }
+                
+                // Cleanup ALL pending crash reports since user declined
+                [self cleanupAllPendingCrashReports];
+                self.attributes = nil;
+                self.sendingInProgress = NO;
+            }];
+            [alert addAction:dontSendAction];
+            
+            // "Send" action
+            UIAlertAction *sendAction = [UIAlertAction actionWithTitle:@"Send"
+                                                                 style:UIAlertActionStyleDefault
+                                                               handler:^(UIAlertAction *action) {
+                [self submitPersistedCrashReportWithFilename:crashFilename
+                                             crashReportText:crashReportText
+                                                    metadata:metadata
+                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    comments:nil];
+            }];
+            [alert addAction:sendAction];
+            
+            // "Always Send" action
+            UIAlertAction *alwaysSendAction = [UIAlertAction actionWithTitle:@"Always Send"
+                                                                       style:UIAlertActionStyleDefault
+                                                                     handler:^(UIAlertAction *action) {
+                // Save the "always send" preference
+                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kBugSplatUserDefaultsAlwaysSend];
+                
+                // Notify delegate
+                @try {
+                    if ([self.delegate respondsToSelector:@selector(bugSplatWillSendCrashReportsAlways:)]) {
+                        [self.delegate bugSplatWillSendCrashReportsAlways:self];
+                    }
+                } @catch (NSException *exception) {
+                    NSLog(@"BugSplat: Exception in bugSplatWillSendCrashReportsAlways delegate: %@ - %@", exception.name, exception.reason);
+                }
+                
+                [self submitPersistedCrashReportWithFilename:crashFilename
+                                             crashReportText:crashReportText
+                                                    metadata:metadata
+                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    comments:nil];
+            }];
+            [alert addAction:alwaysSendAction];
+            
+            // Find the top-most view controller to present the alert
+            UIViewController *presentingViewController = [self topMostViewController];
+            if (presentingViewController) {
+                [presentingViewController presentViewController:alert animated:YES completion:nil];
+            } else {
+                NSLog(@"BugSplat: Could not find view controller to present crash report alert, auto-submitting...");
+                // Fall back to auto-submit if no view controller available
+                [self submitPersistedCrashReportWithFilename:crashFilename
+                                             crashReportText:crashReportText
+                                                    metadata:metadata
+                                                    userName:metadata[kBugSplatMetaKeyUserName] ?: self.userName
+                                                   userEmail:metadata[kBugSplatMetaKeyUserEmail] ?: self.userEmail
+                                                    comments:nil];
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"BugSplat: Exception showing crash report alert: %@ - %@", exception.name, exception.reason);
+            // Fall back to auto-submit if alert fails
+            [self submitPersistedCrashReportWithFilename:crashFilename
+                                         crashReportText:crashReportText
+                                                metadata:metadata
+                                                userName:self.userName
+                                               userEmail:self.userEmail
+                                                comments:nil];
+        }
+    });
+}
+
+/**
+ * Find the top-most view controller in the app to present the alert.
+ */
+- (UIViewController *)topMostViewController
+{
+    UIWindowScene *activeScene = nil;
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
+            activeScene = (UIWindowScene *)scene;
+            break;
+        }
+    }
+    
+    if (!activeScene) {
+        // Fall back to any foreground inactive scene
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundInactive && [scene isKindOfClass:[UIWindowScene class]]) {
+                activeScene = (UIWindowScene *)scene;
+                break;
+            }
+        }
+    }
+    
+    if (!activeScene) {
+        return nil;
+    }
+    
+    UIWindow *keyWindow = nil;
+    for (UIWindow *window in activeScene.windows) {
+        if (window.isKeyWindow) {
+            keyWindow = window;
+            break;
+        }
+    }
+    
+    if (!keyWindow) {
+        keyWindow = activeScene.windows.firstObject;
+    }
+    
+    if (!keyWindow) {
+        return nil;
+    }
+    
+    UIViewController *rootViewController = keyWindow.rootViewController;
+    return [self topViewControllerWithRootViewController:rootViewController];
+}
+
+- (UIViewController *)topViewControllerWithRootViewController:(UIViewController *)rootViewController
+{
+    if (!rootViewController) {
+        return nil;
+    }
+    
+    if (rootViewController.presentedViewController) {
+        return [self topViewControllerWithRootViewController:rootViewController.presentedViewController];
+    }
+    
+    if ([rootViewController isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *navigationController = (UINavigationController *)rootViewController;
+        return [self topViewControllerWithRootViewController:navigationController.visibleViewController];
+    }
+    
+    if ([rootViewController isKindOfClass:[UITabBarController class]]) {
+        UITabBarController *tabBarController = (UITabBarController *)rootViewController;
+        return [self topViewControllerWithRootViewController:tabBarController.selectedViewController];
+    }
+    
+    return rootViewController;
 }
 #endif
 

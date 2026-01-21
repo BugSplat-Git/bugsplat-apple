@@ -33,6 +33,8 @@ struct BugSplatTest_SwiftUI_SPMApp: App {
         // Initialize BugSplat
         let bugSplat = BugSplat.shared()
         bugSplat.delegate = self
+        // Enable user prompt for crash reports (default is true for silent reporting)
+        // When set to false, users see Send/Don't Send/Always Send options
         bugSplat.autoSubmitCrashReport = false
 
         // Optionally, add some attributes to your crash reports.

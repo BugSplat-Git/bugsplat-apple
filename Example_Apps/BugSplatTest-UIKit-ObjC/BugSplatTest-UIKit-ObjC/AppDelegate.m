@@ -26,6 +26,8 @@
 
     // Initialize BugSplat
     [[BugSplat shared] setDelegate:self];
+    // Enable user prompt for crash reports (default is YES for silent reporting)
+    // When set to NO, users see Send/Don't Send/Always Send options
     [[BugSplat shared] setAutoSubmitCrashReport:NO];
 
     // Optionally, add some attributes to your crash reports.
