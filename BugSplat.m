@@ -14,6 +14,8 @@
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
+#import "BugSplatTestSupport.h"
+#import "BugSplat+Testing.h"
 
 #if TARGET_OS_OSX
 #import "BugSplatCrashReportWindow.h"
@@ -51,9 +53,13 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 @property (atomic, assign) BOOL isStartInvoked;
 @property (atomic, assign) BOOL sendingInProgress;
 @property (nonatomic, nullable) NSDictionary<NSString *, NSString *> *attributes;
-@property (nonatomic, strong) PLCrashReporter *crashReporter;
+@property (nonatomic, strong) id<BugSplatCrashReporterProtocol> crashReporterInternal;
+@property (nonatomic, strong, nullable) id<BugSplatCrashStorageProtocol> crashStorageInternal;
+@property (nonatomic, strong, nullable) id<BugSplatUserDefaultsProtocol> userDefaultsInternal;
+@property (nonatomic, strong, nullable) id<BugSplatBundleProtocol> bundleInternal;
 @property (nonatomic, strong, nullable) BugSplatUploadService *uploadService;
 @property (nonatomic, copy, nullable) NSString *currentCrashFilename;
+@property (nonatomic, assign) BOOL isTestInstance;
 
 #if TARGET_OS_OSX
 @property (nonatomic, strong, nullable) BugSplatCrashReportWindow *crashReportWindow;
@@ -86,6 +92,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.isStartInvoked = NO;
         self.sendingInProgress = NO;
         self.currentCrashFilename = nil;
+        self.isTestInstance = NO;
 
         // Configure PLCrashReporter
         // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
@@ -98,7 +105,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
             initWithSignalHandlerType:signalHandlerType
             symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
         
-        _crashReporter = [[PLCrashReporter alloc] initWithConfiguration:config];
+        _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
+        
+        // Use real defaults by default
+        _userDefaultsInternal = (id<BugSplatUserDefaultsProtocol>)[NSUserDefaults standardUserDefaults];
+        _bundleInternal = (id<BugSplatBundleProtocol>)[NSBundle mainBundle];
 
 #if TARGET_OS_OSX
         _autoSubmitCrashReport = NO;
@@ -117,6 +128,39 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }
 
     return self;
+}
+
+- (instancetype)initForTestingWithCrashReporter:(id<BugSplatCrashReporterProtocol>)crashReporter
+                                   crashStorage:(id<BugSplatCrashStorageProtocol>)crashStorage
+                                   userDefaults:(id<BugSplatUserDefaultsProtocol>)userDefaults
+                                         bundle:(id<BugSplatBundleProtocol>)bundle
+{
+    if (self = [super init]) {
+        self.isStartInvoked = NO;
+        self.sendingInProgress = NO;
+        self.currentCrashFilename = nil;
+        self.isTestInstance = YES;
+        
+        _crashReporterInternal = crashReporter;
+        _crashStorageInternal = crashStorage;
+        _userDefaultsInternal = userDefaults;
+        _bundleInternal = bundle;
+        
+#if TARGET_OS_OSX
+        _autoSubmitCrashReport = NO;
+        _askUserDetails = YES;
+        _expirationTimeInterval = -1;
+#else
+        _autoSubmitCrashReport = YES;
+#endif
+    }
+    return self;
+}
+
+// Convenience accessor that returns the crashReporter as PLCrashReporter for internal use
+- (PLCrashReporter *)crashReporter
+{
+    return (PLCrashReporter *)self.crashReporterInternal;
 }
 
 - (void)start
@@ -473,7 +517,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }
 #else
     // iOS: User chose "Always Send"
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:kBugSplatUserDefaultsAlwaysSend]) {
+    if ([self.userDefaultsInternal boolForKey:kBugSplatUserDefaultsAlwaysSend]) {
         return YES;
     }
 #endif
@@ -682,7 +726,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                                                                        style:UIAlertActionStyleDefault
                                                                      handler:^(UIAlertAction *action) {
                 // Save the "always send" preference
-                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kBugSplatUserDefaultsAlwaysSend];
+                [self.userDefaultsInternal setBool:YES forKey:kBugSplatUserDefaultsAlwaysSend];
                 
                 // Notify delegate
                 @try {
@@ -940,7 +984,15 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (NSBundle *)bundle
 {
+    if (self.bundleInternal && [self.bundleInternal isKindOfClass:[NSBundle class]]) {
+        return (NSBundle *)self.bundleInternal;
+    }
     return [NSBundle mainBundle];
+}
+
+- (id<BugSplatBundleProtocol>)bundleProtocol
+{
+    return self.bundleInternal ?: (id<BugSplatBundleProtocol>)[NSBundle mainBundle];
 }
 
 - (NSString *)bugSplatDatabase
@@ -949,7 +1001,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     if (_bugSplatDatabase) {
         return _bugSplatDatabase;
     }
-    return (NSString *)[self.bundle objectForInfoDictionaryKey:kBugSplatDatabase];
+    return (NSString *)[self.bundleProtocol objectForInfoDictionaryKey:kBugSplatDatabase];
 }
 
 - (void)setBugSplatDatabase:(NSString *)bugSplatDatabase
@@ -985,11 +1037,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     if (_applicationName) {
         return _applicationName;
     }
-    NSString *displayName = [self.bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+    NSString *displayName = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleDisplayName"];
     if (displayName) {
         return displayName;
     }
-    NSString *bundleName = [self.bundle objectForInfoDictionaryKey:@"CFBundleName"];
+    NSString *bundleName = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleName"];
     if (bundleName) {
         return bundleName;
     }
@@ -1001,7 +1053,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     if (_applicationVersion) {
         return _applicationVersion;
     }
-    NSString *version = [self.bundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSString *version = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
     if (version) {
         return version;
     }
@@ -1010,23 +1062,23 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (NSString *)userName
 {
-    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserName];
+    return [self.userDefaultsInternal stringForKey:kBugSplatUserDefaultsUserName];
 }
 
 - (void)setUserName:(NSString *)userName
 {
-    [NSUserDefaults.standardUserDefaults setObject:userName forKey:kBugSplatUserDefaultsUserName];
+    [self.userDefaultsInternal setObject:userName forKey:kBugSplatUserDefaultsUserName];
     [self updateCrashReporterCustomData];
 }
 
 - (NSString *)userEmail
 {
-    return [NSUserDefaults.standardUserDefaults stringForKey:kBugSplatUserDefaultsUserEmail];
+    return [self.userDefaultsInternal stringForKey:kBugSplatUserDefaultsUserEmail];
 }
 
 - (void)setUserEmail:(NSString *)userEmail
 {
-    [NSUserDefaults.standardUserDefaults setObject:userEmail forKey:kBugSplatUserDefaultsUserEmail];
+    [self.userDefaultsInternal setObject:userEmail forKey:kBugSplatUserDefaultsUserEmail];
     [self updateCrashReporterCustomData];
 }
 
@@ -1381,6 +1433,53 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception in cleanupAllPendingCrashReports: %@ - %@", exception.name, exception.reason);
     }
+}
+
+@end
+
+#pragma mark - Testing Category
+
+@implementation BugSplat (Testing)
+
++ (instancetype)testInstanceWithCrashReporter:(id<BugSplatCrashReporterProtocol>)crashReporter
+                                 crashStorage:(id<BugSplatCrashStorageProtocol>)crashStorage
+                                 userDefaults:(id<BugSplatUserDefaultsProtocol>)userDefaults
+                                       bundle:(id<BugSplatBundleProtocol>)bundle
+{
+    return [[BugSplat alloc] initForTestingWithCrashReporter:crashReporter
+                                                crashStorage:crashStorage
+                                                userDefaults:userDefaults
+                                                      bundle:bundle];
+}
+
+- (void)setUploadServiceForTesting:(BugSplatUploadService *)uploadService
+{
+    self.uploadService = uploadService;
+}
+
+- (BOOL)isStartInvoked
+{
+    return self.isStartInvoked;
+}
+
+- (BOOL)isSendingInProgress
+{
+    return self.sendingInProgress;
+}
+
+- (NSString *)currentCrashFilename
+{
+    return self.currentCrashFilename;
+}
+
+- (id<BugSplatCrashReporterProtocol>)crashReporter
+{
+    return self.crashReporterInternal;
+}
+
+- (id<BugSplatCrashStorageProtocol>)crashStorage
+{
+    return self.crashStorageInternal;
 }
 
 @end

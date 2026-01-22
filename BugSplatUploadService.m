@@ -6,6 +6,7 @@
 
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
+#import "BugSplatTestSupport.h"
 
 NSString *const BugSplatUploadErrorDomain = @"com.bugsplat.upload";
 
@@ -25,7 +26,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 @property (nonatomic, copy) NSString *database;
 @property (nonatomic, copy) NSString *applicationName;
 @property (nonatomic, copy) NSString *applicationVersion;
-@property (nonatomic, strong) NSURLSession *urlSession;
+@property (nonatomic, strong) id<BugSplatURLSessionProtocol> urlSession;
 @property (nonatomic, strong, nullable) NSURLSessionTask *currentTask;
 
 @end
@@ -36,16 +37,28 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                  applicationName:(NSString *)applicationName
               applicationVersion:(NSString *)applicationVersion
 {
+    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    config.timeoutIntervalForRequest = 60.0;
+    config.timeoutIntervalForResource = 300.0;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:config];
+    
+    return [self initWithDatabase:database
+                  applicationName:applicationName
+               applicationVersion:applicationVersion
+                       urlSession:(id<BugSplatURLSessionProtocol>)session];
+}
+
+- (instancetype)initWithDatabase:(NSString *)database
+                 applicationName:(NSString *)applicationName
+              applicationVersion:(NSString *)applicationVersion
+                      urlSession:(id<BugSplatURLSessionProtocol>)urlSession
+{
     self = [super init];
     if (self) {
         _database = [database copy];
         _applicationName = [applicationName copy];
         _applicationVersion = [applicationVersion copy];
-        
-        NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
-        config.timeoutIntervalForRequest = 60.0;
-        config.timeoutIntervalForResource = 300.0;
-        _urlSession = [NSURLSession sessionWithConfiguration:config];
+        _urlSession = urlSession;
     }
     return self;
 }

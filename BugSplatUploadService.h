@@ -6,6 +6,7 @@
 
 #import <Foundation/Foundation.h>
 #import "BugSplatAttachment.h"
+#import "BugSplatTestSupport.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -66,6 +67,20 @@ typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error,
 - (instancetype)initWithDatabase:(NSString *)database
                  applicationName:(NSString *)applicationName
               applicationVersion:(NSString *)applicationVersion;
+
+/**
+ * Creates a new upload service instance with a custom URL session (for testing).
+ *
+ * @param database The BugSplat database name.
+ * @param applicationName The application name.
+ * @param applicationVersion The application version string.
+ * @param urlSession A custom URL session conforming to BugSplatURLSessionProtocol.
+ * @return A configured upload service instance.
+ */
+- (instancetype)initWithDatabase:(NSString *)database
+                 applicationName:(NSString *)applicationName
+              applicationVersion:(NSString *)applicationVersion
+                      urlSession:(id<BugSplatURLSessionProtocol>)urlSession;
 
 /**
  * Uploads a crash report to BugSplat.
