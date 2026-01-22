@@ -101,15 +101,9 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 #else
         PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeMach;
 #endif
-        // Set max crash report size to 10MB
-        static const NSUInteger kMaxCrashReportBytes = 10 * 1024 * 1024; // 10MB
-        
         PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
             initWithSignalHandlerType:signalHandlerType
-                symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone
-   shouldRegisterUncaughtExceptionHandler:YES
-                                 basePath:nil
-                           maxReportBytes:kMaxCrashReportBytes];
+            symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
         
         _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
         
@@ -172,6 +166,15 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)start
 {
     NSLog(@"BugSplat start...");
+    
+    // Debug: Check what bundle and info dictionary we're reading from
+    NSBundle *mainBundle = [NSBundle mainBundle];
+    NSLog(@"BugSplat: mainBundle = %@", mainBundle);
+    NSLog(@"BugSplat: bundleIdentifier = %@", mainBundle.bundleIdentifier);
+    NSLog(@"BugSplat: infoDictionary = %@", mainBundle.infoDictionary);
+    NSLog(@"BugSplat: BugSplatDatabase from infoDictionary = %@", [mainBundle objectForInfoDictionaryKey:@"BugSplatDatabase"]);
+    NSLog(@"BugSplat: self.bundleProtocol = %@", self.bundleProtocol);
+    NSLog(@"BugSplat: self.bugSplatDatabase = %@", self.bugSplatDatabase);
 
     if (!self.bugSplatDatabase) {
         NSLog(@"*** BugSplatDatabase is nil. Please add this key/value to your app's Info.plist or set bugSplatDatabase before invoking start. ***");
@@ -1465,7 +1468,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (BOOL)isStartInvoked
 {
-    return self.isStartInvoked;
+    return _isStartInvoked;
 }
 
 - (BOOL)isSendingInProgress
@@ -1475,7 +1478,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
 - (NSString *)currentCrashFilename
 {
-    return self.currentCrashFilename;
+    return _currentCrashFilename;
 }
 
 - (id<BugSplatCrashReporterProtocol>)crashReporter
