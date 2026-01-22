@@ -20,55 +20,22 @@ Tests/
     └── Info.plist                  # Test bundle Info.plist
 ```
 
-## Adding Test Target to Xcode Project
-
-To add the test target to your Xcode project:
-
-### Option 1: Using Xcode UI (Recommended)
-
-1. Open `BugSplat.xcodeproj` in Xcode
-2. Select the project in the Navigator
-3. Click the `+` button at the bottom of the targets list
-4. Choose `Unit Testing Bundle`
-5. Configure:
-   - Product Name: `BugSplatMacTests`
-   - Target to be Tested: `BugSplatMac`
-   - Language: `Objective-C`
-6. Click Finish
-7. Delete the auto-generated test file
-8. Add existing files from `Tests/BugSplatTests/` to the test target:
-   - Select all `.m` files in `Tests/BugSplatTests/`
-   - Right-click → "Add Files to BugSplat..."
-   - Ensure `BugSplatMacTests` is checked as the target
-9. Add the main source files to the test target (for testing internal methods):
-   - Select the test target in project settings
-   - Go to Build Phases → Compile Sources
-   - Add: `BugSplat.m`, `BugSplatUtilities.m`, `BugSplatZipHelper.m`, `BugSplatAttachment.m`, `BugSplatUploadService.m`
-10. Configure Header Search Paths:
-    - In Build Settings, add to Header Search Paths:
-      - `$(PROJECT_DIR)` (recursive)
-      - `$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/macos-arm64_x86_64/CrashReporter.framework/Headers`
-
-### Option 2: For iOS Tests
-
-Repeat the above steps but:
-- Product Name: `BugSplatTests`
-- Target to be Tested: `BugSplat`
-- Set Destination to iOS
-
 ## Running Tests
 
 ### From Xcode
-- Press `Cmd+U` to run all tests
-- Or use Product → Test
+
+1. Open `BugSplat.xcworkspace` in Xcode
+2. Select the `BugSplatMacTests` or `BugSplatIOSTests` scheme
+3. Press `Cmd+U` to run tests, or use Product → Test
 
 ### From Command Line
+
 ```bash
 # Run macOS tests
-xcodebuild test -project BugSplat.xcodeproj -scheme BugSplatMac -destination 'platform=macOS'
+xcodebuild test -workspace BugSplat.xcworkspace -scheme BugSplatMacTests -destination 'platform=macOS'
 
 # Run iOS tests
-xcodebuild test -project BugSplat.xcodeproj -scheme BugSplat -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild test -workspace BugSplat.xcworkspace -scheme BugSplatIOSTests -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
 ## Test Coverage
@@ -112,7 +79,7 @@ When adding new tests:
 1. Create a new test class in `Tests/BugSplatTests/`
 2. Import the class being tested
 3. Use XCTest assertions
-4. Add the file to the test target in Xcode
+4. Add the `.m` file to both test targets (`BugSplatMacTests` and `BugSplatIOSTests`) in Xcode
 
 Example:
 ```objc

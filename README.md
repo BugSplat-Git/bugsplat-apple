@@ -371,11 +371,11 @@ Additional languages may be supported by adding the language bundle and strings 
 
 ## Sample Applications 🧑‍🏫
 
-`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSpat only requires the xcframework and a few lines of code.
+`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSplat only requires the xcframework and a few lines of code.
 
 1. Clone the [bugsplat-apple repo](https://github.com/BugSplat-Git/bugsplat-apple).
 
-1. Open an example Xcode project from `Example_Apps`. For iOS, set the destination to be your iOS device. After running from Xcode, stop the process and relaunch from the iOS device directly.
+1. Open `BugSplat.xcworkspace` in Xcode. This workspace contains the SDK and all example apps. Select an example app scheme to run. For iOS, set the destination to be your iOS device. After running from Xcode, stop the process and relaunch from the iOS device directly.
 
 1. Once the app launches, click the "crash" button when prompted.
 
@@ -389,16 +389,21 @@ Additional languages may be supported by adding the language bundle and strings 
 
 BugSplat is an open-source project, and we welcome contributions from the community. To configure a development environment, follow the instructions below.
 
-### Building
+### Development
 
-Clone this repository:
+Clone this repository and open the workspace:
 
 ```sh
 git clone https://github.com/BugSplat-Git/bugsplat-apple
 cd bugsplat-apple
+open BugSplat.xcworkspace
 ```
 
-Build BugSplat.xcframework:
+The workspace contains the SDK frameworks, test targets, and example apps. Use the `BugSplatMacTests` or `BugSplatIOSTests` schemes to run unit tests.
+
+### Building xcframework
+
+To build a distributable `BugSplat.xcframework`:
 
 ```sh
 ./makeXCFramework.sh
