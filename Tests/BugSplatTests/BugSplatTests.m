@@ -7,6 +7,7 @@
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
 
+#import <TargetConditionals.h>
 #import <XCTest/XCTest.h>
 
 #if TARGET_OS_OSX

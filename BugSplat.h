@@ -4,6 +4,7 @@
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
 
+#import <TargetConditionals.h>
 #import <Foundation/Foundation.h>
 
 //! Project version number for BugSplat.
