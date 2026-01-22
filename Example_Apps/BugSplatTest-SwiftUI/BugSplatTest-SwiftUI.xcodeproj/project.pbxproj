@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		63532E562BCF32E70075B042 /* BugSplat.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63D006F42BBF569200587FBF /* BugSplat.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000012E40000000000006 /* BugSplat.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000007 /* BugSplat.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		63D006E22BBF4A5500587FBF /* BugSplatTest-SwiftUIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D006E12BBF4A5500587FBF /* BugSplatTest-SwiftUIApp.swift */; };
 		63D006E42BBF4A5500587FBF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D006E32BBF4A5500587FBF /* ContentView.swift */; };
 		63D006E92BBF4A5700587FBF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */; };
 		63D006F22BBF4C3700587FBF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006F12BBF4C3700587FBF /* Assets.xcassets */; };
-		63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63D006F42BBF569200587FBF /* BugSplat.xcframework */; };
+		WS0000032E40000000000008 /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000007 /* BugSplat.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -22,7 +22,7 @@
 			dstPath = Frameworks;
 			dstSubfolderSpec = 1;
 			files = (
-				63532E562BCF32E70075B042 /* BugSplat.xcframework in Embed Frameworks */,
+				WS0000012E40000000000006 /* BugSplat.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -36,7 +36,7 @@
 		63D006E32BBF4A5500587FBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		63D006F12BBF4C3700587FBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "BugSplatTest-SwiftUI/Assets.xcassets"; sourceTree = "<group>"; };
-		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		WS0000022E40000000000007 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,7 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */,
+				WS0000032E40000000000008 /* BugSplat.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,7 +72,7 @@
 		63D006F32BBF569200587FBF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				63D006F42BBF569200587FBF /* BugSplat.xcframework */,
+				WS0000022E40000000000007 /* BugSplat.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

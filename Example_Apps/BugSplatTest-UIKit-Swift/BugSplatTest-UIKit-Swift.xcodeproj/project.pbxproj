@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6341B2392BDB22DE007EE8AC /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */; };
-		6341B23A2BDB22DE007EE8AC /* BugSplat.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000012E4000000000000C /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E4000000000000D /* BugSplat.framework */; };
+		WS0000032E4000000000000E /* BugSplat.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E4000000000000D /* BugSplat.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		6383C7232BDB1BEF00ABC887 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383C7222BDB1BEF00ABC887 /* AppDelegate.swift */; };
 		6383C7252BDB1BEF00ABC887 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383C7242BDB1BEF00ABC887 /* SceneDelegate.swift */; };
 		6383C7272BDB1BEF00ABC887 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383C7262BDB1BEF00ABC887 /* ViewController.swift */; };
@@ -24,7 +24,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				6341B23A2BDB22DE007EE8AC /* BugSplat.xcframework in Embed Frameworks */,
+				WS0000032E4000000000000E /* BugSplat.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -40,7 +40,7 @@
 		6383C72B2BDB1BF100ABC887 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6383C72E2BDB1BF100ABC887 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		6383C7302BDB1BF100ABC887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		WS0000022E4000000000000D /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,7 +48,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6341B2392BDB22DE007EE8AC /* BugSplat.xcframework in Frameworks */,
+				WS0000012E4000000000000C /* BugSplat.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,7 +89,7 @@
 		6383C7362BDB1C2300ABC887 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				6383C7372BDB1C2300ABC887 /* BugSplat.xcframework */,
+				WS0000022E4000000000000D /* BugSplat.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

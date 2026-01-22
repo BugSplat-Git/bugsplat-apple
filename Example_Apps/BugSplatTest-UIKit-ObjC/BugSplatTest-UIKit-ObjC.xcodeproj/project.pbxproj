@@ -14,8 +14,8 @@
 		6341B2552BDC3CA5007EE8AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2542BDC3CA5007EE8AC /* Assets.xcassets */; };
 		6341B2582BDC3CA5007EE8AC /* Base in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2572BDC3CA5007EE8AC /* Base */; };
 		6341B25B2BDC3CA5007EE8AC /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B25A2BDC3CA5007EE8AC /* main.m */; };
-		6341B2632BDC3D0B007EE8AC /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */; };
-		6341B2642BDC3D0B007EE8AC /* BugSplat.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000012E40000000000009 /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E4000000000000A /* BugSplat.framework */; };
+		WS0000032E4000000000000B /* BugSplat.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E4000000000000A /* BugSplat.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,7 +25,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				6341B2642BDC3D0B007EE8AC /* BugSplat.xcframework in Embed Frameworks */,
+				WS0000032E4000000000000B /* BugSplat.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -45,7 +45,7 @@
 		6341B2572BDC3CA5007EE8AC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		6341B2592BDC3CA5007EE8AC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6341B25A2BDC3CA5007EE8AC /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
+		WS0000022E4000000000000A /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,7 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6341B2632BDC3D0B007EE8AC /* BugSplat.xcframework in Frameworks */,
+				WS0000012E40000000000009 /* BugSplat.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,7 +98,7 @@
 		6341B2612BDC3D0A007EE8AC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				6341B2622BDC3D0B007EE8AC /* BugSplat.xcframework */,
+				WS0000022E4000000000000A /* BugSplat.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
