@@ -10,7 +10,7 @@
 		CC0000022E3FC00000000002 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		CC0000032E3FC00000000003 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		CC0000042E3FC00000000004 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
-/* Test target build files */
+/* Test target build files - macOS */
 		TT0000012E3FE00000000001 /* BugSplatUtilitiesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000102E3FE00000000010 /* BugSplatUtilitiesTests.m */; };
 		TT0000022E3FE00000000002 /* BugSplatZipHelperTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000112E3FE00000000011 /* BugSplatZipHelperTests.m */; };
 		TT0000032E3FE00000000003 /* BugSplatAttachmentTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000122E3FE00000000012 /* BugSplatAttachmentTests.m */; };
@@ -28,6 +28,19 @@
 		TT00000F2E3FE0000000000F /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		TT0000202E3FE00000000020 /* BugSplatMac.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */; };
 		TT0000212E3FE00000000021 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
+/* Test target build files - iOS */
+		TT0000702E3FE00000000070 /* BugSplatUtilitiesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000102E3FE00000000010 /* BugSplatUtilitiesTests.m */; };
+		TT0000712E3FE00000000071 /* BugSplatZipHelperTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000112E3FE00000000011 /* BugSplatZipHelperTests.m */; };
+		TT0000722E3FE00000000072 /* BugSplatAttachmentTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000122E3FE00000000012 /* BugSplatAttachmentTests.m */; };
+		TT0000732E3FE00000000073 /* BugSplatUploadServiceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000132E3FE00000000013 /* BugSplatUploadServiceTests.m */; };
+		TT0000742E3FE00000000074 /* BugSplatTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000142E3FE00000000014 /* BugSplatTests.m */; };
+		TT0000752E3FE00000000075 /* MockURLSession.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000152E3FE00000000015 /* MockURLSession.m */; };
+		TT0000762E3FE00000000076 /* MockCrashStorage.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000162E3FE00000000016 /* MockCrashStorage.m */; };
+		TT0000772E3FE00000000077 /* MockCrashReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000172E3FE00000000017 /* MockCrashReporter.m */; };
+		TT0000782E3FE00000000078 /* MockBundle.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000182E3FE00000000018 /* MockBundle.m */; };
+		TT0000792E3FE0000000007A /* MockUserDefaults.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000192E3FE00000000019 /* MockUserDefaults.m */; };
+		TT00007A2E3FE0000000007A /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */; };
+		TT00007B2E3FE0000000007B /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 		DD0000012E3FD00000000001 /* bugsplat-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = DD0000002E3FD00000000000 /* bugsplat-logo.png */; };
 		63598C432BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
 		63598C442BA0CCD500770E43 /* BugSplat.m in Sources */ = {isa = PBXBuildFile; fileRef = 63598C422BA0CCD500770E43 /* BugSplat.m */; };
@@ -75,6 +88,7 @@
 		DD0000002E3FD00000000000 /* bugsplat-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Resources/bugsplat-logo.png"; sourceTree = SOURCE_ROOT; };
 /* Test file references */
 		TT0000002E3FE00000000000 /* BugSplatMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BugSplatMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		TT0000802E3FE00000000080 /* BugSplatIOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BugSplatIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT0000102E3FE00000000010 /* BugSplatUtilitiesTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilitiesTests.m; sourceTree = "<group>"; };
 		TT0000112E3FE00000000011 /* BugSplatZipHelperTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatZipHelperTests.m; sourceTree = "<group>"; };
 		TT0000122E3FE00000000012 /* BugSplatAttachmentTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatAttachmentTests.m; sourceTree = "<group>"; };
@@ -175,6 +189,7 @@
 				63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */,
 				BB0000002E3FB00000000000 /* BugSplatTV.framework */,
 				TT0000002E3FE00000000000 /* BugSplatMacTests.xctest */,
+				TT0000802E3FE00000000080 /* BugSplatIOSTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -228,6 +243,13 @@
 			remoteGlobalIDString = 63C6E1EC2B92831A00AED3E3;
 			remoteInfo = BugSplatMac;
 		};
+		TT0000812E3FE00000000081 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 63C6E1E42B92831A00AED3E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 63C6E1FB2B9283B000AED3E3;
+			remoteInfo = BugSplat;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXTargetDependency section */
@@ -235,6 +257,11 @@
 			isa = PBXTargetDependency;
 			target = 63C6E1EC2B92831A00AED3E3 /* BugSplatMac */;
 			targetProxy = TT0000402E3FE00000000040 /* PBXContainerItemProxy */;
+		};
+		TT0000822E3FE00000000082 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 63C6E1FB2B9283B000AED3E3 /* BugSplat */;
+			targetProxy = TT0000812E3FE00000000081 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -355,6 +382,24 @@
 			productReference = TT0000002E3FE00000000000 /* BugSplatMacTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		TT0000832E3FE00000000083 /* BugSplatIOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TT0000902E3FE00000000090 /* Build configuration list for PBXNativeTarget "BugSplatIOSTests" */;
+			buildPhases = (
+				TT0000842E3FE00000000084 /* Sources */,
+				TT0000852E3FE00000000085 /* Frameworks */,
+				TT0000862E3FE00000000086 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TT0000822E3FE00000000082 /* PBXTargetDependency */,
+			);
+			name = BugSplatIOSTests;
+			productName = BugSplatIOSTests;
+			productReference = TT0000802E3FE00000000080 /* BugSplatIOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -392,6 +437,7 @@
 				63C6E1FB2B9283B000AED3E3 /* BugSplat */,
 				BB0000152E3FB00000000015 /* BugSplatTV */,
 				TT0000502E3FE00000000050 /* BugSplatMacTests */,
+				TT0000832E3FE00000000083 /* BugSplatIOSTests */,
 			);
 		};
 /* End PBXProject section */
@@ -489,6 +535,39 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		TT0000532E3FE00000000053 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT0000842E3FE00000000084 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT0000702E3FE00000000070 /* BugSplatUtilitiesTests.m in Sources */,
+				TT0000712E3FE00000000071 /* BugSplatZipHelperTests.m in Sources */,
+				TT0000722E3FE00000000072 /* BugSplatAttachmentTests.m in Sources */,
+				TT0000732E3FE00000000073 /* BugSplatUploadServiceTests.m in Sources */,
+				TT0000742E3FE00000000074 /* BugSplatTests.m in Sources */,
+				TT0000752E3FE00000000075 /* MockURLSession.m in Sources */,
+				TT0000762E3FE00000000076 /* MockCrashStorage.m in Sources */,
+				TT0000772E3FE00000000077 /* MockCrashReporter.m in Sources */,
+				TT0000782E3FE00000000078 /* MockBundle.m in Sources */,
+				TT0000792E3FE0000000007A /* MockUserDefaults.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT0000852E3FE00000000085 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT00007A2E3FE0000000007A /* BugSplat.framework in Frameworks */,
+				TT00007B2E3FE0000000007B /* CrashReporter.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT0000862E3FE00000000086 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -926,6 +1005,91 @@
 			};
 			name = Release;
 		};
+		TT0000912E3FE00000000091 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/Tests/BugSplatTests",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64/CrashReporter.framework/Headers",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_x86_64-simulator/CrashReporter.framework/Headers",
+				);
+				INFOPLIST_FILE = Tests/BugSplatTests/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "-lc++";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatIOSTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		TT0000922E3FE00000000092 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN6R4Q475K;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/Tests/BugSplatTests",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64/CrashReporter.framework/Headers",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_x86_64-simulator/CrashReporter.framework/Headers",
+				);
+				INFOPLIST_FILE = Tests/BugSplatTests/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "-lc++";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatIOSTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -970,6 +1134,15 @@
 			buildConfigurations = (
 				TT0000612E3FE00000000061 /* Debug */,
 				TT0000622E3FE00000000062 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		TT0000902E3FE00000000090 /* Build configuration list for PBXNativeTarget "BugSplatIOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TT0000912E3FE00000000091 /* Debug */,
+				TT0000922E3FE00000000092 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -422,6 +422,7 @@
     metadata.database = @"crashTimeDb";
     metadata.applicationName = @"CrashTimeApp";
     metadata.applicationVersion = @"0.9.0";
+    metadata.crashTime = @"2024-01-15T10:30:00Z";
     
     NSData *crashData = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
     [self.uploadService uploadCrashReport:crashData
@@ -441,6 +442,13 @@
     XCTAssertTrue([urlString containsString:@"crashTimeDb.bugsplat.com"]);
     XCTAssertTrue([urlString containsString:@"appName=CrashTimeApp"]);
     XCTAssertTrue([urlString containsString:@"appVersion=0.9.0"]);
+    
+    // Third request (commit) should include crashTime in the body
+    MockURLSessionRequest *commitRequest = self.mockSession.recordedRequests[2];
+    NSString *commitBody = [[NSString alloc] initWithData:commitRequest.request.HTTPBody encoding:NSUTF8StringEncoding];
+    
+    XCTAssertTrue([commitBody containsString:@"name=\"crashTime\""], @"Commit request should include crashTime field");
+    XCTAssertTrue([commitBody containsString:@"2024-01-15T10:30:00Z"], @"Commit request should include the crashTime value");
 }
 
 #pragma mark - Attachment Tests
