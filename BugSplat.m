@@ -1062,9 +1062,17 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     if (_applicationVersion) {
         return _applicationVersion;
     }
-    NSString *version = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
-    if (version) {
-        return version;
+    NSString *shortVersion = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSString *buildNumber = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleVersion"];
+    
+    if (shortVersion && buildNumber) {
+        return [NSString stringWithFormat:@"%@ (%@)", shortVersion, buildNumber];
+    }
+    if (shortVersion) {
+        return shortVersion;
+    }
+    if (buildNumber) {
+        return buildNumber;
     }
     return @"1.0";
 }

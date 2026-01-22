@@ -196,6 +196,19 @@
     XCTAssertEqualObjects([instance resolvedApplicationVersion], @"3.0.0");
 }
 
+- (void)testResolvedApplicationVersion_CombinesVersionAndBuildNumber
+{
+    [self.mockBundle setObject:@"2.5.0" forInfoDictionaryKey:@"CFBundleShortVersionString"];
+    [self.mockBundle setObject:@"42" forInfoDictionaryKey:@"CFBundleVersion"];
+    
+    BugSplat *instance = [BugSplat testInstanceWithCrashReporter:self.mockCrashReporter
+                                                    crashStorage:self.mockCrashStorage
+                                                    userDefaults:self.mockUserDefaults
+                                                          bundle:self.mockBundle];
+    
+    XCTAssertEqualObjects([instance resolvedApplicationVersion], @"2.5.0 (42)");
+}
+
 - (void)testResolvedApplicationVersion_FallsBackTo1_0
 {
     [self.mockBundle setObject:nil forInfoDictionaryKey:@"CFBundleShortVersionString"];
