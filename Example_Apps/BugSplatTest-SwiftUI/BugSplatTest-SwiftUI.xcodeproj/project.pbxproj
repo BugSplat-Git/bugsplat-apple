@@ -7,16 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		63532E562BCF32E70075B042 /* BugSplat.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63D006F42BBF569200587FBF /* BugSplat.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000012E40000000000006 /* BugSplat.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000007 /* BugSplat.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		63D006E22BBF4A5500587FBF /* BugSplatTest-SwiftUIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D006E12BBF4A5500587FBF /* BugSplatTest-SwiftUIApp.swift */; };
 		63D006E42BBF4A5500587FBF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D006E32BBF4A5500587FBF /* ContentView.swift */; };
 		63D006E92BBF4A5700587FBF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */; };
 		63D006F22BBF4C3700587FBF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006F12BBF4C3700587FBF /* Assets.xcassets */; };
-		63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63D006F42BBF569200587FBF /* BugSplat.xcframework */; };
-		63E96A142D973F1700C0C026 /* HockeySDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A122D973F1700C0C026 /* HockeySDK.xcframework */; };
-		63E96A152D973F1700C0C026 /* HockeySDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A122D973F1700C0C026 /* HockeySDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		63E96A162D973F1700C0C026 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A132D973F1700C0C026 /* CrashReporter.xcframework */; };
-		63E96A172D973F1700C0C026 /* CrashReporter.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 63E96A132D973F1700C0C026 /* CrashReporter.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000032E40000000000008 /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000007 /* BugSplat.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,19 +22,7 @@
 			dstPath = Frameworks;
 			dstSubfolderSpec = 1;
 			files = (
-				63532E562BCF32E70075B042 /* BugSplat.xcframework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		63E96A182D973F1700C0C026 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				63E96A172D973F1700C0C026 /* CrashReporter.xcframework in Embed Frameworks */,
-				63E96A152D973F1700C0C026 /* HockeySDK.xcframework in Embed Frameworks */,
+				WS0000012E40000000000006 /* BugSplat.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -52,9 +36,7 @@
 		63D006E32BBF4A5500587FBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		63D006F12BBF4C3700587FBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "BugSplatTest-SwiftUI/Assets.xcassets"; sourceTree = "<group>"; };
-		63D006F42BBF569200587FBF /* BugSplat.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = BugSplat.xcframework; path = ../../xcframeworks/BugSplat.xcframework; sourceTree = "<group>"; };
-		63E96A122D973F1700C0C026 /* HockeySDK.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = HockeySDK.xcframework; path = ../../Vendor/HockeySDK.xcframework; sourceTree = "<group>"; };
-		63E96A132D973F1700C0C026 /* CrashReporter.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:TN6R4Q475K:BugSplat, LLC"; lastKnownFileType = wrapper.xcframework; name = CrashReporter.xcframework; path = ../../Vendor/CrashReporter.xcframework; sourceTree = "<group>"; };
+		WS0000022E40000000000007 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,9 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63D006FB2BC0B03700587FBF /* BugSplat.xcframework in Frameworks */,
-				63E96A142D973F1700C0C026 /* HockeySDK.xcframework in Frameworks */,
-				63E96A162D973F1700C0C026 /* CrashReporter.xcframework in Frameworks */,
+				WS0000032E40000000000008 /* BugSplat.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,9 +72,7 @@
 		63D006F32BBF569200587FBF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				63E96A132D973F1700C0C026 /* CrashReporter.xcframework */,
-				63E96A122D973F1700C0C026 /* HockeySDK.xcframework */,
-				63D006F42BBF569200587FBF /* BugSplat.xcframework */,
+				WS0000022E40000000000007 /* BugSplat.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -130,7 +108,6 @@
 				63D006DD2BBF4A5500587FBF /* Resources */,
 				63D006FD2BC0B03700587FBF /* Embed Frameworks */,
 				634ABCCF2BD85E8500926648 /* BugSplat Symbol Upload */,
-				63E96A182D973F1700C0C026 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -206,7 +183,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nrm -f \"/tmp/Xcode_run_script.log\"\n\n# Xcode doesn't show run script errors in build log.\nexec > \"/tmp/Xcode_run_script.log\" 2>&1\n\necho \"PROJECT_DIR=$PROJECT_DIR\"\necho \"ARCHIVE_PATH=$ARCHIVE_PATH\"\necho \"BUILT_PRODUCTS_DIR=$BUILT_PRODUCTS_DIR\"\n \n# Use osascript(1) to present notification banners; otherwise\n# there's no progress indication until the script finishes.\n#/usr/bin/osascript -e 'display notification \"Exporting application archive…\" with title \"Archiving\"'\n\n# Ask xcodebuild(1) to export the app. Use the export options\n# from a previous manual export that used a Developer ID.\n#/usr/bin/xcodebuild -exportArchive -archivePath \"$ARCHIVE_PATH\" -exportOptionsPlist \"$SRCROOT/ExportOptions.plist\" -exportPath \"$EXPORT_PATH\"\n\n#create new archive\n#xcodebuild archive -scheme \"BugSplatTest-SwiftUIApp\" -sdk iphoneos -destination generic/platform=iOS -archivePath \"$ARCHIVE_PATH\"/BugSplatTest-SwiftUIApp.xcarchive\n\n# Ensure symbol upload tool is available\nif [ ! -f \"$PROJECT_DIR/../../Tools/symbol-upload-macos\" ]; then\n    mkdir -p \"$PROJECT_DIR/../../Tools\"\n    cd \"$PROJECT_DIR/../../Tools\"\n    curl -sL -O \"https://app.bugsplat.com/download/symbol-upload-macos\"\n    chmod +x symbol-upload-macos\nfi\n\nosascript -e 'display notification \"preparing and uploading symbols…\" with title \"BugSplat\"'\n\n\"$PROJECT_DIR\"/../../Tools/symbol-upload-macos -a \"BugSplatTest-SwiftUIApp\" -b \"Fred\" -u \"fred@bugsplat.com\" -p \"Flintstone\" -f \"**/*.dSYM\" -d \"$BUILT_PRODUCTS_DIR\" -v \"1.0 (1)\"\n";
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nrm -f \"/tmp/Xcode_run_script.log\"\n\n# Xcode doesn't show run script errors in build log.\nexec > \"/tmp/Xcode_run_script.log\" 2>&1\n\necho \"PROJECT_DIR=$PROJECT_DIR\"\necho \"ARCHIVE_PATH=$ARCHIVE_PATH\"\necho \"BUILT_PRODUCTS_DIR=$BUILT_PRODUCTS_DIR\"\n \n# Use osascript(1) to present notification banners; otherwise\n# there's no progress indication until the script finishes.\n#/usr/bin/osascript -e 'display notification \"Exporting application archive…\" with title \"Archiving\"'\n\n# Ask xcodebuild(1) to export the app. Use the export options\n# from a previous manual export that used a Developer ID.\n#/usr/bin/xcodebuild -exportArchive -archivePath \"$ARCHIVE_PATH\" -exportOptionsPlist \"$SRCROOT/ExportOptions.plist\" -exportPath \"$EXPORT_PATH\"\n\n#create new archive\n#xcodebuild archive -scheme \"BugSplatTest-SwiftUIApp\" -sdk iphoneos -destination generic/platform=iOS -archivePath \"$ARCHIVE_PATH\"/BugSplatTest-SwiftUIApp.xcarchive\n\n# Ensure symbol upload tool is available\nif [ ! -f \"$PROJECT_DIR/../../Tools/symbol-upload-macos\" ]; then\n    mkdir -p \"$PROJECT_DIR/../../Tools\"\n    cd \"$PROJECT_DIR/../../Tools\"\n    curl -sL -O \"https://app.bugsplat.com/download/symbol-upload-macos\"\n    chmod +x symbol-upload-macos\nfi\n\nosascript -e 'display notification \"preparing and uploading symbols…\" with title \"BugSplat\"'\n\n\"$PROJECT_DIR\"/../../Tools/symbol-upload-macos -a \"BugSplatTest-SwiftUIApp\" -b \"fred\" -u \"fred@bugsplat.com\" -p \"Flintstone\" -f \"**/*.dSYM\" -d \"$BUILT_PRODUCTS_DIR\" -v \"1.0 (1)\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

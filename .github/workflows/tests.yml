@@ -1,0 +1,63 @@
+name: Tests
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-macos:
+    name: macOS Tests
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+        
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+        
+    - name: Run macOS Tests
+      run: |
+        set -o pipefail
+        xcodebuild test \
+          -workspace BugSplat.xcworkspace \
+          -scheme BugSplatMacTests \
+          -destination 'platform=macOS' \
+          CODE_SIGNING_ALLOWED=NO
+
+  test-ios:
+    name: iOS Tests
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+        
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+
+    - name: List available simulators
+      run: xcrun simctl list devices available
+
+    - name: Run iOS Tests
+      run: |
+        set -o pipefail
+        xcodebuild test \
+          -workspace BugSplat.xcworkspace \
+          -scheme BugSplatIOSTests \
+          -destination 'platform=iOS Simulator,OS=latest,name=iPhone 16' \
+          CODE_SIGNING_ALLOWED=NO

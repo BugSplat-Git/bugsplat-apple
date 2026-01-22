@@ -2,11 +2,13 @@
 import PackageDescription
 
 // Bundle up BugSplat.xcframework as a Swift Package suitable for integration with Swift Package Manager
+// PLCrashReporter is statically linked into BugSplat - no separate framework needed
 let package = Package(
     name: "BugSplat",
     platforms: [
         .iOS(.v13),
-        .macOS(.v10_13)
+        .macOS("11.5"),
+        .tvOS(.v13)
     ],
     products: [
         .library(
@@ -15,29 +17,21 @@ let package = Package(
         )
     ],
     targets: [
+        // For releases: update the URL and checksum to point to the GitHub release
+        // BugSplat.xcframework contains PLCrashReporter statically linked
         .binaryTarget(
             name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/BugSplat.xcframework.zip",
-            checksum: "c88a6b05d83415b968e85745376fa997dc6ce19df865447ae6a21e2d7288400f"
+            path: "BugSplat.xcframework"
         ),
-        .binaryTarget(
-            name: "HockeySDK",
-            // this zip should be created from the contents of xcframeworks/HockeySDK.xcframework after combining HockeySDK-Mac and HockeySDK-iOS
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/HockeySDK.xcframework.zip",
-            checksum: "22c4e6ce9448a8985b0e48c58cff535268eacda566991b79260f19c24be98dfa"
-        ),
-        .binaryTarget(
-            name: "CrashReporter",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v1.2.6/CrashReporter.xcframework.zip",
-            checksum: "d6e9f19c161fa6a29baa7792883409c3546df910cfbcc0f6dc55896ce4c5c588"
-        ),
-        // Add a fake target to satisfy the swift build system
-        // Add a dependency to the .binaryTarget
-        // Add the expected Sources folder structure: Sources/BugSplatPackage/
-        // Add a fake Swift source: Sources/BugSplatPackage/Empty.swift
+        // Wrapper target that links dependencies
+        // Sources/BugSplatPackage/Empty.swift satisfies SPM's requirement for source files
         .target(
             name: "BugSplatPackage",
-            dependencies: ["BugSplat", "HockeySDK", "CrashReporter"]
+            dependencies: ["BugSplat"],
+            linkerSettings: [
+                .linkedLibrary("z"), // Required for zip compression
+                .linkedLibrary("c++") // Required by PLCrashReporter (statically linked)
+            ]
         )
     ]
 )

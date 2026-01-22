@@ -44,10 +44,10 @@ jobs:
     runs-on: macos-latest
     
     steps:
-    - name: Create parent directory
-      run: |
-        mkdir bugsplat-workspace
-        cd bugsplat-workspace
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GH_PAT }}
         
     - name: Install the Apple certificate
       env:
@@ -71,67 +71,29 @@ jobs:
         security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
         security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security list-keychain -d user -s $KEYCHAIN_PATH
-        
-    - name: Clone repositories
-      working-directory: bugsplat-workspace
-      run: |
-        # Clone bugsplat-apple with token for push access
-        git clone https://${{ secrets.GH_PAT }}@github.com/BugSplat-Git/bugsplat-apple.git
-        git clone https://github.com/BugSplat-Git/HockeySDK-Mac
-        git clone https://github.com/BugSplat-Git/HockeySDK-iOS
-        git clone https://github.com/BugSplat-Git/plCrashReporter
 
-    - name: Set up Xcode 15.4
+    - name: Set up Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '15.4'
-
-    - name: Build PlCrashReporter
-      working-directory: bugsplat-workspace/plCrashReporter
+        xcode-version: latest-stable
+        
+    - name: Build BugSplat XCFramework
       run: |
+        # Build the xcframework (PLCrashReporter is statically linked from Vendor/)
         ./makeXCFramework.sh
         
-    - name: Build HockeySDK-Mac
-      working-directory: bugsplat-workspace/HockeySDK-Mac
-      run: |
-        ./makeXCFramework.sh
-        
-    - name: Build HockeySDK-iOS
-      working-directory: bugsplat-workspace/HockeySDK-iOS
-      run: |
-        ./makeXCFramework.sh
-        
-    - name: Build BugSplat
-      working-directory: bugsplat-workspace/bugsplat-apple
-      run: |
-        ./makeXCFramework.sh
-        
-        # Create zip archives of the frameworks
+        # Create zip archive
         cd xcframeworks
         zip -y -r BugSplat.xcframework.zip BugSplat.xcframework
-        cd ../Vendor
-        zip -y -r HockeySDK.xcframework.zip HockeySDK.xcframework
-        zip -y -r CrashReporter.xcframework.zip CrashReporter.xcframework
         
     - name: Update Package.swift
-      working-directory: bugsplat-workspace/bugsplat-apple
       run: |
-        # Calculate checksums
-        BUGSPLAT_CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
-        HOCKEY_CHECKSUM=$(swift package compute-checksum Vendor/HockeySDK.xcframework.zip)
-        CRASHREPORTER_CHECKSUM=$(swift package compute-checksum Vendor/CrashReporter.xcframework.zip)
+        CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
+        URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip"
         
-        # Update all frameworks in Package.swift
-        sed -i '' \
-          -e "/name: \"BugSplat\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip\"|" \
-          -e "/name: \"BugSplat\"/,/}/ s|checksum: \".*\"|checksum: \"${BUGSPLAT_CHECKSUM}\"|" \
-          -e "/name: \"HockeySDK\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/HockeySDK.xcframework.zip\"|" \
-          -e "/name: \"HockeySDK\"/,/}/ s|checksum: \".*\"|checksum: \"${HOCKEY_CHECKSUM}\"|" \
-          -e "/name: \"CrashReporter\"/,/}/ s|url: \".*\"|url: \"https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/CrashReporter.xcframework.zip\"|" \
-          -e "/name: \"CrashReporter\"/,/}/ s|checksum: \".*\"|checksum: \"${CRASHREPORTER_CHECKSUM}\"|" \
-          Package.swift
+        # Replace local path with remote URL and checksum
+        sed -i '' 's|path: "BugSplat.xcframework"|url: "'"$URL"'",\n            checksum: "'"$CHECKSUM"'"|' Package.swift
           
-        # Commit and push the updated Package.swift
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add Package.swift
@@ -139,7 +101,6 @@ jobs:
         git push origin HEAD:main
 
     - name: Create and Push Tag
-      working-directory: bugsplat-workspace/bugsplat-apple
       run: |
         git tag ${{ needs.check-version.outputs.next }}
         git push origin ${{ needs.check-version.outputs.next }}
@@ -149,25 +110,27 @@ jobs:
       with:
         tag_name: ${{ needs.check-version.outputs.next }}
         files: |
-          bugsplat-workspace/bugsplat-apple/xcframeworks/BugSplat.xcframework.zip
-          bugsplat-workspace/bugsplat-apple/Vendor/HockeySDK.xcframework.zip
-          bugsplat-workspace/bugsplat-apple/Vendor/CrashReporter.xcframework.zip
+          xcframeworks/BugSplat.xcframework.zip
         name: Release ${{ needs.check-version.outputs.next }}
         body: |
           Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next }}
           
-          This release contains:
-          - BugSplat.xcframework
-          - HockeySDK.xcframework
-          - CrashReporter.xcframework
+          This release includes:
+          - BugSplat.xcframework (iOS, macOS, tvOS)
+          - PLCrashReporter statically linked
           
-          Swift Package Manager:
+          ## Swift Package Manager
+          
           ```swift
           dependencies: [
               .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ needs.check-version.outputs.next }}")
           ]
           ```
+          
+          ## Manual Integration
+          
+          Download `BugSplat.xcframework.zip`, unzip, and add to your Xcode project.
         draft: false
         prerelease: false
       env:
-        GITHUB_TOKEN: ${{ secrets.GH_PAT }} 
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
