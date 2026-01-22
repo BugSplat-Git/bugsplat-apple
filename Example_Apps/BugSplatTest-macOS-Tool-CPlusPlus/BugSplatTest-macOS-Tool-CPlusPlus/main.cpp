@@ -23,23 +23,29 @@ int setAttributeAndValue()
 
 int checkInput(std::string input)
 {
-    std::cout << "checkInput called: ";
-    std::cout << input;
+    std::cout << "checkInput called: " << input << std::endl;
 
     if (input == "seg fault")
     {
-        int *ptr = nullptr;  // Initialize pointer to null
-        std::cout << *ptr << std::endl;  // Dereferencing a null pointer (segfault)
+        std::cout << "Triggering segfault..." << std::endl;
+        // Use volatile to prevent compiler optimization
+        volatile int *ptr = nullptr;
+        *ptr = 42;  // Write to null pointer - guaranteed crash
     }
     else if (input == "divide by zero")
     {
-        int a = 10;
-        int b = 0;
+        std::cout << "Triggering divide by zero..." << std::endl;
+        volatile int a = 10;
+        volatile int b = 0;
         std::cout << "Result: " << a / b << std::endl;  // Division by zero
     }
     else if (input == "set")
     {
         return setAttributeAndValue();
+    }
+    else
+    {
+        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', or 'q' to quit" << std::endl;
     }
 
     return 0;
