@@ -101,9 +101,15 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 #else
         PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeMach;
 #endif
+        // Set max crash report size to 10MB
+        static const NSUInteger kMaxCrashReportBytes = 10 * 1024 * 1024; // 10MB
+        
         PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
             initWithSignalHandlerType:signalHandlerType
-            symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
+                symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone
+   shouldRegisterUncaughtExceptionHandler:YES
+                                 basePath:nil
+                           maxReportBytes:kMaxCrashReportBytes];
         
         _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
         
