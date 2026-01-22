@@ -19,6 +19,18 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /**
+ * Class extension to expose private methods for testing.
+ * These methods are implemented in the main BugSplat class.
+ */
+@interface BugSplat ()
+
+- (BOOL)shouldSendCrashSilently:(NSDictionary *)metadata;
+- (NSString *)resolvedApplicationName;
+- (NSString *)resolvedApplicationVersion;
+
+@end
+
+/**
  * Testing interface for BugSplat.
  * Exposes internal methods and allows dependency injection for unit testing.
  */
@@ -68,13 +80,6 @@ NS_ASSUME_NONNULL_BEGIN
  * Get the crash storage (for verification).
  */
 - (id<BugSplatCrashStorageProtocol>)crashStorage;
-
-/**
- * Exposed internal methods for testing.
- */
-- (BOOL)shouldSendCrashSilently:(NSDictionary *)metadata;
-- (NSString *)resolvedApplicationName;
-- (NSString *)resolvedApplicationVersion;
 
 @end
 
