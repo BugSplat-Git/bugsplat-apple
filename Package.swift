@@ -7,7 +7,7 @@ let package = Package(
     name: "BugSplat",
     platforms: [
         .iOS(.v13),
-        .macOS(.v10_13),
+        .macOS("11.5"),
         .tvOS(.v13)
     ],
     products: [
