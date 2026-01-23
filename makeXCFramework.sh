@@ -1,8 +1,68 @@
 #!/bin/bash
 # Build BugSplat.xcframework for all platforms (iOS, macOS, tvOS)
-# PLCrashReporter static libraries are in Vendor/PLCrashReporter/
+# PLCrashReporter is built from source with BugSplat namespace prefix
+#
+# Usage:
+#   ./makeXCFramework.sh                      # Build (uses cached PLCrashReporter if available)
+#   ./makeXCFramework.sh --rebuild-plcrashreporter  # Force rebuild PLCrashReporter
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLCRASHREPORTER_DIR="$SCRIPT_DIR/Vendor/PLCrashReporter"
+PLCRASHREPORTER_XCFRAMEWORK="$PLCRASHREPORTER_DIR/CrashReporter.xcframework"
+
+# Check for --rebuild-plcrashreporter flag
+if [ "$1" == "--rebuild-plcrashreporter" ]; then
+    echo "Force rebuilding PLCrashReporter..."
+    rm -rf "$PLCRASHREPORTER_XCFRAMEWORK"
+fi
+
+# Build PLCrashReporter if xcframework doesn't exist
+if [ ! -d "$PLCRASHREPORTER_XCFRAMEWORK" ]; then
+    echo "Building PLCrashReporter with BugSplat namespace prefix..."
+    
+    cd "$PLCRASHREPORTER_DIR"
+    
+    # Build for each platform
+    echo "  Building iOS device..."
+    xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+    
+    echo "  Building iOS simulator..."
+    xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphonesimulator \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+    
+    echo "  Building macOS..."
+    xcodebuild -scheme "CrashReporter macOS Framework" -configuration Release \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+    
+    echo "  Building tvOS device..."
+    xcodebuild -scheme "CrashReporter tvOS Framework" -configuration Release -sdk appletvos \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+    
+    echo "  Building tvOS simulator..."
+    xcodebuild -scheme "CrashReporter tvOS Framework" -configuration Release -sdk appletvsimulator \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+    
+    # Find the DerivedData path
+    DERIVED_DATA=$(xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos -showBuildSettings 2>/dev/null | grep -m 1 "BUILD_DIR" | awk '{print $3}' | sed 's|/Build/Products||')
+    PRODUCTS_DIR="$DERIVED_DATA/Build/Products"
+    
+    echo "  Creating CrashReporter.xcframework..."
+    xcodebuild -create-xcframework \
+        -framework "$PRODUCTS_DIR/Release-iphoneos/CrashReporter.framework" \
+        -framework "$PRODUCTS_DIR/Release-iphonesimulator/CrashReporter.framework" \
+        -framework "$PRODUCTS_DIR/Release-macosx/CrashReporter.framework" \
+        -framework "$PRODUCTS_DIR/Release-appletvos/CrashReporter.framework" \
+        -framework "$PRODUCTS_DIR/Release-appletvsimulator/CrashReporter.framework" \
+        -output "$PLCRASHREPORTER_XCFRAMEWORK"
+    
+    echo "PLCrashReporter.xcframework built successfully!"
+    cd "$SCRIPT_DIR"
+else
+    echo "Using existing PLCrashReporter xcframework at $PLCRASHREPORTER_XCFRAMEWORK"
+fi
 
 # Clean up previous builds
 rm -rf archives/*
