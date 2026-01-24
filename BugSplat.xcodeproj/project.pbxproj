@@ -1024,7 +1024,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 					"$(PROJECT_DIR)/Tests/BugSplatTests",
-					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64/CrashReporter.framework/Headers",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_arm64e/CrashReporter.framework/Headers",
 					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_x86_64-simulator/CrashReporter.framework/Headers",
 				);
 				INFOPLIST_FILE = Tests/BugSplatTests/Info.plist;
@@ -1066,7 +1066,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 					"$(PROJECT_DIR)/Tests/BugSplatTests",
-					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64/CrashReporter.framework/Headers",
+					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_arm64e/CrashReporter.framework/Headers",
 					"$(PROJECT_DIR)/Vendor/PLCrashReporter/CrashReporter.xcframework/ios-arm64_x86_64-simulator/CrashReporter.framework/Headers",
 				);
 				INFOPLIST_FILE = Tests/BugSplatTests/Info.plist;

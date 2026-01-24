@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
         
     - name: Set up Xcode
       uses: maxim-lobanov/setup-xcode@v1
@@ -24,6 +26,22 @@ jobs:
 
     - name: Show Xcode version
       run: xcodebuild -version
+
+    - name: Build PLCrashReporter
+      run: |
+        cd Vendor/PLCrashReporter
+        
+        # Build macOS framework
+        xcodebuild -scheme "CrashReporter macOS Framework" -configuration Release \
+          BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+        
+        # Get derived data path and create xcframework
+        DERIVED_DATA=$(xcodebuild -scheme "CrashReporter macOS Framework" -configuration Release -showBuildSettings 2>/dev/null | grep -m 1 "BUILD_DIR" | awk '{print $3}' | sed 's|/Build/Products||')
+        PRODUCTS_DIR="$DERIVED_DATA/Build/Products"
+        
+        xcodebuild -create-xcframework \
+          -framework "$PRODUCTS_DIR/Release-macosx/CrashReporter.framework" \
+          -output "CrashReporter.xcframework"
         
     - name: Run macOS Tests
       run: |
@@ -41,6 +59,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
         
     - name: Set up Xcode
       uses: maxim-lobanov/setup-xcode@v1
@@ -52,6 +72,25 @@ jobs:
 
     - name: List available simulators
       run: xcrun simctl list devices available
+
+    - name: Build PLCrashReporter
+      run: |
+        cd Vendor/PLCrashReporter
+        
+        # Build iOS device and simulator frameworks
+        xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos \
+          BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+        xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphonesimulator \
+          BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
+        
+        # Get derived data path and create xcframework
+        DERIVED_DATA=$(xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos -showBuildSettings 2>/dev/null | grep -m 1 "BUILD_DIR" | awk '{print $3}' | sed 's|/Build/Products||')
+        PRODUCTS_DIR="$DERIVED_DATA/Build/Products"
+        
+        xcodebuild -create-xcframework \
+          -framework "$PRODUCTS_DIR/Release-iphoneos/CrashReporter.framework" \
+          -framework "$PRODUCTS_DIR/Release-iphonesimulator/CrashReporter.framework" \
+          -output "CrashReporter.xcframework"
 
     - name: Run iOS Tests
       run: |

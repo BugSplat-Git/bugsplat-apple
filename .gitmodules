@@ -1,0 +1,3 @@
+[submodule "Vendor/PLCrashReporter"]
+	path = Vendor/PLCrashReporter
+	url = https://github.com/BugSplat-Git/plcrashreporter.git
