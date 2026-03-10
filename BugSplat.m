@@ -991,6 +991,31 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }];
 }
 
+#pragma mark - User Feedback
+
+- (void)postFeedbackWithTitle:(NSString *)title
+                  description:(NSString *)description
+                     userName:(NSString *)userName
+                    userEmail:(NSString *)userEmail
+                   completion:(void (^)(NSError * _Nullable error))completion
+{
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = self.bugSplatDatabase;
+    metadata.applicationName = self.resolvedApplicationName;
+    metadata.applicationVersion = self.resolvedApplicationVersion;
+    metadata.userName = userName ?: self.userName;
+    metadata.userEmail = userEmail ?: self.userEmail;
+    metadata.userDescription = description ?: @"";
+    metadata.applicationKey = self.appKey;
+    metadata.notes = self.notes;
+    metadata.crashTypeId = @"36";
+
+    BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:self.bugSplatDatabase
+                                                                           applicationName:self.resolvedApplicationName
+                                                                        applicationVersion:self.resolvedApplicationVersion];
+    [uploadService uploadFeedbackWithTitle:title description:description metadata:metadata completion:completion];
+}
+
 #pragma mark - Properties
 
 - (NSBundle *)bundle

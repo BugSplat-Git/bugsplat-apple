@@ -161,6 +161,93 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     }
 }
 
+- (void)uploadFeedbackWithTitle:(NSString *)title
+                    description:(NSString *)description
+                       metadata:(BugSplatCrashMetadata *)metadata
+                     completion:(void (^)(NSError * _Nullable error))completion
+{
+    if (!completion) {
+        NSLog(@"BugSplat: uploadFeedbackWithTitle called with nil completion handler");
+        return;
+    }
+
+    @try {
+        metadata.crashTypeId = @"36";
+
+        // Create feedback.json content
+        NSMutableDictionary *feedbackDict = [NSMutableDictionary dictionary];
+        feedbackDict[@"title"] = title ?: @"";
+        feedbackDict[@"description"] = description ?: @"";
+
+        NSError *jsonError;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:feedbackDict options:0 error:&jsonError];
+        if (jsonError) {
+            completion(jsonError);
+            return;
+        }
+
+        // Create zip containing feedback.json using existing zip helper
+        BugSplatZipEntry *feedbackEntry = [BugSplatZipEntry entryWithFilename:@"feedback.json" data:jsonData];
+        NSData *zipData = [BugSplatZipHelper zipEntries:@[feedbackEntry]];
+        if (!zipData) {
+            NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                                 code:BugSplatUploadErrorCodeInvalidData
+                                             userInfo:@{NSLocalizedDescriptionKey: @"Failed to create feedback ZIP archive"}];
+            completion(error);
+            return;
+        }
+
+        // Use crash-time values from metadata, fall back to upload service defaults
+        NSString *database = metadata.database ?: self.database;
+        NSString *appName = metadata.applicationName ?: self.applicationName;
+        NSString *appVersion = metadata.applicationVersion ?: self.applicationVersion;
+
+        NSString *md5Hash = [BugSplatZipHelper md5HashOfData:zipData];
+
+        // Step 1: Get presigned URL
+        [self getPresignedURLForDatabase:database
+                         applicationName:appName
+                      applicationVersion:appVersion
+                                    size:zipData.length
+                              completion:^(NSString *presignedURL, NSError *error) {
+            if (error) {
+                completion(error);
+                return;
+            }
+
+            // Step 2: Upload to S3
+            [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
+                if (!success) {
+                    completion(uploadError);
+                    return;
+                }
+
+                // Step 3: Commit the upload
+                [self commitUploadWithS3Key:presignedURL
+                                    md5Hash:md5Hash
+                                   database:database
+                            applicationName:appName
+                         applicationVersion:appVersion
+                                   metadata:metadata
+                                 completion:^(BOOL commitSuccess, NSError *commitError, NSString *infoUrl) {
+                    if (commitSuccess) {
+                        NSLog(@"BugSplat: User feedback uploaded successfully");
+                        completion(nil);
+                    } else {
+                        completion(commitError);
+                    }
+                }];
+            }];
+        }];
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in uploadFeedbackWithTitle: %@ - %@", exception.name, exception.reason);
+        NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                             code:BugSplatUploadErrorCodeInvalidData
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
+        completion(error);
+    }
+}
+
 - (void)cancelUpload
 {
     [self.currentTask cancel];
@@ -318,13 +405,26 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     [self appendFormField:@"appName" value:appName boundary:boundary toData:body];
     [self appendFormField:@"appVersion" value:appVersion boundary:boundary toData:body];
     
+    if (metadata.crashTypeId) {
+        [self appendFormField:@"crashTypeId" value:metadata.crashTypeId boundary:boundary toData:body];
+        if ([metadata.crashTypeId isEqualToString:@"36"]) {
+            [self appendFormField:@"crashType" value:@"User.Feedback" boundary:boundary toData:body];
+        } else {
 #if TARGET_OS_OSX
-    [self appendFormField:@"crashType" value:@"macOS" boundary:boundary toData:body];
-    [self appendFormField:@"crashTypeId" value:@"13" boundary:boundary toData:body]; // macOS crash type ID
+            [self appendFormField:@"crashType" value:@"macOS" boundary:boundary toData:body];
 #else
-    [self appendFormField:@"crashType" value:@"iOS" boundary:boundary toData:body];
-    [self appendFormField:@"crashTypeId" value:@"26" boundary:boundary toData:body]; // iOS crash type ID
+            [self appendFormField:@"crashType" value:@"iOS" boundary:boundary toData:body];
 #endif
+        }
+    } else {
+#if TARGET_OS_OSX
+        [self appendFormField:@"crashType" value:@"macOS" boundary:boundary toData:body];
+        [self appendFormField:@"crashTypeId" value:@"13" boundary:boundary toData:body];
+#else
+        [self appendFormField:@"crashType" value:@"iOS" boundary:boundary toData:body];
+        [self appendFormField:@"crashTypeId" value:@"26" boundary:boundary toData:body];
+#endif
+    }
     
     [self appendFormField:@"s3key" value:s3Key boundary:boundary toData:body];
     [self appendFormField:@"md5" value:md5Hash boundary:boundary toData:body];

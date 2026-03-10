@@ -39,6 +39,13 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, nullable) NSString *crashTime;
 
+/**
+ * The crash type ID to use for this upload.
+ * When set, overrides the default platform-specific crash type ID.
+ * Use @"36" for user feedback submissions.
+ */
+@property (nonatomic, copy, nullable) NSString *crashTypeId;
+
 @end
 
 /**
@@ -96,6 +103,23 @@ typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error,
               attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
                  metadata:(nullable BugSplatCrashMetadata *)metadata
                completion:(BugSplatUploadCompletion)completion;
+
+/**
+ * Uploads user feedback to BugSplat.
+ *
+ * Creates a feedback.json file containing the title and description,
+ * zips it, and uploads using the standard 3-step presigned URL flow
+ * with crashTypeId=36 (User.Feedback).
+ *
+ * @param title The feedback title.
+ * @param description Optional feedback description.
+ * @param metadata Metadata (database, app info, user info, etc).
+ * @param completion Called when upload completes or fails.
+ */
+- (void)uploadFeedbackWithTitle:(NSString *)title
+                    description:(nullable NSString *)description
+                       metadata:(BugSplatCrashMetadata *)metadata
+                     completion:(void (^)(NSError * _Nullable error))completion;
 
 /**
  * Cancels any in-progress upload.
