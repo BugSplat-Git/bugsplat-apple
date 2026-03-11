@@ -997,6 +997,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                   description:(NSString *)description
                      userName:(NSString *)userName
                     userEmail:(NSString *)userEmail
+                  attachments:(NSArray<BugSplatAttachment *> *)attachments
                    completion:(void (^)(NSError * _Nullable error))completion
 {
     BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
@@ -1013,7 +1014,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:self.bugSplatDatabase
                                                                            applicationName:self.resolvedApplicationName
                                                                         applicationVersion:self.resolvedApplicationVersion];
-    [uploadService uploadFeedbackWithTitle:title description:description metadata:metadata completion:completion];
+    [uploadService uploadFeedbackWithTitle:title description:description attachments:attachments metadata:metadata completion:completion];
 }
 
 #pragma mark - Properties

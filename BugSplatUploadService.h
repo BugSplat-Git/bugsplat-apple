@@ -108,16 +108,18 @@ typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error,
  * Uploads user feedback to BugSplat.
  *
  * Creates a feedback.json file containing the title and description,
- * zips it, and uploads using the standard 3-step presigned URL flow
- * with crashTypeId=36 (User.Feedback).
+ * zips it along with any attachments, and uploads using the standard
+ * 3-step presigned URL flow with crashTypeId=36 (User.Feedback).
  *
  * @param title The feedback title.
  * @param description Optional feedback description.
+ * @param attachments Optional array of file attachments to include.
  * @param metadata Metadata (database, app info, user info, etc).
  * @param completion Called when upload completes or fails.
  */
 - (void)uploadFeedbackWithTitle:(NSString *)title
                     description:(nullable NSString *)description
+                    attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
                        metadata:(BugSplatCrashMetadata *)metadata
                      completion:(void (^)(NSError * _Nullable error))completion;
 

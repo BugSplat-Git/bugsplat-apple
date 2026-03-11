@@ -163,6 +163,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 
 - (void)uploadFeedbackWithTitle:(NSString *)title
                     description:(NSString *)description
+                    attachments:(NSArray<BugSplatAttachment *> *)attachments
                        metadata:(BugSplatCrashMetadata *)metadata
                      completion:(void (^)(NSError * _Nullable error))completion
 {
@@ -186,9 +187,24 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             return;
         }
 
-        // Create zip containing feedback.json using existing zip helper
-        BugSplatZipEntry *feedbackEntry = [BugSplatZipEntry entryWithFilename:@"feedback.json" data:jsonData];
-        NSData *zipData = [BugSplatZipHelper zipEntries:@[feedbackEntry]];
+        // Create zip entries starting with feedback.json
+        NSMutableArray<BugSplatZipEntry *> *zipEntries = [NSMutableArray array];
+        [zipEntries addObject:[BugSplatZipEntry entryWithFilename:@"feedback.json" data:jsonData]];
+
+        // Add all attachments to the ZIP (same pattern as crash report uploads)
+        for (BugSplatAttachment *attachment in attachments) {
+            @try {
+                if (attachment && attachment.attachmentData && attachment.filename) {
+                    [zipEntries addObject:[BugSplatZipEntry entryWithFilename:attachment.filename data:attachment.attachmentData]];
+                    NSLog(@"BugSplat: Adding attachment to feedback ZIP: %@", attachment.filename);
+                }
+            } @catch (NSException *exception) {
+                NSLog(@"BugSplat: Exception adding attachment to feedback ZIP: %@ - %@", exception.name, exception.reason);
+                // Continue with remaining attachments
+            }
+        }
+
+        NSData *zipData = [BugSplatZipHelper zipEntries:zipEntries];
         if (!zipData) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
