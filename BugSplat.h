@@ -222,6 +222,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param description Optional description providing additional detail.
  * @param userName Optional user name. Falls back to the `userName` property if nil.
  * @param userEmail Optional user email. Falls back to the `userEmail` property if nil.
+ * @param appKey Optional application key. Falls back to the `appKey` property if nil.
  * @param attachments Optional array of file attachments to include with the feedback.
  * @param completion Optional completion handler called when the upload finishes.
  *                   The error parameter is nil on success.
@@ -230,6 +231,7 @@ NS_ASSUME_NONNULL_BEGIN
                   description:(nullable NSString *)description
                      userName:(nullable NSString *)userName
                     userEmail:(nullable NSString *)userEmail
+                       appKey:(nullable NSString *)appKey
                   attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
                    completion:(nullable void (^)(NSError * _Nullable error))completion;
 

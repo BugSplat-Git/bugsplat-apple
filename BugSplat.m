@@ -997,6 +997,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
                   description:(NSString *)description
                      userName:(NSString *)userName
                     userEmail:(NSString *)userEmail
+                       appKey:(NSString *)appKey
                   attachments:(NSArray<BugSplatAttachment *> *)attachments
                    completion:(void (^)(NSError * _Nullable error))completion
 {
@@ -1007,7 +1008,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     metadata.userName = userName ?: self.userName;
     metadata.userEmail = userEmail ?: self.userEmail;
     metadata.userDescription = description ?: @"";
-    metadata.applicationKey = self.appKey;
+    metadata.applicationKey = appKey ?: self.appKey;
     metadata.notes = self.notes;
     metadata.crashTypeId = @"36";
 
