@@ -21,34 +21,35 @@ fi
 # Build PLCrashReporter if xcframework doesn't exist
 if [ ! -d "$PLCRASHREPORTER_XCFRAMEWORK" ]; then
     echo "Building PLCrashReporter with BugSplat namespace prefix..."
-    
+
     cd "$PLCRASHREPORTER_DIR"
-    
-    # Build for each platform
+
+    # Build for each platform as static frameworks (MACH_O_TYPE=staticlib)
+    # so CrashReporter is statically linked into BugSplat.framework
     echo "  Building iOS device..."
     xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
-    
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO MACH_O_TYPE=staticlib -quiet
+
     echo "  Building iOS simulator..."
     xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphonesimulator \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
-    
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO MACH_O_TYPE=staticlib -quiet
+
     echo "  Building macOS..."
     xcodebuild -scheme "CrashReporter macOS Framework" -configuration Release \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
-    
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO MACH_O_TYPE=staticlib -quiet
+
     echo "  Building tvOS device..."
     xcodebuild -scheme "CrashReporter tvOS Framework" -configuration Release -sdk appletvos \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
-    
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO MACH_O_TYPE=staticlib -quiet
+
     echo "  Building tvOS simulator..."
     xcodebuild -scheme "CrashReporter tvOS Framework" -configuration Release -sdk appletvsimulator \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO -quiet
-    
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES SKIP_INSTALL=NO MACH_O_TYPE=staticlib -quiet
+
     # Find the DerivedData path
     DERIVED_DATA=$(xcodebuild -scheme "CrashReporter iOS Framework" -configuration Release -sdk iphoneos -showBuildSettings 2>/dev/null | grep -m 1 "BUILD_DIR" | awk '{print $3}' | sed 's|/Build/Products||')
     PRODUCTS_DIR="$DERIVED_DATA/Build/Products"
-    
+
     echo "  Creating CrashReporter.xcframework..."
     xcodebuild -create-xcframework \
         -framework "$PRODUCTS_DIR/Release-iphoneos/CrashReporter.framework" \
@@ -57,7 +58,7 @@ if [ ! -d "$PLCRASHREPORTER_XCFRAMEWORK" ]; then
         -framework "$PRODUCTS_DIR/Release-appletvos/CrashReporter.framework" \
         -framework "$PRODUCTS_DIR/Release-appletvsimulator/CrashReporter.framework" \
         -output "$PLCRASHREPORTER_XCFRAMEWORK"
-    
+
     echo "PLCrashReporter.xcframework built successfully!"
     cd "$SCRIPT_DIR"
 else
@@ -96,9 +97,9 @@ echo "Creating xcframeworks/BugSplat.xcframework..."
 xcodebuild -create-xcframework \
     -archive archives/BugSplat-iOS.xcarchive -framework BugSplat.framework \
     -archive archives/BugSplat-iOS_Simulator.xcarchive -framework BugSplat.framework \
-    -archive archives/BugSplat-macOS.xcarchive -framework BugSplatMac.framework \
-    -archive archives/BugSplat-tvOS.xcarchive -framework BugSplatTV.framework \
-    -archive archives/BugSplat-tvOS_Simulator.xcarchive -framework BugSplatTV.framework \
+    -archive archives/BugSplat-macOS.xcarchive -framework BugSplat.framework \
+    -archive archives/BugSplat-tvOS.xcarchive -framework BugSplat.framework \
+    -archive archives/BugSplat-tvOS_Simulator.xcarchive -framework BugSplat.framework \
     -output xcframeworks/BugSplat.xcframework
 
 echo "Done! xcframeworks/BugSplat.xcframework created."

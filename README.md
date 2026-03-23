@@ -25,6 +25,7 @@ The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac 
 
 The BugSplat crash reporting SDK can be integrated into your project via the following methods:
 - Using Swift Package Manager
+- Using CocoaPods
 - Manually adding xcframeworks
 
 ### Swift Package Manager (SPM)
@@ -34,6 +35,16 @@ Add the following URL to your project's `Additional Package Dependencies`:
 ```sh
 https://github.com/BugSplat-Git/bugsplat-apple
 ```
+
+### CocoaPods
+
+Add the following to your `Podfile`:
+
+```ruby
+pod 'BugSplat', '~> 3.0'
+```
+
+Then run `pod install`.
 
 ### Manually Add xcframeworks
 
@@ -198,7 +209,7 @@ struct BugSplatTestSwiftUIApp: App {
 #### Obj-C
 
 ```objc
-#import "BugSplatMac/BugSplatMac.h"
+#import <BugSplat/BugSplat.h>
 
 @interface AppDelegate () <BugSplatDelegate>
 @end
@@ -367,7 +378,7 @@ For macOS, the BugSplat crash dialogue can be localized and supports eight langu
 7. Norwegian
 8. Swedish
 
-Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplatMac.framework/Versions/A/Resources/`
+Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplat.framework/Versions/A/Resources/`
 
 ## Sample Applications 🧑‍🏫
 

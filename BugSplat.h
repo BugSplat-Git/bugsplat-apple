@@ -15,12 +15,10 @@ FOUNDATION_EXPORT const unsigned char BugSplatVersionString[];
 
 // In this header, you should import all the public headers of your framework using statements like #import <BugSplat/PublicHeader.h>
 
+#import <BugSplat/BugSplatDelegate.h>
+#import <BugSplat/BugSplatAttachment.h>
 #if TARGET_OS_OSX
-  #import <BugSplatMac/BugSplatDelegate.h>
-  #import <BugSplatMac/BugSplatAttachment.h>
-#else
-  #import <BugSplat/BugSplatDelegate.h>
-  #import <BugSplat/BugSplatAttachment.h>
+#import <BugSplat/BugSplatMac.h>
 #endif
 
 NS_ASSUME_NONNULL_BEGIN

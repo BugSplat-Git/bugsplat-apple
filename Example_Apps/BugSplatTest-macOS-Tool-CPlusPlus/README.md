@@ -22,7 +22,7 @@ In the Example App BugSplatTest-macOS-Tool-CPlusPlus, BugSplatInit.mm contains b
 #include "BugSplatInit.hpp"
 
 #import <AppKit/AppKit.h> // for NSApplicationDidFinishLaunchingNotification
-#import <BugSplatMac/BugSplatMac.h>
+#import <BugSplat/BugSplat.h>
 
 @interface MyBugSplatDelegate : NSObject <BugSplatDelegate>
 @end

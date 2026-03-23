@@ -6,7 +6,7 @@
 //
 
 #import "ViewController.h"
-#import <BugSplatMac/BugSplatMac.h>
+#import <BugSplat/BugSplat.h>
 
 @implementation ViewController
 

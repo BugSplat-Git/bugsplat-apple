@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BB0000152E3FB00000000015"
-               BuildableName = "BugSplatTV.framework"
+               BuildableName = "BugSplat.framework"
                BlueprintName = "BugSplatTV"
                ReferencedContainer = "container:BugSplat.xcodeproj">
             </BuildableReference>

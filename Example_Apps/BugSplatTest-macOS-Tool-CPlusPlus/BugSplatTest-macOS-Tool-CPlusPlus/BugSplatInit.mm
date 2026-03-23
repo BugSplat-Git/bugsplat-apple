@@ -8,7 +8,7 @@
 #include "BugSplatInit.hpp"
 
 #import <AppKit/AppKit.h> // for NSApplicationDidFinishLaunchingNotification
-#import <BugSplatMac/BugSplatMac.h>
+#import <BugSplat/BugSplat.h>
 
 @interface MyBugSplatDelegate : NSObject <BugSplatDelegate>
 

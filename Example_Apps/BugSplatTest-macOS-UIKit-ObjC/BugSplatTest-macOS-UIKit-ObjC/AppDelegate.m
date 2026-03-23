@@ -6,7 +6,7 @@
 //
 
 #import "AppDelegate.h"
-#import "BugSplatMac/BugSplatMac.h"
+#import "BugSplat/BugSplat.h"
 
 @interface AppDelegate () <BugSplatDelegate>
 

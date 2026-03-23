@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637DF0D72D72A69C00DDD8FE /* AppKit.framework */; };
-		637DF0E12D72B00000000002 /* BugSplatMac.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000005 /* BugSplatMac.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		WS0000012E40000000000004 /* BugSplatMac.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000005 /* BugSplatMac.framework */; };
+		637DF0E12D72B00000000002 /* BugSplat.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000005 /* BugSplat.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		WS0000012E40000000000004 /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = WS0000022E40000000000005 /* BugSplat.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,7 +28,7 @@
 			dstPath = ../Frameworks;
 			dstSubfolderSpec = 6;
 			files = (
-				637DF0E12D72B00000000002 /* BugSplatMac.framework in Embed Frameworks */,
+				637DF0E12D72B00000000002 /* BugSplat.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -38,7 +38,7 @@
 /* Begin PBXFileReference section */
 		637DF0622D6CE56800DDD8FE /* BugSplatTest-macOS-Tool-CPlusPlus */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "BugSplatTest-macOS-Tool-CPlusPlus"; sourceTree = BUILT_PRODUCTS_DIR; };
 		637DF0D72D72A69C00DDD8FE /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
-		WS0000022E40000000000005 /* BugSplatMac.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplatMac.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		WS0000022E40000000000005 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -54,7 +54,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				WS0000012E40000000000004 /* BugSplatMac.framework in Frameworks */,
+				WS0000012E40000000000004 /* BugSplat.framework in Frameworks */,
 				637DF0D92D72A8CA00DDD8FE /* AppKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -83,7 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				637DF0D72D72A69C00DDD8FE /* AppKit.framework */,
-				WS0000022E40000000000005 /* BugSplatMac.framework */,
+				WS0000022E40000000000005 /* BugSplat.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -186,7 +186,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Manually Codesign dependency frameworks. Team ID for cert must match app Team ID.\n# Path to your frameworks\nBUGSPLAT_PATH=\"${BUILT_PRODUCTS_DIR}/BugSplatMac.framework\"\n\n# Sign the frameworks\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$BUGSPLAT_PATH\"\n";
+			shellScript = "# Manually Codesign dependency frameworks. Team ID for cert must match app Team ID.\n# Path to your frameworks\nBUGSPLAT_PATH=\"${BUILT_PRODUCTS_DIR}/BugSplat.framework\"\n\n# Sign the frameworks\ncodesign --force --deep --sign \"Apple Distribution: BugSplat, LLC (TN6R4Q475K)\" \"$BUGSPLAT_PATH\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

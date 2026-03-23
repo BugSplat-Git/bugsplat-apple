@@ -6,11 +6,7 @@
 
 #import <TargetConditionals.h>
 
-#if TARGET_OS_OSX
-#import <BugSplatMac/BugSplat.h>
-#else
 #import <BugSplat/BugSplat.h>
-#endif
 
 #import <CrashReporter/CrashReporter.h>
 #import "BugSplatUtilities.h"
