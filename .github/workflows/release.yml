@@ -92,8 +92,9 @@ jobs:
         CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
         URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip"
         
-        # Replace local path with remote URL and checksum
-        sed -i '' 's|path: "BugSplat.xcframework"|url: "'"$URL"'",\n            checksum: "'"$CHECKSUM"'"|' Package.swift
+        # Update the URL and checksum in Package.swift
+        sed -i '' 's|url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/[^"]*"|url: "'"$URL"'"|' Package.swift
+        sed -i '' 's|checksum: "[^"]*"|checksum: "'"$CHECKSUM"'"|' Package.swift
           
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
