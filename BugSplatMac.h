@@ -8,8 +8,8 @@
 #ifndef BugSplatMac_h
 #define BugSplatMac_h
 
-#import <BugSplatMac/BugSplat.h>
-#import <BugSplatMac/BugSplatDelegate.h>
-#import <BugSplatMac/BugSplatAttachment.h>
+#import <BugSplat/BugSplat.h>
+#import <BugSplat/BugSplatDelegate.h>
+#import <BugSplat/BugSplatAttachment.h>
 
 #endif /* BugSplatMac_h */

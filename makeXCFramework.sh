@@ -96,9 +96,9 @@ echo "Creating xcframeworks/BugSplat.xcframework..."
 xcodebuild -create-xcframework \
     -archive archives/BugSplat-iOS.xcarchive -framework BugSplat.framework \
     -archive archives/BugSplat-iOS_Simulator.xcarchive -framework BugSplat.framework \
-    -archive archives/BugSplat-macOS.xcarchive -framework BugSplatMac.framework \
-    -archive archives/BugSplat-tvOS.xcarchive -framework BugSplatTV.framework \
-    -archive archives/BugSplat-tvOS_Simulator.xcarchive -framework BugSplatTV.framework \
+    -archive archives/BugSplat-macOS.xcarchive -framework BugSplat.framework \
+    -archive archives/BugSplat-tvOS.xcarchive -framework BugSplat.framework \
+    -archive archives/BugSplat-tvOS_Simulator.xcarchive -framework BugSplat.framework \
     -output xcframeworks/BugSplat.xcframework
 
 echo "Done! xcframeworks/BugSplat.xcframework created."

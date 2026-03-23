@@ -26,7 +26,7 @@
 		TT00000D2E3FE0000000000D /* BugSplatZipHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000142E3FA00000000014 /* BugSplatZipHelper.m */; };
 		TT00000E2E3FE0000000000E /* BugSplatAttachment.m in Sources */ = {isa = PBXBuildFile; fileRef = 63E2337A2B9710410066C7FC /* BugSplatAttachment.m */; };
 		TT00000F2E3FE0000000000F /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
-		TT0000202E3FE00000000020 /* BugSplatMac.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */; };
+		TT0000202E3FE00000000020 /* BugSplat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63C6E1ED2B92831A00AED3E3 /* BugSplat.framework */; };
 		TT0000212E3FE00000000021 /* CrashReporter.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000012E3FC00000000001 /* CrashReporter.xcframework */; };
 /* Test target build files - iOS */
 		TT0000702E3FE00000000070 /* BugSplatUtilitiesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = TT0000102E3FE00000000010 /* BugSplatUtilitiesTests.m */; };
@@ -112,7 +112,7 @@
 		637DF0442D49A49C00DDD8FE /* BugSplatUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUtilities.h; sourceTree = "<group>"; };
 		637DF0472D49A50800DDD8FE /* BugSplatUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUtilities.m; sourceTree = "<group>"; };
 		63905E952D83912E009CDBEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplatMac.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		63C6E1ED2B92831A00AED3E3 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		63C6E1FE2B9283B000AED3E3 /* BugSplat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplat.h; sourceTree = "<group>"; };
 		63D006F92BBF785B00587FBF /* BugSplatMac.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatMac.h; sourceTree = "<group>"; };
@@ -124,7 +124,7 @@
 		AA0000122E3FA00000000012 /* BugSplatCrashReportWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatCrashReportWindow.h; sourceTree = "<group>"; };
 		AA0000142E3FA00000000014 /* BugSplatZipHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatZipHelper.m; sourceTree = "<group>"; };
 		AA0000172E3FA00000000017 /* BugSplatZipHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatZipHelper.h; sourceTree = "<group>"; };
-		BB0000002E3FB00000000000 /* BugSplatTV.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplatTV.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000002E3FB00000000000 /* BugSplat.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BugSplat.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -185,9 +185,9 @@
 		63C6E1EE2B92831A00AED3E3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */,
+				63C6E1ED2B92831A00AED3E3 /* BugSplat.framework */,
 				63C6E1FC2B9283B000AED3E3 /* BugSplat.framework */,
-				BB0000002E3FB00000000000 /* BugSplatTV.framework */,
+				BB0000002E3FB00000000000 /* BugSplat.framework */,
 				TT0000002E3FE00000000000 /* BugSplatMacTests.xctest */,
 				TT0000802E3FE00000000080 /* BugSplatIOSTests.xctest */,
 			);
@@ -325,7 +325,7 @@
 			);
 			name = BugSplatMac;
 			productName = BugSplat;
-			productReference = 63C6E1ED2B92831A00AED3E3 /* BugSplatMac.framework */;
+			productReference = 63C6E1ED2B92831A00AED3E3 /* BugSplat.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 		63C6E1FB2B9283B000AED3E3 /* BugSplat */ = {
@@ -360,8 +360,8 @@
 			dependencies = (
 			);
 			name = BugSplatTV;
-			productName = BugSplatTV;
-			productReference = BB0000002E3FB00000000000 /* BugSplatTV.framework */;
+			productName = BugSplat;
+			productReference = BB0000002E3FB00000000000 /* BugSplat.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 		TT0000502E3FE00000000050 /* BugSplatMacTests */ = {
@@ -529,7 +529,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				TT0000202E3FE00000000020 /* BugSplatMac.framework in Frameworks */,
+				TT0000202E3FE00000000020 /* BugSplat.framework in Frameworks */,
 				TT0000212E3FE00000000021 /* CrashReporter.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -730,7 +730,7 @@
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatMac;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PRODUCT_NAME = BugSplat;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = macosx;
@@ -769,7 +769,7 @@
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatMac;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PRODUCT_NAME = BugSplat;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = macosx;
@@ -881,7 +881,7 @@
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatTV;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PRODUCT_NAME = BugSplat;
 				SDKROOT = appletvos;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -916,7 +916,7 @@
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				OTHER_LDFLAGS = "-lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bugsplat.BugSplatTV;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PRODUCT_NAME = BugSplat;
 				SDKROOT = appletvos;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -7,13 +7,7 @@
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
 
-#import <TargetConditionals.h>
-
-#if TARGET_OS_OSX
-  #import <BugSplatMac/BugSplat.h>
-#else
-  #import <BugSplat/BugSplat.h>
-#endif
+#import <BugSplat/BugSplat.h>
 
 #import "BugSplatTestSupport.h"
 #import "BugSplatUploadService.h"

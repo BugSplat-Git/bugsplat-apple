@@ -6,11 +6,7 @@
 
 #import <TargetConditionals.h>
 
-#if TARGET_OS_OSX
-  #import <BugSplatMac/BugSplatMac.h>
-#else
-  #import <BugSplat/BugSplat.h>
-#endif
+#import <BugSplat/BugSplat.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
