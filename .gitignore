@@ -4,3 +4,4 @@ xcframeworks
 archives
 build/*
 Tools/symbol-upload-macos
+.build
