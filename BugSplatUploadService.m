@@ -162,28 +162,35 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 }
 
 - (void)uploadFeedback:(NSString *)title
-           description:(NSString *)description
-           attachments:(NSArray<BugSplatAttachment *> *)attachments
+           description:(nullable NSString *)description
+           attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
               metadata:(BugSplatCrashMetadata *)metadata
-            completion:(void (^)(NSError * _Nullable error))completion
+            completion:(nullable void (^)(NSError * _Nullable error))completion
 {
-    if (!completion) {
-        NSLog(@"BugSplat: uploadFeedback called with nil completion handler");
-        return;
-    }
+    // Substitute a no-op block so the upload proceeds even without a caller-supplied completion
+    void (^safeCompletion)(NSError * _Nullable) = completion ?: ^(NSError * _Nullable __unused error) {};
 
     @try {
+        // Validate that title is non-nil and non-empty
+        if (!title || title.length == 0) {
+            NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
+                                                 code:BugSplatUploadErrorCodeInvalidData
+                                             userInfo:@{NSLocalizedDescriptionKey: @"Feedback title is required and cannot be empty"}];
+            safeCompletion(error);
+            return;
+        }
+
         metadata.crashTypeId = @"36";
 
         // Create feedback.json content
         NSMutableDictionary *feedbackDict = [NSMutableDictionary dictionary];
-        feedbackDict[@"title"] = title ?: @"";
+        feedbackDict[@"title"] = title;
         feedbackDict[@"description"] = description ?: @"";
 
         NSError *jsonError;
         NSData *jsonData = [NSJSONSerialization dataWithJSONObject:feedbackDict options:0 error:&jsonError];
         if (jsonError) {
-            completion(jsonError);
+            safeCompletion(jsonError);
             return;
         }
 
@@ -209,7 +216,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Failed to create feedback ZIP archive"}];
-            completion(error);
+            safeCompletion(error);
             return;
         }
 
@@ -227,14 +234,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                     size:zipData.length
                               completion:^(NSString *presignedURL, NSError *error) {
             if (error) {
-                completion(error);
+                safeCompletion(error);
                 return;
             }
 
             // Step 2: Upload to S3
             [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
                 if (!success) {
-                    completion(uploadError);
+                    safeCompletion(uploadError);
                     return;
                 }
 
@@ -248,19 +255,19 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                  completion:^(BOOL commitSuccess, NSError *commitError, NSString *infoUrl) {
                     if (commitSuccess) {
                         NSLog(@"BugSplat: User feedback uploaded successfully");
-                        completion(nil);
+                        safeCompletion(nil);
                     } else {
-                        completion(commitError);
+                        safeCompletion(commitError);
                     }
                 }];
             }];
         }];
     } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception in uploadFeedbackWithTitle: %@ - %@", exception.name, exception.reason);
+        NSLog(@"BugSplat: Exception in uploadFeedback: %@ - %@", exception.name, exception.reason);
         NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                              code:BugSplatUploadErrorCodeInvalidData
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
-        completion(error);
+        safeCompletion(error);
     }
 }
 

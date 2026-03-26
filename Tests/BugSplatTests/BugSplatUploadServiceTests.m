@@ -538,4 +538,303 @@
     XCTAssertEqualObjects(metadata.crashTime, @"2024-01-15T10:30:00Z");
 }
 
+#pragma mark - Feedback Upload Tests
+
+- (void)testUploadFeedback_SuccessfulFlow
+{
+    // Queue responses for the 3-step flow
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.amazonaws.com/bucket/key?signature=abc"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    NSDictionary *commitResponse = @{@"status": @"success"};
+    NSData *commitData = [NSJSONSerialization dataWithJSONObject:commitResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:commitData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Test Feedback"
+                           description:@"A test description"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+    XCTAssertEqual(self.mockSession.requestCount, 3);
+}
+
+- (void)testUploadFeedback_SetsCrashTypeId36
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // Verify commit request contains crashTypeId=36 and crashType=User.Feedback
+    MockURLSessionRequest *commitRequest = self.mockSession.recordedRequests[2];
+    NSString *bodyString = [[NSString alloc] initWithData:commitRequest.request.HTTPBody encoding:NSUTF8StringEncoding];
+    XCTAssertTrue([bodyString containsString:@"crashTypeId"]);
+    XCTAssertTrue([bodyString containsString:@"36"]);
+    XCTAssertTrue([bodyString containsString:@"User.Feedback"]);
+}
+
+- (void)testUploadFeedback_S3UploadContainsZipData
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // Second request (S3 upload) should contain ZIP data (PK magic number)
+    MockURLSessionRequest *s3Request = self.mockSession.recordedRequests[1];
+    XCTAssertTrue(s3Request.isUploadTask);
+    XCTAssertEqualObjects(s3Request.request.HTTPMethod, @"PUT");
+    const uint8_t *bytes = s3Request.bodyData.bytes;
+    XCTAssertEqual(bytes[0], 'P');
+    XCTAssertEqual(bytes[1], 'K');
+}
+
+- (void)testUploadFeedback_FailsWithEmptyTitle
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback fails"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+
+    [self.uploadService uploadFeedback:@""
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNotNil(error);
+        XCTAssertTrue([error.localizedDescription containsString:@"title"]);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+    XCTAssertEqual(self.mockSession.requestCount, 0);
+}
+
+- (void)testUploadFeedback_FailsWithNilTitle
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback fails"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+
+    [self.uploadService uploadFeedback:nil
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNotNil(error);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+    XCTAssertEqual(self.mockSession.requestCount, 0);
+}
+
+- (void)testUploadFeedback_NilCompletionStillUploads
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    // Passing nil completion should not crash and should still upload
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:nil];
+
+    // Give async work time to complete
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Wait for upload"];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [expectation fulfill];
+    });
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    XCTAssertEqual(self.mockSession.requestCount, 3);
+}
+
+- (void)testUploadFeedback_PresignedURLFailure
+{
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:500]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback fails"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNotNil(error);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
+- (void)testUploadFeedback_WithAttachments
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    NSData *attachmentData = [@"log file content" dataUsingEncoding:NSUTF8StringEncoding];
+    BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"log.txt"
+                                                                   attachmentData:attachmentData
+                                                                      contentType:@"text/plain"];
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:@[attachment]
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // Verify ZIP was uploaded (should contain both feedback.json and log.txt)
+    MockURLSessionRequest *s3Request = self.mockSession.recordedRequests[1];
+    XCTAssertTrue(s3Request.bodyData.length > 0);
+    const uint8_t *bytes = s3Request.bodyData.bytes;
+    XCTAssertEqual(bytes[0], 'P');
+    XCTAssertEqual(bytes[1], 'K');
+}
+
+- (void)testUploadFeedback_NilDescriptionIsAccepted
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title only"
+                           description:nil
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+    XCTAssertEqual(self.mockSession.requestCount, 3);
+}
+
 @end
