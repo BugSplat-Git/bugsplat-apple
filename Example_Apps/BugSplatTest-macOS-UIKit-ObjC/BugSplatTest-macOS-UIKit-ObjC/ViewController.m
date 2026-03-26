@@ -47,7 +47,6 @@
 - (IBAction)showFeedbackDialog:(id)sender {
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Send Feedback";
-    alert.informativeText = @"Enter your feedback below.";
     [alert addButtonWithTitle:@"Send"];
     [alert addButtonWithTitle:@"Cancel"];
 
@@ -57,10 +56,11 @@
     NSTextField *descriptionField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 22)];
     descriptionField.placeholderString = @"Description";
 
-    NSStackView *stack = [NSStackView stackViewWithViews:@[titleField, descriptionField]];
+    NSStackView *stack = [[NSStackView alloc] initWithFrame:NSMakeRect(0, 0, 300, 52)];
     stack.orientation = NSUserInterfaceLayoutOrientationVertical;
     stack.spacing = 8;
-    [titleField.widthAnchor constraintEqualToConstant:300].active = YES;
+    [stack addArrangedSubview:titleField];
+    [stack addArrangedSubview:descriptionField];
 
     alert.accessoryView = stack;
     [alert.window setInitialFirstResponder:titleField];
