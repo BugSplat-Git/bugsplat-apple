@@ -12,8 +12,9 @@ struct ContentView: View {
     @State var isFeature1Active: Bool = false
     @State var isFeature2Active: Bool = false
     @State var isFeature3Active: Bool = false
-    @State var feedbackTitle: String = ""
-    @State var feedbackDescription: String = ""
+    @State var showFeedbackAlert = false
+    @State var feedbackTitle = ""
+    @State var feedbackDescription = ""
     @State var feedbackStatus: String?
 
     let prop: Int? = nil
@@ -55,22 +56,13 @@ struct ContentView: View {
             .background(Color.accentColor)
             .cornerRadius(10)
 
-            TextField("Feedback title", text: $feedbackTitle)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
-
-            TextField("Description", text: $feedbackDescription)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
-
             Button("Send Feedback") {
-                sendFeedback()
+                showFeedbackAlert = true
             }
             .padding()
             .foregroundColor(.white)
-            .background(feedbackTitle.isEmpty ? Color.gray : Color.green)
+            .background(Color.green)
             .cornerRadius(10)
-            .disabled(feedbackTitle.isEmpty)
 
             if let feedbackStatus {
                 Text(feedbackStatus)
@@ -86,6 +78,12 @@ struct ContentView: View {
         }
         .onChange(of: isFeature3Active) {
             update(attribute: "Feature3", value: isFeature3Active.description)
+        }
+        .alert("Send Feedback", isPresented: $showFeedbackAlert) {
+            TextField("Title", text: $feedbackTitle)
+            TextField("Description", text: $feedbackDescription)
+            Button("Send") { sendFeedback() }
+            Button("Cancel", role: .cancel) { }
         }
     }
 

@@ -1012,10 +1012,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     metadata.notes = self.notes;
     metadata.crashTypeId = @"36";
 
-    BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:self.bugSplatDatabase
-                                                                           applicationName:self.resolvedApplicationName
-                                                                        applicationVersion:self.resolvedApplicationVersion];
-    [uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
+    [self.uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
 }
 
 #pragma mark - Properties

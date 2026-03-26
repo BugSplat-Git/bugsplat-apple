@@ -12,20 +12,6 @@ import BugSplat
 class ViewController: UIViewController {
     var nonOptional: NSObject!
 
-    private let titleField: UITextField = {
-        let field = UITextField()
-        field.placeholder = "Feedback title"
-        field.borderStyle = .roundedRect
-        return field
-    }()
-
-    private let descriptionField: UITextField = {
-        let field = UITextField()
-        field.placeholder = "Description"
-        field.borderStyle = .roundedRect
-        return field
-    }()
-
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
@@ -35,20 +21,15 @@ class ViewController: UIViewController {
         // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
         BugSplat.shared().set(NSDate().description, for: "ViewDidLoadDateTime")
 
-        // Add feedback input fields and button programmatically
+        // Add a "Send Feedback" button that presents a dialog
         let feedbackButton = UIButton(type: .system)
         feedbackButton.setTitle("Send Feedback", for: .normal)
-        feedbackButton.addTarget(self, action: #selector(sendFeedback), for: .touchUpInside)
-
-        let stack = UIStackView(arrangedSubviews: [titleField, descriptionField, feedbackButton])
-        stack.axis = .vertical
-        stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        feedbackButton.addTarget(self, action: #selector(showFeedbackDialog), for: .touchUpInside)
+        feedbackButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(feedbackButton)
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            stack.topAnchor.constraint(equalTo: view.centerYAnchor, constant: 40),
-            titleField.widthAnchor.constraint(equalToConstant: 280),
+            feedbackButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            feedbackButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 60)
         ])
     }
 
@@ -58,28 +39,31 @@ class ViewController: UIViewController {
         print(description)
     }
 
-    @objc func sendFeedback() {
-        guard let title = titleField.text, !title.isEmpty else { return }
-        let description = descriptionField.text
+    @objc func showFeedbackDialog() {
+        let alert = UIAlertController(title: "Send Feedback", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.placeholder = "Title" }
+        alert.addTextField { $0.placeholder = "Description" }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Send", style: .default) { _ in
+            guard let title = alert.textFields?[0].text, !title.isEmpty else { return }
+            let description = alert.textFields?[1].text
 
-        BugSplat.shared().postFeedback(
-            title: title,
-            description: description?.isEmpty == false ? description : nil,
-            userName: nil,
-            userEmail: nil,
-            appKey: nil,
-            attachments: nil
-        ) { error in
-            DispatchQueue.main.async { [weak self] in
+            BugSplat.shared().postFeedback(
+                title: title,
+                description: description?.isEmpty == false ? description : nil,
+                userName: nil,
+                userEmail: nil,
+                appKey: nil,
+                attachments: nil
+            ) { error in
                 if let error {
                     print("Feedback failed: \(error.localizedDescription)")
                 } else {
                     print("Feedback submitted successfully!")
-                    self?.titleField.text = ""
-                    self?.descriptionField.text = ""
                 }
             }
-        }
+        })
+        present(alert, animated: true)
     }
 
 }

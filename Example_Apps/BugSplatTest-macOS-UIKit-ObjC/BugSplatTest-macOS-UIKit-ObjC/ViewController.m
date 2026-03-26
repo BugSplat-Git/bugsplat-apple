@@ -8,11 +8,6 @@
 #import "ViewController.h"
 #import <BugSplatMac/BugSplatMac.h>
 
-@interface ViewController ()
-@property (nonatomic, strong) NSTextField *titleField;
-@property (nonatomic, strong) NSTextField *descriptionField;
-@end
-
 @implementation ViewController
 
 - (void)viewDidLoad {
@@ -23,28 +18,17 @@
     // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
     [[BugSplat shared] setValue:[[NSDate now] description] forAttribute:@"DateAndTime"];
 
-    // Add feedback input fields and button programmatically
-    self.titleField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.titleField.placeholderString = @"Feedback title";
-
-    self.descriptionField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.descriptionField.placeholderString = @"Description";
-
+    // Add a "Send Feedback" button that presents a dialog
     NSButton *feedbackButton = [[NSButton alloc] initWithFrame:NSZeroRect];
     feedbackButton.title = @"Send Feedback";
     feedbackButton.bezelStyle = NSBezelStyleRounded;
     feedbackButton.target = self;
-    feedbackButton.action = @selector(sendFeedback:);
-
-    NSStackView *stack = [NSStackView stackViewWithViews:@[self.titleField, self.descriptionField, feedbackButton]];
-    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-    stack.spacing = 8;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:stack];
+    feedbackButton.action = @selector(showFeedbackDialog:);
+    feedbackButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:feedbackButton];
     [NSLayoutConstraint activateConstraints:@[
-        [stack.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [stack.topAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:30],
-        [self.titleField.widthAnchor constraintEqualToConstant:280],
+        [feedbackButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [feedbackButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:40]
     ]];
 }
 
@@ -60,28 +44,46 @@
     assert(NO);
 }
 
-- (IBAction)sendFeedback:(id)sender {
-    NSString *title = self.titleField.stringValue;
-    if (title.length == 0) return;
-    NSString *description = self.descriptionField.stringValue.length > 0 ? self.descriptionField.stringValue : nil;
+- (IBAction)showFeedbackDialog:(id)sender {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Send Feedback";
+    alert.informativeText = @"Enter your feedback below.";
+    [alert addButtonWithTitle:@"Send"];
+    [alert addButtonWithTitle:@"Cancel"];
 
-    [[BugSplat shared] postFeedback:title
-                        description:description
-                           userName:nil
-                          userEmail:nil
-                             appKey:nil
-                        attachments:nil
-                         completion:^(NSError * _Nullable error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
+    NSTextField *titleField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 22)];
+    titleField.placeholderString = @"Title";
+
+    NSTextField *descriptionField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 22)];
+    descriptionField.placeholderString = @"Description";
+
+    NSStackView *stack = [NSStackView stackViewWithViews:@[titleField, descriptionField]];
+    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    stack.spacing = 8;
+    [titleField.widthAnchor constraintEqualToConstant:300].active = YES;
+
+    alert.accessoryView = stack;
+    [alert.window setInitialFirstResponder:titleField];
+
+    if ([alert runModal] == NSAlertFirstButtonReturn) {
+        NSString *title = titleField.stringValue;
+        if (title.length == 0) return;
+        NSString *description = descriptionField.stringValue.length > 0 ? descriptionField.stringValue : nil;
+
+        [[BugSplat shared] postFeedback:title
+                            description:description
+                               userName:nil
+                              userEmail:nil
+                                 appKey:nil
+                            attachments:nil
+                             completion:^(NSError * _Nullable error) {
             if (error) {
                 NSLog(@"Feedback failed: %@", error.localizedDescription);
             } else {
                 NSLog(@"Feedback submitted successfully!");
-                self.titleField.stringValue = @"";
-                self.descriptionField.stringValue = @"";
             }
-        });
-    }];
+        }];
+    }
 }
 
 @end
