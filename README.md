@@ -275,6 +275,49 @@ Put another way, attributes and their values are only valid for the lifetime of 
 
 Please take a look at the framework-specific [sample applications](#sample-applications-) for more examples showing how to use attributes.
 
+### User Feedback
+
+BugSplat supports submitting user feedback (non-crash reports) from your application. Feedback is uploaded using crash type ID 36 (`User.Feedback`) and appears in the BugSplat dashboard alongside crash reports.
+
+**Swift:**
+
+```swift
+BugSplat.shared().postFeedback(
+    title: "Login button unresponsive",
+    description: "The login button doesn't respond on the first tap.",
+    userName: nil,
+    userEmail: nil,
+    appKey: nil,
+    attachments: nil
+) { error in
+    if let error {
+        print("Feedback failed: \(error.localizedDescription)")
+    } else {
+        print("Feedback submitted successfully!")
+    }
+}
+```
+
+**Obj-C:**
+
+```objc
+[[BugSplat shared] postFeedback:@"Login button unresponsive"
+                    description:@"The login button doesn't respond on the first tap."
+                       userName:nil
+                      userEmail:nil
+                         appKey:nil
+                    attachments:nil
+                     completion:^(NSError * _Nullable error) {
+    if (error) {
+        NSLog(@"Feedback failed: %@", error.localizedDescription);
+    } else {
+        NSLog(@"Feedback submitted successfully!");
+    }
+}];
+```
+
+All parameters except `title` are optional. When `userName`, `userEmail`, or `appKey` are nil, BugSplat falls back to the corresponding property values set on the `BugSplat` singleton. You can also include file attachments using an array of `BugSplatAttachment` objects.
+
 ### Crash Reporter Customization
 
 There are several ways to customize your BugSplat crash reporter.

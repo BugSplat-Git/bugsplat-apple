@@ -987,6 +987,30 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }];
 }
 
+#pragma mark - User Feedback
+
+- (void)postFeedback:(NSString *)title
+         description:(NSString *)description
+            userName:(NSString *)userName
+           userEmail:(NSString *)userEmail
+              appKey:(NSString *)appKey
+         attachments:(NSArray<BugSplatAttachment *> *)attachments
+          completion:(void (^)(NSError * _Nullable error))completion
+{
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = self.bugSplatDatabase;
+    metadata.applicationName = self.resolvedApplicationName;
+    metadata.applicationVersion = self.resolvedApplicationVersion;
+    metadata.userName = userName ?: self.userName;
+    metadata.userEmail = userEmail ?: self.userEmail;
+    metadata.userDescription = description ?: @"";
+    metadata.applicationKey = appKey ?: self.appKey;
+    metadata.notes = self.notes;
+    metadata.crashTypeId = @"36";
+
+    [self.uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
+}
+
 #pragma mark - Properties
 
 - (NSBundle *)bundle

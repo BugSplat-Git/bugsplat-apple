@@ -21,6 +21,17 @@ int setAttributeAndValue()
     return bugSplatSetAttributeValue(attribute, value);
 }
 
+int sendFeedback()
+{
+    std::string title, description;
+    std::cout << "Enter feedback title: ";
+    std::getline(std::cin, title);
+    std::cout << "Enter feedback description: ";
+    std::getline(std::cin, description);
+
+    return bugSplatSendFeedback(title, description);
+}
+
 int checkInput(std::string input)
 {
     std::cout << "checkInput called: " << input << std::endl;
@@ -43,9 +54,13 @@ int checkInput(std::string input)
     {
         return setAttributeAndValue();
     }
+    else if (input == "feedback")
+    {
+        return sendFeedback();
+    }
     else
     {
-        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', or 'q' to quit" << std::endl;
+        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', or 'q' to quit" << std::endl;
     }
 
     return 0;
