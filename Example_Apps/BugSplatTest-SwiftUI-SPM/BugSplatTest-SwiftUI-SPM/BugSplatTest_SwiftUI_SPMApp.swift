@@ -37,6 +37,11 @@ struct BugSplatTest_SwiftUI_SPMApp: App {
         // When set to false, users see Send/Don't Send/Always Send options
         bugSplat.autoSubmitCrashReport = false
 
+        // example of programmatically setting user meta data
+        // when user has granted permission to include their PII in a crash report
+        bugSplat.userName = "Foo Barr"
+        bugSplat.userEmail = "foo@barr.com"
+
         // Optionally, add some attributes to your crash reports.
         // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
         bugSplat.set("Value of Plain Attribute", for: "PlainAttribute")
