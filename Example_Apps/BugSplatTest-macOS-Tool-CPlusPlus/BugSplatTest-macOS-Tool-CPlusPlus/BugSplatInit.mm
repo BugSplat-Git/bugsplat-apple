@@ -91,6 +91,42 @@ int bugSplatSetAttributeValue(std::string attribute, std::string value)
     return 0;
 }
 
+int bugSplatSendFeedback(std::string title, std::string description)
+{
+    @autoreleasepool {
+        NSString *titleString = @(title.c_str());
+        NSString *descriptionString = @(description.c_str());
+        NSLog(@"bugSplatSendFeedback(%@, %@)", titleString, descriptionString);
+
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        __block NSError *feedbackError = nil;
+
+        [[BugSplat shared] postFeedback:titleString
+                            description:descriptionString
+                               userName:nil
+                              userEmail:nil
+                                 appKey:nil
+                            attachments:nil
+                             completion:^(NSError * _Nullable error) {
+            feedbackError = error;
+            dispatch_semaphore_signal(semaphore);
+        }];
+
+        // Give the run loop time to process the network request
+        while (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW)) {
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        }
+
+        if (feedbackError) {
+            NSLog(@"Feedback failed: %@", feedbackError.localizedDescription);
+            return 1;
+        } else {
+            NSLog(@"Feedback submitted successfully!");
+            return 0;
+        }
+    }
+}
+
 void mainObjCRunLoop() {
     @autoreleasepool {
         // Objective-C often needs an NSRunLoop

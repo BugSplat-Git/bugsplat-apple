@@ -161,14 +161,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     }
 }
 
-- (void)uploadFeedbackWithTitle:(NSString *)title
-                    description:(NSString *)description
-                    attachments:(NSArray<BugSplatAttachment *> *)attachments
-                       metadata:(BugSplatCrashMetadata *)metadata
-                     completion:(void (^)(NSError * _Nullable error))completion
+- (void)uploadFeedback:(NSString *)title
+           description:(NSString *)description
+           attachments:(NSArray<BugSplatAttachment *> *)attachments
+              metadata:(BugSplatCrashMetadata *)metadata
+            completion:(void (^)(NSError * _Nullable error))completion
 {
     if (!completion) {
-        NSLog(@"BugSplat: uploadFeedbackWithTitle called with nil completion handler");
+        NSLog(@"BugSplat: uploadFeedback called with nil completion handler");
         return;
     }
 

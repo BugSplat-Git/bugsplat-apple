@@ -12,6 +12,7 @@ struct ContentView: View {
     @State var isFeature1Active: Bool = false
     @State var isFeature2Active: Bool = false
     @State var isFeature3Active: Bool = false
+    @State var feedbackStatus: String?
 
     let prop: Int? = nil
 
@@ -51,6 +52,20 @@ struct ContentView: View {
             .foregroundColor(.white)
             .background(Color.accentColor)
             .cornerRadius(10)
+
+            Button("Send Feedback") {
+                sendFeedback()
+            }
+            .padding()
+            .foregroundColor(.white)
+            .background(Color.green)
+            .cornerRadius(10)
+
+            if let feedbackStatus {
+                Text(feedbackStatus)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
         }
         .onChange(of: isFeature1Active) {
             update(attribute: "Feature1", value: isFeature1Active.description)
@@ -66,6 +81,26 @@ struct ContentView: View {
     func update(attribute: String, value: String?) {
         print("update(\(attribute), value: \(value ?? "nil")")
         BugSplat.shared().set(value, for: attribute)
+    }
+
+    func sendFeedback() {
+        feedbackStatus = "Sending..."
+        BugSplat.shared().postFeedback(
+            title: "User Feedback",
+            description: "This is a test feedback submission from the SwiftUI SPM example app.",
+            userName: nil,
+            userEmail: nil,
+            appKey: nil,
+            attachments: nil
+        ) { error in
+            DispatchQueue.main.async {
+                if let error {
+                    feedbackStatus = "Failed: \(error.localizedDescription)"
+                } else {
+                    feedbackStatus = "Feedback sent!"
+                }
+            }
+        }
     }
 
 }

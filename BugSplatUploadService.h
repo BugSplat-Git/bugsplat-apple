@@ -117,11 +117,11 @@ typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error,
  * @param metadata Metadata (database, app info, user info, etc).
  * @param completion Called when upload completes or fails.
  */
-- (void)uploadFeedbackWithTitle:(NSString *)title
-                    description:(nullable NSString *)description
-                    attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
-                       metadata:(BugSplatCrashMetadata *)metadata
-                     completion:(void (^)(NSError * _Nullable error))completion;
+- (void)uploadFeedback:(NSString *)title
+           description:(nullable NSString *)description
+           attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
+              metadata:(BugSplatCrashMetadata *)metadata
+            completion:(void (^)(NSError * _Nullable error))completion;
 
 /**
  * Cancels any in-progress upload.

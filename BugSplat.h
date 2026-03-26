@@ -227,13 +227,14 @@ NS_ASSUME_NONNULL_BEGIN
  * @param completion Optional completion handler called when the upload finishes.
  *                   The error parameter is nil on success.
  */
-- (void)postFeedbackWithTitle:(NSString *)title
-                  description:(nullable NSString *)description
-                     userName:(nullable NSString *)userName
-                    userEmail:(nullable NSString *)userEmail
-                       appKey:(nullable NSString *)appKey
-                  attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
-                   completion:(nullable void (^)(NSError * _Nullable error))completion;
+- (void)postFeedback:(NSString *)title
+         description:(nullable NSString *)description
+            userName:(nullable NSString *)userName
+           userEmail:(nullable NSString *)userEmail
+              appKey:(nullable NSString *)appKey
+         attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
+          completion:(nullable void (^)(NSError * _Nullable error))completion
+    NS_SWIFT_NAME(postFeedback(title:description:userName:userEmail:appKey:attachments:completion:));
 
 // macOS specific API
 #if TARGET_OS_OSX
