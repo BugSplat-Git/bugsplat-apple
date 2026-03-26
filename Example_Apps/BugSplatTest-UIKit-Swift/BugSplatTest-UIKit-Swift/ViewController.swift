@@ -55,11 +55,12 @@ class ViewController: UIViewController {
                 userEmail: nil,
                 appKey: nil,
                 attachments: nil
-            ) { error in
-                if let error {
-                    print("Feedback failed: \(error.localizedDescription)")
-                } else {
-                    print("Feedback submitted successfully!")
+            ) { [weak self] error in
+                DispatchQueue.main.async {
+                    let message = error != nil ? "Failed: \(error!.localizedDescription)" : "Feedback submitted successfully!"
+                    let confirm = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+                    confirm.addAction(UIAlertAction(title: "OK", style: .default))
+                    self?.present(confirm, animated: true)
                 }
             }
         })

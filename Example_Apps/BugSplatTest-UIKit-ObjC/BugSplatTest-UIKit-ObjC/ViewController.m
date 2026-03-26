@@ -61,11 +61,12 @@
                                  appKey:nil
                             attachments:nil
                              completion:^(NSError * _Nullable error) {
-            if (error) {
-                NSLog(@"Feedback failed: %@", error.localizedDescription);
-            } else {
-                NSLog(@"Feedback submitted successfully!");
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *message = error ? [NSString stringWithFormat:@"Failed: %@", error.localizedDescription] : @"Feedback submitted successfully!";
+                UIAlertController *confirm = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
+                [confirm addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                [self presentViewController:confirm animated:YES completion:nil];
+            });
         }];
     }]];
     [self presentViewController:alert animated:YES completion:nil];

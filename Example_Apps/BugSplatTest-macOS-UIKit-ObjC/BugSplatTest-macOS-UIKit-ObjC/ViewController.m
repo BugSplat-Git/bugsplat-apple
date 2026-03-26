@@ -77,11 +77,13 @@
                                  appKey:nil
                             attachments:nil
                              completion:^(NSError * _Nullable error) {
-            if (error) {
-                NSLog(@"Feedback failed: %@", error.localizedDescription);
-            } else {
-                NSLog(@"Feedback submitted successfully!");
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSAlert *confirm = [[NSAlert alloc] init];
+                confirm.messageText = error ? @"Feedback Failed" : @"Feedback Sent";
+                confirm.informativeText = error ? error.localizedDescription : @"Your feedback was submitted successfully!";
+                [confirm addButtonWithTitle:@"OK"];
+                [confirm runModal];
+            });
         }];
     }
 }
