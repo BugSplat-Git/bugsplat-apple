@@ -994,12 +994,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 #pragma mark - User Feedback
 
 - (void)postFeedback:(NSString *)title
-         description:(nullable NSString *)description
-            userName:(nullable NSString *)userName
-           userEmail:(nullable NSString *)userEmail
-              appKey:(nullable NSString *)appKey
-         attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
-          completion:(nullable void (^)(NSError * _Nullable error))completion
+         description:(NSString *)description
+            userName:(NSString *)userName
+           userEmail:(NSString *)userEmail
+              appKey:(NSString *)appKey
+         attachments:(NSArray<BugSplatAttachment *> *)attachments
+          completion:(void (^)(NSError * _Nullable error))completion
 {
     BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
     metadata.database = self.bugSplatDatabase;

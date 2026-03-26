@@ -162,10 +162,10 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 }
 
 - (void)uploadFeedback:(NSString *)title
-           description:(nullable NSString *)description
-           attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
+           description:(NSString *)description
+           attachments:(NSArray<BugSplatAttachment *> *)attachments
               metadata:(BugSplatCrashMetadata *)metadata
-            completion:(nullable void (^)(NSError * _Nullable error))completion
+            completion:(void (^)(NSError * _Nullable error))completion
 {
     // Substitute a no-op block so the upload proceeds even without a caller-supplied completion
     void (^safeCompletion)(NSError * _Nullable) = completion ?: ^(NSError * _Nullable __unused error) {};
