@@ -8,6 +8,11 @@
 #import "ViewController.h"
 #import <BugSplatMac/BugSplatMac.h>
 
+@interface ViewController ()
+@property (nonatomic, strong) NSTextField *titleField;
+@property (nonatomic, strong) NSTextField *descriptionField;
+@end
+
 @implementation ViewController
 
 - (void)viewDidLoad {
@@ -18,17 +23,28 @@
     // Attributes set in this app session will only appear if the app session in which they are set terminates with an app crash
     [[BugSplat shared] setValue:[[NSDate now] description] forAttribute:@"DateAndTime"];
 
-    // Add a "Send Feedback" button programmatically
+    // Add feedback input fields and button programmatically
+    self.titleField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+    self.titleField.placeholderString = @"Feedback title";
+
+    self.descriptionField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+    self.descriptionField.placeholderString = @"Description";
+
     NSButton *feedbackButton = [[NSButton alloc] initWithFrame:NSZeroRect];
     feedbackButton.title = @"Send Feedback";
     feedbackButton.bezelStyle = NSBezelStyleRounded;
     feedbackButton.target = self;
     feedbackButton.action = @selector(sendFeedback:);
-    feedbackButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:feedbackButton];
+
+    NSStackView *stack = [NSStackView stackViewWithViews:@[self.titleField, self.descriptionField, feedbackButton]];
+    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    stack.spacing = 8;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:stack];
     [NSLayoutConstraint activateConstraints:@[
-        [feedbackButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [feedbackButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:40]
+        [stack.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [stack.topAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:30],
+        [self.titleField.widthAnchor constraintEqualToConstant:280],
     ]];
 }
 
@@ -45,18 +61,26 @@
 }
 
 - (IBAction)sendFeedback:(id)sender {
-    [[BugSplat shared] postFeedback:@"User Feedback"
-                        description:@"This is a test feedback submission from the macOS ObjC example app."
+    NSString *title = self.titleField.stringValue;
+    if (title.length == 0) return;
+    NSString *description = self.descriptionField.stringValue.length > 0 ? self.descriptionField.stringValue : nil;
+
+    [[BugSplat shared] postFeedback:title
+                        description:description
                            userName:nil
                           userEmail:nil
                              appKey:nil
                         attachments:nil
                          completion:^(NSError * _Nullable error) {
-        if (error) {
-            NSLog(@"Feedback failed: %@", error.localizedDescription);
-        } else {
-            NSLog(@"Feedback submitted successfully!");
-        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                NSLog(@"Feedback failed: %@", error.localizedDescription);
+            } else {
+                NSLog(@"Feedback submitted successfully!");
+                self.titleField.stringValue = @"";
+                self.descriptionField.stringValue = @"";
+            }
+        });
     }];
 }
 

@@ -12,6 +12,8 @@ struct ContentView: View {
     @State var isFeature1Active: Bool = false
     @State var isFeature2Active: Bool = false
     @State var isFeature3Active: Bool = false
+    @State var feedbackTitle: String = ""
+    @State var feedbackDescription: String = ""
     @State var feedbackStatus: String?
 
     let prop: Int? = nil
@@ -53,13 +55,22 @@ struct ContentView: View {
             .background(Color.accentColor)
             .cornerRadius(10)
 
+            TextField("Feedback title", text: $feedbackTitle)
+                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal)
+
+            TextField("Description", text: $feedbackDescription)
+                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal)
+
             Button("Send Feedback") {
                 sendFeedback()
             }
             .padding()
             .foregroundColor(.white)
-            .background(Color.green)
+            .background(feedbackTitle.isEmpty ? Color.gray : Color.green)
             .cornerRadius(10)
+            .disabled(feedbackTitle.isEmpty)
 
             if let feedbackStatus {
                 Text(feedbackStatus)
@@ -86,8 +97,8 @@ struct ContentView: View {
     func sendFeedback() {
         feedbackStatus = "Sending..."
         BugSplat.shared().postFeedback(
-            title: "User Feedback",
-            description: "This is a test feedback submission from the SwiftUI example app.",
+            title: feedbackTitle,
+            description: feedbackDescription.isEmpty ? nil : feedbackDescription,
             userName: nil,
             userEmail: nil,
             appKey: nil,
@@ -98,6 +109,8 @@ struct ContentView: View {
                     feedbackStatus = "Failed: \(error.localizedDescription)"
                 } else {
                     feedbackStatus = "Feedback sent!"
+                    feedbackTitle = ""
+                    feedbackDescription = ""
                 }
             }
         }
