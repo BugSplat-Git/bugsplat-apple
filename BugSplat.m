@@ -9,6 +9,10 @@
 #import <BugSplat/BugSplat.h>
 
 #import <CrashReporter/CrashReporter.h>
+
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
@@ -70,6 +74,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *_bugSplatDatabase;
     NSString *_applicationName;
     NSString *_applicationVersion;
+    NSNumber *_debuggerAttachedOverride;
 }
 
 + (instancetype)shared
@@ -82,6 +87,24 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     });
     
     return sharedInstance;
+}
+
+- (BOOL)isDebuggerAttached
+{
+    if (_debuggerAttachedOverride != nil) {
+        return [_debuggerAttachedOverride boolValue];
+    }
+
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    struct kinfo_proc info = {0};
+    size_t size = sizeof(info);
+
+    if (sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0) != 0) {
+        NSLog(@"BugSplat: Failed to query debugger status via sysctl; assuming debugger is attached");
+        return YES;
+    }
+
+    return (info.kp_proc.p_flag & P_TRACED) != 0;
 }
 
 - (instancetype)init
@@ -102,7 +125,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
             initWithSignalHandlerType:signalHandlerType
             symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
-        
+
         _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
         
         // Use real defaults by default
@@ -164,7 +187,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)start
 {
     NSLog(@"BugSplat start...");
-    
+
     // Debug: Check what bundle and info dictionary we're reading from
     NSBundle *mainBundle = [NSBundle mainBundle];
     NSLog(@"BugSplat: mainBundle = %@", mainBundle);
@@ -204,17 +227,26 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // This includes both new crashes and previously failed uploads
     [self processPendingCrashReports];
     
+    // When a debugger is attached, PLCrashReporter's Mach exception handler conflicts
+    // with LLDB's exception ports, causing SIGTRAP (signal 5) termination.
+    // Skip enabling the crash reporter but still process pending crashes above.
+    if ([self isDebuggerAttached]) {
+        NSLog(@"BugSplat: Debugger attached - crash reporting disabled for this session");
+        self.isStartInvoked = YES;
+        return;
+    }
+
     // Set crash-time metadata on PLCrashReporter BEFORE enabling it
     // If a crash occurs, this metadata will be saved WITH the crash report
     [self updateCrashReporterCustomData];
-    
+
     // Enable crash reporter for this session
     NSError *error = nil;
     if (![self.crashReporter enableCrashReporterAndReturnError:&error]) {
         NSLog(@"BugSplat: Failed to enable crash reporter: %@", error);
         return;
     }
-    
+
     self.isStartInvoked = YES;
 }
 
@@ -1519,6 +1551,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (id<BugSplatCrashStorageProtocol>)crashStorage
 {
     return self.crashStorageInternal;
+}
+
+- (void)setDebuggerAttachedOverride:(NSNumber *)value
+{
+    _debuggerAttachedOverride = value;
 }
 
 @end

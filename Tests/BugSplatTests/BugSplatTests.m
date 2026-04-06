@@ -403,4 +403,39 @@
     XCTAssertNil(self.bugSplat.delegate);
 }
 
+#pragma mark - Debugger Detection Tests
+
+- (void)testStart_SkipsCrashReporterWhenDebuggerAttached
+{
+    [self.bugSplat setDebuggerAttachedOverride:@YES];
+    [self.bugSplat start];
+
+    XCTAssertTrue([self.bugSplat isStartInvoked]);
+    XCTAssertFalse(self.mockCrashReporter.wasEnabled);
+}
+
+- (void)testStart_EnablesCrashReporterWhenNoDebugger
+{
+    [self.bugSplat setDebuggerAttachedOverride:@NO];
+    [self.bugSplat start];
+
+    XCTAssertTrue([self.bugSplat isStartInvoked]);
+    XCTAssertTrue(self.mockCrashReporter.wasEnabled);
+}
+
+- (void)testStart_ProcessesPendingCrashesEvenWithDebugger
+{
+    // Set up a pending crash report
+    NSData *fakeCrashData = [@"fake crash" dataUsingEncoding:NSUTF8StringEncoding];
+    self.mockCrashReporter.hasPendingReport = YES;
+    self.mockCrashReporter.pendingCrashReportData = fakeCrashData;
+
+    [self.bugSplat setDebuggerAttachedOverride:@YES];
+    [self.bugSplat start];
+
+    // Pending report should still be purged (processed) even with debugger attached
+    XCTAssertTrue(self.mockCrashReporter.wasPurged);
+    XCTAssertFalse(self.mockCrashReporter.wasEnabled);
+}
+
 @end
