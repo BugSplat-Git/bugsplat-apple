@@ -9,6 +9,9 @@
 #import <BugSplat/BugSplat.h>
 
 #import <CrashReporter/CrashReporter.h>
+
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
@@ -84,6 +87,19 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     return sharedInstance;
 }
 
++ (BOOL)isDebuggerAttached
+{
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    struct kinfo_proc info;
+    size_t size = sizeof(info);
+
+    if (sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0) != 0) {
+        return NO;
+    }
+
+    return (info.kp_proc.p_flag & P_TRACED) != 0;
+}
+
 - (instancetype)init
 {
     if (self = [super init]) {
@@ -102,7 +118,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
             initWithSignalHandlerType:signalHandlerType
             symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
-        
+
         _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
         
         // Use real defaults by default
@@ -164,7 +180,15 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)start
 {
     NSLog(@"BugSplat start...");
-    
+
+    // When a debugger is attached, PLCrashReporter's Mach exception handler conflicts
+    // with LLDB's exception ports, causing SIGTRAP (signal 5) termination. Since crash
+    // reporting isn't useful during debugging, skip enabling it entirely.
+    if ([BugSplat isDebuggerAttached]) {
+        NSLog(@"BugSplat: Debugger attached — crash reporting disabled");
+        return;
+    }
+
     // Debug: Check what bundle and info dictionary we're reading from
     NSBundle *mainBundle = [NSBundle mainBundle];
     NSLog(@"BugSplat: mainBundle = %@", mainBundle);
