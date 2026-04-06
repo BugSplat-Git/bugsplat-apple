@@ -185,7 +185,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // with LLDB's exception ports, causing SIGTRAP (signal 5) termination. Since crash
     // reporting isn't useful during debugging, skip enabling it entirely.
     if ([BugSplat isDebuggerAttached]) {
-        NSLog(@"BugSplat: Debugger attached — crash reporting disabled");
+        NSLog(@"BugSplat: Debugger attached - crash reporting disabled");
         return;
     }
 
