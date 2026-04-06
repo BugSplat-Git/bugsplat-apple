@@ -74,6 +74,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *_bugSplatDatabase;
     NSString *_applicationName;
     NSString *_applicationVersion;
+    NSNumber *_debuggerAttachedOverride;
 }
 
 + (instancetype)shared
@@ -88,8 +89,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     return sharedInstance;
 }
 
-+ (BOOL)isDebuggerAttached
+- (BOOL)isDebuggerAttached
 {
+    if (_debuggerAttachedOverride != nil) {
+        return [_debuggerAttachedOverride boolValue];
+    }
+
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
     struct kinfo_proc info = {0};
     size_t size = sizeof(info);
@@ -225,7 +230,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // When a debugger is attached, PLCrashReporter's Mach exception handler conflicts
     // with LLDB's exception ports, causing SIGTRAP (signal 5) termination.
     // Skip enabling the crash reporter but still process pending crashes above.
-    if ([BugSplat isDebuggerAttached]) {
+    if ([self isDebuggerAttached]) {
         NSLog(@"BugSplat: Debugger attached - crash reporting disabled for this session");
         self.isStartInvoked = YES;
         return;
@@ -1546,6 +1551,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (id<BugSplatCrashStorageProtocol>)crashStorage
 {
     return self.crashStorageInternal;
+}
+
+- (void)setDebuggerAttachedOverride:(NSNumber *)value
+{
+    _debuggerAttachedOverride = value;
 }
 
 @end

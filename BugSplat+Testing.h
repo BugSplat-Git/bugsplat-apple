@@ -77,6 +77,12 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (id<BugSplatCrashStorageProtocol>)crashStorage;
 
+/**
+ * Override debugger detection for testing.
+ * Pass @YES to simulate debugger attached, @NO to simulate no debugger, nil to use real detection.
+ */
+- (void)setDebuggerAttachedOverride:(nullable NSNumber *)value;
+
 @end
 
 NS_ASSUME_NONNULL_END
