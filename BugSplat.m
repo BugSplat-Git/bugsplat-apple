@@ -12,6 +12,7 @@
 
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <unistd.h>
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
@@ -90,11 +91,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 + (BOOL)isDebuggerAttached
 {
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
-    struct kinfo_proc info;
+    struct kinfo_proc info = {0};
     size_t size = sizeof(info);
 
     if (sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0) != 0) {
-        return NO;
+        NSLog(@"BugSplat: Failed to query debugger status via sysctl; assuming debugger is attached");
+        return YES;
     }
 
     return (info.kp_proc.p_flag & P_TRACED) != 0;
@@ -181,14 +183,6 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 {
     NSLog(@"BugSplat start...");
 
-    // When a debugger is attached, PLCrashReporter's Mach exception handler conflicts
-    // with LLDB's exception ports, causing SIGTRAP (signal 5) termination. Since crash
-    // reporting isn't useful during debugging, skip enabling it entirely.
-    if ([BugSplat isDebuggerAttached]) {
-        NSLog(@"BugSplat: Debugger attached - crash reporting disabled");
-        return;
-    }
-
     // Debug: Check what bundle and info dictionary we're reading from
     NSBundle *mainBundle = [NSBundle mainBundle];
     NSLog(@"BugSplat: mainBundle = %@", mainBundle);
@@ -228,17 +222,26 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     // This includes both new crashes and previously failed uploads
     [self processPendingCrashReports];
     
+    // When a debugger is attached, PLCrashReporter's Mach exception handler conflicts
+    // with LLDB's exception ports, causing SIGTRAP (signal 5) termination.
+    // Skip enabling the crash reporter but still process pending crashes above.
+    if ([BugSplat isDebuggerAttached]) {
+        NSLog(@"BugSplat: Debugger attached - crash reporting disabled for this session");
+        self.isStartInvoked = YES;
+        return;
+    }
+
     // Set crash-time metadata on PLCrashReporter BEFORE enabling it
     // If a crash occurs, this metadata will be saved WITH the crash report
     [self updateCrashReporterCustomData];
-    
+
     // Enable crash reporter for this session
     NSError *error = nil;
     if (![self.crashReporter enableCrashReporterAndReturnError:&error]) {
         NSLog(@"BugSplat: Failed to enable crash reporter: %@", error);
         return;
     }
-    
+
     self.isStartInvoked = YES;
 }
 
