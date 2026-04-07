@@ -86,6 +86,10 @@ jobs:
         # Create zip archive
         cd xcframeworks
         zip -y -r BugSplat.xcframework.zip BugSplat.xcframework
+
+        # Extract macOS dylib for game engine integration (e.g., Unity)
+        cp BugSplat.xcframework/macos-arm64_x86_64/BugSplat.framework/Versions/A/BugSplat BugSplat-macOS.dylib
+        install_name_tool -id "@rpath/BugSplat-macOS.dylib" BugSplat-macOS.dylib
         
     - name: Update Package.swift
       run: |
@@ -113,6 +117,7 @@ jobs:
         tag_name: ${{ needs.check-version.outputs.next }}
         files: |
           xcframeworks/BugSplat.xcframework.zip
+          xcframeworks/BugSplat-macOS.dylib
         name: Release ${{ needs.check-version.outputs.next }}
         body: |
           Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next }}
@@ -130,8 +135,12 @@ jobs:
           ```
           
           ## Manual Integration
-          
+
           Download `BugSplat.xcframework.zip`, unzip, and add to your Xcode project.
+
+          ## Game Engine Integration (Unity, etc.)
+
+          Download `BugSplat-macOS.dylib` for macOS native plugin integration.
         draft: false
         prerelease: false
       env:
