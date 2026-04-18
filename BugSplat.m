@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#import <stdatomic.h>
+
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
@@ -305,6 +307,12 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.hangQueue = dispatch_queue_create("com.bugsplat.hang-handler", DISPATCH_QUEUE_SERIAL);
     }
 
+#if TARGET_OS_IOS || TARGET_OS_TV
+    // Install the notification observers that maintain the cached application-active
+    // state the watchdog polls. Idempotent.
+    [BugSplat installApplicationActiveObservers];
+#endif
+
     __weak __typeof(self) weakSelf = self;
     self.hangTracker = [[BugSplatHangTracker alloc] initWithThresholdSeconds:2.0
                                                                     delegate:self
@@ -320,20 +328,62 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSLog(@"BugSplat: Hang detection enabled (threshold 2.0s)");
 }
 
-/// Main-thread-safe check for whether the app is currently active in the foreground.
-/// Always returns YES on platforms without UIApplication (macOS).
+#if TARGET_OS_IOS || TARGET_OS_TV
+/// Cached foreground-active state, updated via NSNotificationCenter on the main thread
+/// and read without locking (or dispatching) from the hang-tracker watchdog thread.
+///
+/// Using dispatch_sync to the main queue here would deadlock: when the main thread is
+/// actually hung (exactly the case we want to report), the watchdog can never acquire
+/// main to read applicationState, so no hang report would ever be persisted.
+static _Atomic(bool) sBugSplatApplicationActive = true;
+
++ (void)installApplicationActiveObservers
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSOperationQueue *mainQueue = [NSOperationQueue mainQueue];
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+
+        // Seed the cached state from the current application state.
+        atomic_store(&sBugSplatApplicationActive,
+                     [UIApplication sharedApplication].applicationState == UIApplicationStateActive);
+
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, true);
+        }];
+        [center addObserverForName:UIApplicationWillResignActiveNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+        [center addObserverForName:UIApplicationWillEnterForegroundNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            // Foreground but not yet active - treat as inactive for hang purposes,
+            // DidBecomeActive will flip the flag shortly.
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+    });
+}
+#endif
+
+/// Lock-free check for whether the app is currently active. Safe to call from any thread,
+/// including while the main thread is hung.
 + (BOOL)isApplicationActive
 {
 #if TARGET_OS_IOS || TARGET_OS_TV
-    __block UIApplicationState state = UIApplicationStateActive;
-    if ([NSThread isMainThread]) {
-        state = [UIApplication sharedApplication].applicationState;
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), ^{
-            state = [UIApplication sharedApplication].applicationState;
-        });
-    }
-    return state == UIApplicationStateActive;
+    return atomic_load(&sBugSplatApplicationActive);
 #else
     return YES;
 #endif
