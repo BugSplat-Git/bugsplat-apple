@@ -5,6 +5,7 @@
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
 
+#include <chrono>
 #include <iostream>
 #include "BugSplatInit.hpp"
 
@@ -58,9 +59,16 @@ int checkInput(std::string input)
     {
         return sendFeedback();
     }
+    else if (input == "hang")
+    {
+        std::cout << "Simulating a 4-second main-thread hang. Kill the process with Ctrl+C or a SIGKILL to see a fatal-hang report uploaded on next run." << std::endl;
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(4);
+        while (std::chrono::steady_clock::now() < deadline) { }
+        std::cout << "Hang window ended (main thread recovered)." << std::endl;
+    }
     else
     {
-        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', or 'q' to quit" << std::endl;
+        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', 'hang', or 'q' to quit" << std::endl;
     }
 
     return 0;

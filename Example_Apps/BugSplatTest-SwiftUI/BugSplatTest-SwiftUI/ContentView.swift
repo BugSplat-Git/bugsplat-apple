@@ -56,6 +56,18 @@ struct ContentView: View {
             .background(Color.accentColor)
             .cornerRadius(10)
 
+            Button("Simulate Hang") {
+                // Blocks the main thread past BugSplat's hang-detection threshold.
+                // Force-quit the app while the UI is frozen to see a fatal-hang report
+                // uploaded on the next launch.
+                let deadline = Date().addingTimeInterval(4.0)
+                while Date() < deadline { }
+            }
+            .padding()
+            .foregroundColor(.white)
+            .background(Color.orange)
+            .cornerRadius(10)
+
             Button("Send Feedback") {
                 showFeedbackAlert = true
             }

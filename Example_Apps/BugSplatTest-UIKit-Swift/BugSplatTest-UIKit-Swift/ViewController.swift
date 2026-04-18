@@ -31,12 +31,31 @@ class ViewController: UIViewController {
             feedbackButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             feedbackButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 60)
         ])
+
+        // Add a "Simulate Hang" button for demoing fatal-hang detection.
+        let hangButton = UIButton(type: .system)
+        hangButton.setTitle("Simulate Hang", for: .normal)
+        hangButton.addTarget(self, action: #selector(simulateHang), for: .touchUpInside)
+        hangButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(hangButton)
+        NSLayoutConstraint.activate([
+            hangButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            hangButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 100)
+        ])
     }
 
     @IBAction func crashApp(_ sender: Any) {
         // intentially crash app here to demonstrate BugSplat's crash reporting capabilities
         let description = nonOptional!.debugDescription
         print(description)
+    }
+
+    @objc func simulateHang() {
+        // Blocks the main thread past BugSplat's hang-detection threshold.
+        // Force-quit the app while the UI is frozen to see a fatal-hang report
+        // uploaded on the next launch.
+        let deadline = Date().addingTimeInterval(4.0)
+        while Date() < deadline { }
     }
 
     @objc func showFeedbackDialog() {

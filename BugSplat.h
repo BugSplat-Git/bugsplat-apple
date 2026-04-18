@@ -166,6 +166,29 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL autoSubmitCrashReport;
 
 /**
+ * Enable detection and reporting of fatal main-thread hangs.
+ *
+ * When set to YES before `-start` is invoked, BugSplat monitors the main runloop for
+ * prolonged unresponsive periods. If a hang is detected and the app is subsequently
+ * terminated without the main thread recovering (launch/resume watchdog kills, background
+ * task expirations, user force-quit), a hang report is uploaded on the next launch using
+ * the same pipeline as crash reports.
+ *
+ * If the main thread resumes after a hang is detected, the persisted report is discarded -
+ * non-fatal hangs are not reported in this version.
+ *
+ * Hang reports carry the exception name `App Hang (Fatal)` and include attributes prefixed
+ * with `bugsplat-hang-` (duration, detection time, app state, launch id) that can be used
+ * to correlate with crashes from the same launch.
+ *
+ * Detection is suppressed when a debugger is attached or the app is not active. This property
+ * is a no-op inside app extensions.
+ *
+ * Default: NO
+ */
+@property (nonatomic, assign) BOOL enableHangDetection;
+
+/**
  * Add an attribute and value to a dictionary of attributes that will potentially be included in a crash report.
  * If the attribute is an invalid XML entity name, or the attribute+value pair cannot be set,
  * the method will return NO, otherwise it will return YES.

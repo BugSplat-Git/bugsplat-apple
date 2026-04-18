@@ -30,6 +30,27 @@
         [feedbackButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [feedbackButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:40]
     ]];
+
+    // Add a "Simulate Hang" button for demoing fatal-hang detection.
+    NSButton *hangButton = [[NSButton alloc] initWithFrame:NSZeroRect];
+    hangButton.title = @"Simulate Hang";
+    hangButton.bezelStyle = NSBezelStyleRounded;
+    hangButton.target = self;
+    hangButton.action = @selector(simulateHang:);
+    hangButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:hangButton];
+    [NSLayoutConstraint activateConstraints:@[
+        [hangButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [hangButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:80]
+    ]];
+}
+
+- (IBAction)simulateHang:(id)sender {
+    // Blocks the main thread past BugSplat's hang-detection threshold.
+    // Force-quit the app while the UI is frozen to see a fatal-hang report
+    // uploaded on the next launch.
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:4.0];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) { }
 }
 
 
