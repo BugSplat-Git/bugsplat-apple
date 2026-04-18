@@ -5,7 +5,6 @@
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
 
-#include <chrono>
 #include <iostream>
 #include "BugSplatInit.hpp"
 
@@ -61,10 +60,22 @@ int checkInput(std::string input)
     }
     else if (input == "hang")
     {
-        std::cout << "Simulating a 4-second main-thread hang. Kill the process with Ctrl+C or a SIGKILL to see a fatal-hang report uploaded on next run." << std::endl;
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(4);
-        while (std::chrono::steady_clock::now() < deadline) { }
-        std::cout << "Hang window ended (main thread recovered)." << std::endl;
+        std::cout << "\nAbout to simulate a fatal main-thread hang.\n"
+                  << "The process will stop responding and the only way to exit is to kill it\n"
+                  << "(Ctrl+C, or `kill -9 <pid>` from another shell). On the next run, a fatal-hang\n"
+                  << "report will be uploaded.\n"
+                  << "Type 'yes' to continue, anything else to cancel: " << std::flush;
+        std::string confirm;
+        std::getline(std::cin, confirm);
+        if (confirm != "yes") {
+            std::cout << "Cancelled." << std::endl;
+            return 0;
+        }
+        // Blocks the main thread forever. If the main thread were allowed to recover,
+        // the persisted report would be discarded because non-fatal hangs are
+        // intentionally not reported.
+        std::cout << "Simulating main-thread hang. Kill the process to see a fatal-hang report uploaded on the next run." << std::endl;
+        while (true) { }
     }
     else
     {

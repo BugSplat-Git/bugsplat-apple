@@ -52,11 +52,20 @@
 }
 
 - (void)simulateHang {
-    // Blocks the main thread past BugSplat's hang-detection threshold.
-    // Force-quit the app while the UI is frozen to see a fatal-hang report
-    // uploaded on the next launch.
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:4.0];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) { }
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:@"Simulate Fatal Hang?"
+                         message:@"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (swipe up from the app switcher). On the next launch, a fatal-hang report will be uploaded. Continue?"
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Hang App" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        // Blocks the main thread forever so the only way to exit is to force-quit the
+        // app. That produces a fatal-hang report that is uploaded on the next launch.
+        // If the main thread were allowed to recover, the persisted report would be
+        // discarded because non-fatal hangs are intentionally not reported.
+        NSLog(@"BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.");
+        while (1) { }
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showFeedbackDialog {

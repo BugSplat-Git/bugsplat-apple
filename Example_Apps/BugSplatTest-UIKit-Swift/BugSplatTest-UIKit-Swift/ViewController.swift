@@ -51,11 +51,20 @@ class ViewController: UIViewController {
     }
 
     @objc func simulateHang() {
-        // Blocks the main thread past BugSplat's hang-detection threshold.
-        // Force-quit the app while the UI is frozen to see a fatal-hang report
-        // uploaded on the next launch.
-        let deadline = Date().addingTimeInterval(4.0)
-        while Date() < deadline { }
+        let alert = UIAlertController(
+            title: "Simulate Fatal Hang?",
+            message: "The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (swipe up from the app switcher). On the next launch, a fatal-hang report will be uploaded. Continue?",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Hang App", style: .destructive) { _ in
+            // Blocks the main thread forever so the only way to exit is to force-quit
+            // the app. That produces a fatal-hang report that is uploaded on the next
+            // launch. If the main thread were allowed to recover, the persisted report
+            // would be discarded because non-fatal hangs are intentionally not reported.
+            print("BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.")
+            while true { }
+        })
+        present(alert, animated: true)
     }
 
     @objc func showFeedbackDialog() {
