@@ -53,7 +53,7 @@ class ViewController: UIViewController {
     @objc func simulateHang() {
         let alert = UIAlertController(
             title: "Simulate Fatal Hang?",
-            message: "The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (swipe up from the app switcher). On the next launch, a fatal-hang report will be uploaded. Continue?",
+            message: "The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-Swift` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Hang App", style: .destructive) { _ in

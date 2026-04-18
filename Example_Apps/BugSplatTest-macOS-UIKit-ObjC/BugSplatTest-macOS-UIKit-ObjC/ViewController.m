@@ -48,7 +48,7 @@
 - (IBAction)simulateHang:(id)sender {
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Simulate Fatal Hang?";
-    alert.informativeText = @"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (Cmd+Option+Esc, then Force Quit) or kill the process. On the next launch, a fatal-hang report will be uploaded. Continue?";
+    alert.informativeText = @"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (Cmd+Option+Esc, then Force Quit) or kill the process from a terminal (`killall -9 BugSplatTest-macOS-UIKit-ObjC`). On the next launch, a fatal-hang report will be uploaded. Continue?";
     alert.alertStyle = NSAlertStyleWarning;
     [alert addButtonWithTitle:@"Hang App"];
     [alert addButtonWithTitle:@"Cancel"];

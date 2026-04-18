@@ -54,7 +54,7 @@
 - (void)simulateHang {
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:@"Simulate Fatal Hang?"
-                         message:@"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (swipe up from the app switcher). On the next launch, a fatal-hang report will be uploaded. Continue?"
+                         message:@"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-ObjC` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?"
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Hang App" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
