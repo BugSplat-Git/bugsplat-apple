@@ -212,9 +212,14 @@
     UIView *bar = [[UIView alloc] init];
     bar.translatesAutoresizingMaskIntoConstraints = NO;
 
-    UIImageView *wordmark = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"bugsplat_wordmark"]];
+    UIImage *wordmarkImage = [UIImage imageNamed:@"bugsplat_wordmark"];
+    UIImageView *wordmark = [[UIImageView alloc] initWithImage:wordmarkImage];
     wordmark.translatesAutoresizingMaskIntoConstraints = NO;
     wordmark.contentMode = UIViewContentModeScaleAspectFit;
+    // Pin to intrinsic aspect ratio so the view doesn't stretch horizontally;
+    // otherwise scaleAspectFit centers the image inside a wide frame and the
+    // logo visually drifts toward the bar's center instead of hugging leading.
+    [wordmark setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [bar addSubview:wordmark];
 
     UILabel *version = [[UILabel alloc] init];
@@ -234,8 +239,10 @@
         [wordmark.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [wordmark.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [wordmark.heightAnchor constraintEqualToConstant:28],
-        // The wordmark image is wider than tall; let it size by aspect.
-        [wordmark.widthAnchor constraintLessThanOrEqualToConstant:200],
+        [wordmark.widthAnchor constraintEqualToAnchor:wordmark.heightAnchor
+                                            multiplier:(wordmarkImage.size.height > 0
+                                                        ? wordmarkImage.size.width / wordmarkImage.size.height
+                                                        : 1.0)],
 
         [pill.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
         [pill.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
