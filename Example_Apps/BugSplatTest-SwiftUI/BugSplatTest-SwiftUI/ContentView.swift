@@ -72,6 +72,9 @@ struct ContentView: View {
             .padding(.bottom, 32)
         }
         .background(DemoColor.screenBg.ignoresSafeArea())
+        .background(ShakeDetector { showFeedbackSheet = true }
+                        .frame(width: 0, height: 0)
+                        .allowsHitTesting(false))
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { entries = ActivityLog.all() }
         }

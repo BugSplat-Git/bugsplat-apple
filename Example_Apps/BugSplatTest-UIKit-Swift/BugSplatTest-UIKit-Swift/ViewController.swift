@@ -54,6 +54,21 @@ final class ViewController: UIViewController {
         refreshActivity()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Become first responder so motion events (shake) reach this controller.
+        becomeFirstResponder()
+    }
+
+    override var canBecomeFirstResponder: Bool { true }
+
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        super.motionEnded(motion, with: event)
+        if motion == .motionShake {
+            presentFeedbackSheet()
+        }
+    }
+
     @objc private func appDidBecomeActive() {
         refreshActivity()
     }
