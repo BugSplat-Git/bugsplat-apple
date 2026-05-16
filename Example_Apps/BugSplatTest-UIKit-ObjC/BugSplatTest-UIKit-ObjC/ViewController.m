@@ -407,10 +407,10 @@
     // death and shows up when the app relaunches.
     [BSPActivityLog record:BSPActivityTypeCrash detail:@"Native crash triggered"];
     [self refreshRecentActivity];
-    NSNumber *prop = nil;
-    // Force-unwrap-style crash: dereference nil to produce a SIGSEGV.
-    NSNumber *_unused = @([prop longValue] + [(NSNumber *)nil longValue]);
-    (void)_unused;
+    // Null pointer dereference - guaranteed SIGSEGV. Sending an ObjC message
+    // to nil silently returns 0, so a plain C deref is what actually crashes.
+    volatile int *ptr = NULL;
+    *ptr = 42;
 }
 
 - (void)triggerNonCrashError {
