@@ -158,10 +158,20 @@ final class ViewController: UIViewController {
     }
 
     private func makeTopBar() -> UIView {
-        let wordmark = UIImageView(image: UIImage(named: "bugsplat_wordmark"))
+        let wordmarkImage = UIImage(named: "bugsplat_wordmark")
+        let wordmark = UIImageView(image: wordmarkImage)
         wordmark.translatesAutoresizingMaskIntoConstraints = false
         wordmark.contentMode = .scaleAspectFit
-        wordmark.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        // Pin to intrinsic aspect ratio so the view doesn't stretch horizontally;
+        // otherwise scaleAspectFit centers the image inside a wide frame and the
+        // logo visually drifts toward the bar's center instead of hugging leading.
+        wordmark.setContentHuggingPriority(.required, for: .horizontal)
+        if let img = wordmarkImage, img.size.height > 0 {
+            wordmark.widthAnchor.constraint(
+                equalTo: wordmark.heightAnchor,
+                multiplier: img.size.width / img.size.height
+            ).isActive = true
+        }
 
         let version = UILabel()
         version.translatesAutoresizingMaskIntoConstraints = false
