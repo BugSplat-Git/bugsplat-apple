@@ -9,7 +9,4 @@
 
 @interface ViewController : UIViewController
 
-    @property NSArray *array;
-
 @end
-
