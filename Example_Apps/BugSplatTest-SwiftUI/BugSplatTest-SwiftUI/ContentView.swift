@@ -6,89 +6,76 @@
 //
 
 import SwiftUI
+import UIKit
 import BugSplat
 
 struct ContentView: View {
-    @State var isFeature1Active: Bool = false
-    @State var isFeature2Active: Bool = false
-    @State var isFeature3Active: Bool = false
-    @State var showFeedbackAlert = false
-    @State var feedbackTitle = ""
-    @State var feedbackDescription = ""
-    @State var feedbackStatus: String?
-    @State var showHangConfirm = false
+    @State private var entries: [ActivityEntry] = ActivityLog.all()
+    @State private var showFeedbackSheet = false
+    @State private var showHangConfirm = false
+    @State private var feedbackTitle = ""
+    @State private var feedbackDescription = ""
+    @State private var feedbackStatus: String?
+    @Environment(\.scenePhase) private var scenePhase
 
-    let prop: Int? = nil
+    private var database: String {
+        BugSplat.shared().bugSplatDatabase ?? "—"
+    }
+
+    private var sdkVersion: String {
+        let v = Bundle(for: BugSplat.self).object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return "v\(v ?? "—")"
+    }
 
     var body: some View {
-        VStack {
-            Toggle(isOn: $isFeature1Active) {
-                isFeature1Active ? Text("Feature 1 is Active") : Text("Feature 1 is Inactive")
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.secondary)
-            .cornerRadius(10)
-            .padding()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                topBar
+                titleRow.padding(.top, 22)
+                Text("Trigger an event. We catch it, group it, route it to your dashboard.")
+                    .font(.system(size: 15))
+                    .foregroundColor(DemoColor.textSecondary)
+                    .padding(.top, 6)
 
-            Toggle(isOn: $isFeature2Active) {
-                isFeature2Active ? Text("Feature 2 is Active") : Text("Feature 2 is Inactive")
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.secondary)
-            .cornerRadius(10)
-            .padding()
+                sectionHeader("TRIGGER AN EVENT").padding(.top, 22)
 
-            Toggle(isOn: $isFeature3Active) {
-                isFeature3Active ? Text("Feature 3 is Active") : Text("Feature 3 is Inactive")
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.secondary)
-            .cornerRadius(10)
-            .padding()
+                VStack(spacing: 12) {
+                    EventCard(icon: "splat_crash",
+                              title: "Crash",
+                              subtitle: "Native crash · stack + threads + memory",
+                              action: triggerCrash)
+                    EventCard(icon: "splat_error",
+                              title: "Non-Crash Error",
+                              subtitle: "Exception caught · app keeps running",
+                              action: triggerNonCrashError)
+                    EventCard(icon: "splat_feedback",
+                              title: "User Feedback",
+                              subtitle: "Open the feedback sheet",
+                              action: { showFeedbackSheet = true })
+                    EventCard(icon: "splat_hang",
+                              title: "Hang",
+                              subtitle: "Freeze main thread for 8 seconds",
+                              action: { showHangConfirm = true })
+                }
+                .padding(.top, 12)
 
-            Button("Crash!") {
-                _ = prop!
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.accentColor)
-            .cornerRadius(10)
+                recentActivityCard.padding(.top, 18)
 
-            Button("Simulate Hang") {
-                showHangConfirm = true
+                Text(feedbackStatus ?? "Shake the device to send feedback anytime.")
+                    .font(.system(size: 13))
+                    .foregroundColor(DemoColor.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 18)
             }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.orange)
-            .cornerRadius(10)
-
-            Button("Send Feedback") {
-                showFeedbackAlert = true
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.green)
-            .cornerRadius(10)
-
-            if let feedbackStatus {
-                Text(feedbackStatus)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 4)
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
         }
-        .onChange(of: isFeature1Active) {
-            update(attribute: "Feature1", value: isFeature1Active.description)
+        .background(DemoColor.screenBg.ignoresSafeArea())
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { entries = ActivityLog.all() }
         }
-        .onChange(of: isFeature2Active) {
-            update(attribute: "Feature2", value: isFeature2Active.description)
-        }
-        .onChange(of: isFeature3Active) {
-            update(attribute: "Feature3", value: isFeature3Active.description)
-        }
-        .alert("Send Feedback", isPresented: $showFeedbackAlert) {
+        .alert("Send Feedback", isPresented: $showFeedbackSheet) {
             TextField("Title", text: $feedbackTitle)
             TextField("Description", text: $feedbackDescription)
             Button("Send") { sendFeedback() }
@@ -98,28 +85,110 @@ struct ContentView: View {
             Button("Hang App", role: .destructive) { simulateHang() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-SwiftUI` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?")
+            Text("The main thread will be blocked for 8 seconds. The UI will freeze; the app will not appear to respond until the freeze ends.")
         }
     }
 
-    func simulateHang() {
-        // Blocks the main thread forever so the only way to exit is to force-quit
-        // the app. That produces a fatal-hang report that is uploaded on the next
-        // launch. If the main thread were allowed to recover, the persisted report
-        // would be discarded because non-fatal hangs are intentionally not reported.
-        print("BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.")
-        while true { }
+    // MARK: - Sections
+
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            Image("bugsplat_wordmark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 28)
+            Spacer()
+            Text(sdkVersion)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(DemoColor.textSecondary)
+            StatusPill(connected: true)
+        }
     }
 
-    func update(attribute: String, value: String?) {
-        print("update(\(attribute), value: \(value ?? "nil")")
-        BugSplat.shared().set(value, for: attribute)
+    private var titleRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("BugSplat SDK · Demo")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(DemoColor.textPrimary)
+            DatabaseBadge(text: database)
+        }
     }
 
-    func sendFeedback() {
+    private func sectionHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .tracking(1.2)
+            .foregroundColor(DemoColor.textTertiary)
+    }
+
+    private var recentActivityCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                sectionHeader("RECENT ACTIVITY")
+                Spacer()
+                Button(action: openDashboard) {
+                    Text("View dashboard ↗")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(DemoColor.link)
+                }
+                .buttonStyle(.plain)
+            }
+            if entries.isEmpty {
+                Text("No events yet — tap a card above to get started.")
+                    .font(.system(size: 14))
+                    .foregroundColor(DemoColor.textTertiary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(entries) { entry in
+                        RecentActivityRow(entry: entry)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14).fill(DemoColor.cardBg)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14).stroke(DemoColor.cardStroke, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Actions
+
+    private func triggerCrash() {
+        // Record synchronously before the crash so the entry survives process death
+        // and shows up when the app relaunches.
+        ActivityLog.record(.crash, detail: "Native crash triggered")
+        entries = ActivityLog.all()
+        let prop: Int? = nil
+        _ = prop!
+    }
+
+    private func triggerNonCrashError() {
+        // Demo: pretend we caught an exception. Real apps would put a do/try/catch
+        // around an actual risky operation and report the type name here.
+        ActivityLog.record(.error, detail: "NSInvalidArgumentException caught")
+        entries = ActivityLog.all()
+    }
+
+    private func simulateHang() {
+        ActivityLog.record(.hang, detail: "Main thread frozen")
+        entries = ActivityLog.all()
+        // Eight-second freeze - matches the Android demo copy. With the fatal-only
+        // hang detector this won't produce a hang report (main recovers), but the
+        // local activity entry above shows the user that the event was logged.
+        let until = Date(timeIntervalSinceNow: 8)
+        while Date() < until { }
+    }
+
+    private func sendFeedback() {
         feedbackStatus = "Sending..."
+        let title = feedbackTitle
         BugSplat.shared().postFeedback(
-            title: feedbackTitle,
+            title: title,
             description: feedbackDescription.isEmpty ? nil : feedbackDescription,
             userName: nil,
             userEmail: nil,
@@ -128,9 +197,12 @@ struct ContentView: View {
         ) { error in
             DispatchQueue.main.async {
                 if let error {
-                    feedbackStatus = "Failed: \(error.localizedDescription)"
+                    feedbackStatus = "Feedback failed: \(error.localizedDescription)"
                 } else {
-                    feedbackStatus = "Feedback sent!"
+                    feedbackStatus = "Feedback sent — thank you!"
+                    let detail = title.isEmpty ? "Feedback submitted" : "\u{201C}\(title)\u{201D}"
+                    ActivityLog.record(.feedback, detail: detail)
+                    entries = ActivityLog.all()
                     feedbackTitle = ""
                     feedbackDescription = ""
                 }
@@ -138,6 +210,13 @@ struct ContentView: View {
         }
     }
 
+    private func openDashboard() {
+        var components = URLComponents(string: "https://app.bugsplat.com/v2/dashboard")
+        components?.queryItems = [URLQueryItem(name: "database", value: database)]
+        if let url = components?.url {
+            UIApplication.shared.open(url)
+        }
+    }
 }
 
 #Preview {
