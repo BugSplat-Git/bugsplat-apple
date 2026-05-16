@@ -18,8 +18,12 @@
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-    // Insert code here to initialize your application
-    
+    // Install a minimal Edit menu so NSTextField gets standard keyboard
+    // shortcuts (Cmd+A select-all, Cmd+C/V/X). The storyboard's MainMenu
+    // only ships an App menu + Window menu, so without this Cmd+A in the
+    // feedback sheet is dead.
+    [self installEditMenu];
+
     // Create a sample log file for attachment demonstration
     [self createSampleLogFile];
 
@@ -47,6 +51,30 @@
 
     // Don't forget to call start after you've finished configuring BugSplat
     [[BugSplat shared] start];
+}
+
+#pragma mark - Edit Menu
+
+- (void)installEditMenu {
+    NSMenu *mainMenu = [NSApp mainMenu];
+    if ([mainMenu indexOfItemWithTitle:@"Edit"] >= 0) return;
+
+    NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+    [editMenu addItemWithTitle:@"Cut"        action:@selector(cut:)       keyEquivalent:@"x"];
+    [editMenu addItemWithTitle:@"Copy"       action:@selector(copy:)      keyEquivalent:@"c"];
+    [editMenu addItemWithTitle:@"Paste"      action:@selector(paste:)     keyEquivalent:@"v"];
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    [editMenu addItemWithTitle:@"Select All" action:@selector(selectAll:) keyEquivalent:@"a"];
+
+    NSMenuItem *editItem = [[NSMenuItem alloc] initWithTitle:@"Edit" action:NULL keyEquivalent:@""];
+    editItem.submenu = editMenu;
+
+    NSInteger windowIdx = [mainMenu indexOfItemWithTitle:@"Window"];
+    if (windowIdx >= 0) {
+        [mainMenu insertItem:editItem atIndex:windowIdx];
+    } else {
+        [mainMenu addItem:editItem];
+    }
 }
 
 #pragma mark - Sample Log File

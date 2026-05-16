@@ -11,8 +11,12 @@
 #import "BSPActivityLog.h"
 #import <BugSplat/BugSplat.h>
 
-static NSTimeInterval const kBSPSplatGestureWindowSeconds = 1.2;
-static NSInteger const kBSPSplatGestureKeyCount = 8;
+// Splat gesture: 6 distinct keys within a tight 0.5s window. 6 is below the
+// 6-key rollover ceiling most MacBook keyboards enforce, so all simultaneously
+// held fingers actually register. The short window keeps real typing (even at
+// expert speeds, ~6 keys/sec) from triggering it.
+static NSTimeInterval const kBSPSplatGestureWindowSeconds = 0.5;
+static NSInteger const kBSPSplatGestureKeyCount = 6;
 
 @interface ViewController ()
 @property (nonatomic, strong) NSStackView *contentStack;
@@ -335,7 +339,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
     [str appendAttributedString:[[NSAttributedString alloc] initWithString:@"Press "
                                                                 attributes:@{NSFontAttributeName: bodyFont,
                                                                              NSForegroundColorAttributeName: BSPDemoTheme.textTertiary}]];
-    [str appendAttributedString:[[NSAttributedString alloc] initWithString:@"any 8 keys at once"
+    [str appendAttributedString:[[NSAttributedString alloc] initWithString:@"any 6 keys at once"
                                                                 attributes:@{NSFontAttributeName: boldFont,
                                                                              NSForegroundColorAttributeName: BSPDemoTheme.textSecondary}]];
     [str appendAttributedString:[[NSAttributedString alloc] initWithString:@" to send feedback — "
@@ -358,8 +362,8 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
         [sub removeFromSuperview];
     }
 
-    NSArray<NSDictionary *> *entries = [BSPActivityLog all];
-    if (entries.count == 0) {
+    NSArray<NSDictionary *> *all = [BSPActivityLog all];
+    if (all.count == 0) {
         self.recentEmptyLabel.hidden = NO;
         self.recentActivityList.hidden = YES;
         return;
@@ -367,6 +371,13 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 
     self.recentEmptyLabel.hidden = YES;
     self.recentActivityList.hidden = NO;
+
+    // Cap the visible rows so the card stays a stable height. The log still
+    // persists up to 10 entries; we just render the most recent few.
+    static NSUInteger const kBSPMaxVisibleActivityRows = 5;
+    NSArray<NSDictionary *> *entries = all.count > kBSPMaxVisibleActivityRows
+        ? [all subarrayWithRange:NSMakeRange(0, kBSPMaxVisibleActivityRows)]
+        : all;
 
     for (NSDictionary *entry in entries) {
         NSString *type = entry[BSPActivityEntryKeyType] ?: @"";
