@@ -384,10 +384,13 @@ final class ViewController: UIViewController {
     }
 
     private func sendFeedback(title: String, description: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Treat an empty title the same as Cancel - don't submit, don't record.
+        guard !trimmed.isEmpty else { return }
         feedbackStatus = "Sending..."
         renderFooter()
         BugSplat.shared().postFeedback(
-            title: title,
+            title: trimmed,
             description: description.isEmpty ? nil : description,
             userName: nil,
             userEmail: nil,
@@ -401,8 +404,7 @@ final class ViewController: UIViewController {
                     self.renderFooter()
                 } else {
                     self.feedbackStatus = "Feedback sent — thank you!"
-                    let detail = title.isEmpty ? "Feedback submitted" : "\u{201C}\(title)\u{201D}"
-                    ActivityLog.record(.feedback, detail: detail)
+                    ActivityLog.record(.feedback, detail: "\u{201C}\(trimmed)\u{201D}")
                     self.refreshActivity()
                 }
             }

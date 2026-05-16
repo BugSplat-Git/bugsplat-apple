@@ -185,8 +185,14 @@ struct ContentView: View {
     }
 
     private func sendFeedback() {
+        let title = feedbackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Treat an empty title the same as Cancel - don't submit, don't record.
+        guard !title.isEmpty else {
+            feedbackTitle = ""
+            feedbackDescription = ""
+            return
+        }
         feedbackStatus = "Sending..."
-        let title = feedbackTitle
         BugSplat.shared().postFeedback(
             title: title,
             description: feedbackDescription.isEmpty ? nil : feedbackDescription,
@@ -200,8 +206,7 @@ struct ContentView: View {
                     feedbackStatus = "Feedback failed: \(error.localizedDescription)"
                 } else {
                     feedbackStatus = "Feedback sent — thank you!"
-                    let detail = title.isEmpty ? "Feedback submitted" : "\u{201C}\(title)\u{201D}"
-                    ActivityLog.record(.feedback, detail: detail)
+                    ActivityLog.record(.feedback, detail: "\u{201C}\(title)\u{201D}")
                     entries = ActivityLog.all()
                     feedbackTitle = ""
                     feedbackDescription = ""
