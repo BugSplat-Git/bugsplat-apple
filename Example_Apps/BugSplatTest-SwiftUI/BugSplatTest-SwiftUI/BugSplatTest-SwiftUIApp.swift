@@ -26,7 +26,7 @@ struct BugSplatTestSwiftUIApp: App {
 
     override init() {
         super.init()
-        
+
         // Create a sample log file for attachment demonstration
         createSampleLogFile()
         

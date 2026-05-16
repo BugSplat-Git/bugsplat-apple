@@ -81,6 +81,13 @@
     [self becomeFirstResponder];
 }
 
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    [super motionEnded:motion withEvent:event];
+    if (motion == UIEventSubtypeMotionShake) {
+        [self showFeedbackDialog];
+    }
+}
+
 #pragma mark - Derived data
 
 - (NSString *)database {
