@@ -20,7 +20,6 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 @property (nonatomic, strong) NSTextField *recentEmptyLabel;
 @property (nonatomic, strong) NSTextField *footerLabel;
 @property (nonatomic, strong) id keyDownMonitor;
-@property (nonatomic, strong) id keyUpMonitor;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *pressedKeyCodes;
 @property (nonatomic, assign) NSTimeInterval splatWindowStart;
 @end
@@ -56,9 +55,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 - (void)viewWillDisappear {
     [super viewWillDisappear];
     if (self.keyDownMonitor) [NSEvent removeMonitor:self.keyDownMonitor];
-    if (self.keyUpMonitor) [NSEvent removeMonitor:self.keyUpMonitor];
     self.keyDownMonitor = nil;
-    self.keyUpMonitor = nil;
 }
 
 #pragma mark - Layout
@@ -493,16 +490,12 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
                 if (c == '3') { [self triggerFeedback:nil]; return nil; }
                 if (c == '4') { [self triggerHang:nil]; return nil; }
             }
+            // Other Cmd combos - leave alone, don't count toward splat.
+            return event;
         }
 
         if (event.isARepeat) return event;
         [self trackKeyDown:event.keyCode];
-        return event;
-    }];
-
-    self.keyUpMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp
-                                                              handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-        [weakSelf.pressedKeyCodes removeObject:@(event.keyCode)];
         return event;
     }];
 }
