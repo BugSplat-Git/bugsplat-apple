@@ -6,6 +6,8 @@
 //
 
 #include <iostream>
+#include <thread>
+#include <chrono>
 #include "BugSplatInit.hpp"
 
 int setAttributeAndValue()
@@ -74,8 +76,13 @@ int checkInput(std::string input)
         // Blocks the main thread forever. If the main thread were allowed to recover,
         // the persisted report would be discarded because non-fatal hangs are
         // intentionally not reported.
+        //
+        // sleep_for keeps the loop observably side-effectful so the C++ forward-progress
+        // rule cannot let an optimizer elide it; a bare `while (true) {}` is UB in C++.
         std::cout << "Simulating main-thread hang. Kill the process to see a fatal-hang report uploaded on the next run." << std::endl;
-        while (true) { }
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
     }
     else
     {

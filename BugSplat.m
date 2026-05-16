@@ -13,7 +13,9 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <pthread.h>
 #import <stdatomic.h>
+#import <mach/mach.h>
 
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
@@ -92,6 +94,14 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *_applicationName;
     NSString *_applicationVersion;
     NSNumber *_debuggerAttachedOverride;
+
+    // Mach port of the main thread, captured on the main thread during -start (or test
+    // setup). Used to mark main as the crashed thread when generating a live hang report
+    // from the hang queue. MACH_PORT_NULL until captured.
+    //
+    // pthread_mach_thread_np does not add a port reference, so no cleanup is needed and
+    // the port remains valid for the lifetime of the main thread (i.e. the process).
+    mach_port_t _mainThreadMachPort;
 }
 
 + (instancetype)shared
@@ -295,6 +305,14 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         return;
     }
 
+    // Capture the main thread's mach port while we are definitely on main, so the live
+    // hang report can mark main as the crashed thread (the report is generated later
+    // from the hang queue, where pthread_self would yield the wrong thread).
+    NSAssert([NSThread isMainThread], @"BugSplat -start must be invoked on the main thread for hang detection");
+    if (_mainThreadMachPort == MACH_PORT_NULL) {
+        _mainThreadMachPort = pthread_mach_thread_np(pthread_self());
+    }
+
     // Generate a per-launch id and attach it as an attribute so crashes from this launch
     // can be correlated with any fatal hang that was persisted before termination.
     if (!self.launchId) {
@@ -428,8 +446,17 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     NSError *error = nil;
     NSData *liveReportData = nil;
     PLCrashReporter *plCrashReporter = (PLCrashReporter *)self.crashReporterInternal;
+    mach_port_t mainThreadPort = _mainThreadMachPort;
     @try {
-        liveReportData = [plCrashReporter generateLiveReportWithException:hangException error:&error];
+        if (mainThreadPort != MACH_PORT_NULL) {
+            // Mark main as the crashed thread so the dashboard's crashed-thread view
+            // points at what's actually hung, rather than the hang-queue worker.
+            liveReportData = [plCrashReporter generateLiveReportWithThread:mainThreadPort
+                                                                 exception:hangException
+                                                                     error:&error];
+        } else {
+            liveReportData = [plCrashReporter generateLiveReportWithException:hangException error:&error];
+        }
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception generating live hang report: %@ - %@", exception.name, exception.reason);
         return;
@@ -1829,6 +1856,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     if (!self.launchId) {
         self.launchId = [[NSUUID UUID] UUIDString];
+    }
+    // XCTest invokes setUp on the main thread, so capturing here yields the same port
+    // as the production path. Required by persistHangReportWithDuration:.
+    if (_mainThreadMachPort == MACH_PORT_NULL) {
+        _mainThreadMachPort = pthread_mach_thread_np(pthread_self());
     }
 }
 
