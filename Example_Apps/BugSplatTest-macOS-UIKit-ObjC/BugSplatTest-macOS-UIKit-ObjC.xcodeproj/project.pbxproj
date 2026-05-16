@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		6341B2752BDC4DE9007EE8AC /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B2742BDC4DE9007EE8AC /* AppDelegate.m */; };
 		6341B2782BDC4DE9007EE8AC /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B2772BDC4DE9007EE8AC /* ViewController.m */; };
+		65D000AC10010000000000A2 /* BSPActivityLog.m in Sources */ = {isa = PBXBuildFile; fileRef = 65D000AC10010000000000A1 /* BSPActivityLog.m */; };
+		65D000AC10010000000000B2 /* BSPDemoTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 65D000AC10010000000000B1 /* BSPDemoTheme.m */; };
+		65D000AC10010000000000C2 /* BSPDemoViews.m in Sources */ = {isa = PBXBuildFile; fileRef = 65D000AC10010000000000C1 /* BSPDemoViews.m */; };
 		6341B27A2BDC4DEB007EE8AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2792BDC4DEB007EE8AC /* Assets.xcassets */; };
 		6341B27D2BDC4DEB007EE8AC /* Base in Resources */ = {isa = PBXBuildFile; fileRef = 6341B27C2BDC4DEB007EE8AC /* Base */; };
 		6341B27F2BDC4DEB007EE8AC /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B27E2BDC4DEB007EE8AC /* main.m */; };
@@ -36,6 +39,12 @@
 		6341B2742BDC4DE9007EE8AC /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		6341B2762BDC4DE9007EE8AC /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		6341B2772BDC4DE9007EE8AC /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
+		65D000AC10010000000000A0 /* BSPActivityLog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPActivityLog.h; sourceTree = "<group>"; };
+		65D000AC10010000000000A1 /* BSPActivityLog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPActivityLog.m; sourceTree = "<group>"; };
+		65D000AC10010000000000B0 /* BSPDemoTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPDemoTheme.h; sourceTree = "<group>"; };
+		65D000AC10010000000000B1 /* BSPDemoTheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPDemoTheme.m; sourceTree = "<group>"; };
+		65D000AC10010000000000C0 /* BSPDemoViews.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPDemoViews.h; sourceTree = "<group>"; };
+		65D000AC10010000000000C1 /* BSPDemoViews.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPDemoViews.m; sourceTree = "<group>"; };
 		6341B2792BDC4DEB007EE8AC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6341B27C2BDC4DEB007EE8AC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		6341B27E2BDC4DEB007EE8AC /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -81,6 +90,12 @@
 				6341B2742BDC4DE9007EE8AC /* AppDelegate.m */,
 				6341B2762BDC4DE9007EE8AC /* ViewController.h */,
 				6341B2772BDC4DE9007EE8AC /* ViewController.m */,
+				65D000AC10010000000000A0 /* BSPActivityLog.h */,
+				65D000AC10010000000000A1 /* BSPActivityLog.m */,
+				65D000AC10010000000000B0 /* BSPDemoTheme.h */,
+				65D000AC10010000000000B1 /* BSPDemoTheme.m */,
+				65D000AC10010000000000C0 /* BSPDemoViews.h */,
+				65D000AC10010000000000C1 /* BSPDemoViews.m */,
 				6341B2792BDC4DEB007EE8AC /* Assets.xcassets */,
 				6341B27B2BDC4DEB007EE8AC /* Main.storyboard */,
 				6341B27E2BDC4DEB007EE8AC /* main.m */,
@@ -191,6 +206,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				6341B2782BDC4DE9007EE8AC /* ViewController.m in Sources */,
+				65D000AC10010000000000A2 /* BSPActivityLog.m in Sources */,
+				65D000AC10010000000000B2 /* BSPDemoTheme.m in Sources */,
+				65D000AC10010000000000C2 /* BSPDemoViews.m in Sources */,
 				6341B27F2BDC4DEB007EE8AC /* main.m in Sources */,
 				6341B2752BDC4DE9007EE8AC /* AppDelegate.m in Sources */,
 			);
