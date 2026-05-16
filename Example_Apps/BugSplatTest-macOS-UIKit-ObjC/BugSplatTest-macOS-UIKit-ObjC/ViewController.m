@@ -390,9 +390,10 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 - (void)triggerCrash:(id)sender {
     [BSPActivityLog record:BSPActivityTypeCrash detail:@"Native crash triggered"];
     [self renderRecentActivity];
-    // Synchronously persisted above. Now crash.
-    NSObject *nilObj = nil;
-    [nilObj performSelector:@selector(self)];
+    // Null pointer dereference - guaranteed SIGSEGV. Sending an ObjC message
+    // to nil silently returns 0, so a plain C deref is what actually crashes.
+    volatile int *ptr = NULL;
+    *ptr = 42;
 }
 
 - (void)triggerNonCrashError:(id)sender {
