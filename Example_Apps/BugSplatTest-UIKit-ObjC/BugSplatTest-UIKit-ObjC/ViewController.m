@@ -482,9 +482,14 @@
 }
 
 - (void)sendFeedbackWithTitle:(NSString *)title description:(NSString *)description {
+    NSString *trimmed = [title stringByTrimmingCharactersInSet:
+                         [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    // Treat an empty title the same as Cancel - don't submit, don't record.
+    if (trimmed.length == 0) return;
+
     self.feedbackStatus = @"Sending...";
     __weak typeof(self) weakSelf = self;
-    [[BugSplat shared] postFeedback:title
+    [[BugSplat shared] postFeedback:trimmed
                         description:description
                            userName:nil
                           userEmail:nil
@@ -499,9 +504,7 @@
                                               error.localizedDescription];
             } else {
                 strongSelf.feedbackStatus = @"Feedback sent — thank you!";
-                NSString *detail = title.length == 0
-                    ? @"Feedback submitted"
-                    : [NSString stringWithFormat:@"“%@”", title];
+                NSString *detail = [NSString stringWithFormat:@"“%@”", trimmed];
                 [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
                 [strongSelf refreshRecentActivity];
             }

@@ -22,6 +22,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 @property (nonatomic, strong) id keyDownMonitor;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *pressedKeyCodes;
 @property (nonatomic, assign) NSTimeInterval splatWindowStart;
+@property (nonatomic, assign) BOOL feedbackInProgress;
 @end
 
 @implementation ViewController
@@ -407,6 +408,10 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 }
 
 - (void)triggerFeedback:(id)sender {
+    self.feedbackInProgress = YES;
+    [self.pressedKeyCodes removeAllObjects];
+    self.splatWindowStart = 0;
+
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Send Feedback";
     [alert addButtonWithTitle:@"Send"];
@@ -425,11 +430,19 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
     alert.accessoryView = stack;
     [alert.window setInitialFirstResponder:titleField];
 
-    if ([alert runModal] != NSAlertFirstButtonReturn) return;
-    NSString *title = titleField.stringValue;
+    NSModalResponse response = [alert runModal];
+    NSString *title = [titleField.stringValue
+                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     NSString *desc = descField.stringValue.length > 0 ? descField.stringValue : nil;
 
-    [[BugSplat shared] postFeedback:title.length > 0 ? title : @"(no title)"
+    self.feedbackInProgress = NO;
+    [self.pressedKeyCodes removeAllObjects];
+    self.splatWindowStart = 0;
+
+    // Treat Cancel and empty-title-Send the same way: no submission, no record.
+    if (response != NSAlertFirstButtonReturn || title.length == 0) return;
+
+    [[BugSplat shared] postFeedback:title
                         description:desc
                            userName:nil
                           userEmail:nil
@@ -438,9 +451,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
                          completion:^(NSError * _Nullable error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!error) {
-                NSString *detail = title.length > 0
-                    ? [NSString stringWithFormat:@"“%@”", title]
-                    : @"Feedback submitted";
+                NSString *detail = [NSString stringWithFormat:@"“%@”", title];
                 [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
                 [self renderRecentActivity];
             }
@@ -479,6 +490,10 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
                                                                 handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
         typeof(self) self = weakSelf;
         if (!self) return event;
+
+        // Stay out of the way while the feedback sheet is up - otherwise typing
+        // in the text fields would re-trigger splat or steal Cmd+digit input.
+        if (self.feedbackInProgress) return event;
 
         // Cmd+1..4 routes to the corresponding card action.
         if ((event.modifierFlags & NSEventModifierFlagCommand) && !event.isARepeat) {
