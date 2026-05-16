@@ -534,7 +534,15 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
     NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
-    [metadata writeToFile:metaFilePath atomically:YES];
+    if (![metadata writeToFile:metaFilePath atomically:YES]) {
+        // Without the .meta file the next-launch scanner sees an orphan .crash that
+        // lacks userSubmitted=YES, database, and attributes - it would either fail to
+        // upload or surface a dialog instead of the intended silent submit. Drop the
+        // .crash too so we don't leak a half-formed report.
+        NSLog(@"BugSplat: Failed to write hang metadata; removing orphan crash file");
+        [[NSFileManager defaultManager] removeItemAtPath:crashFilePath error:nil];
+        return;
+    }
 
     self.currentHangFilename = hangFilename;
     NSLog(@"BugSplat: Persisted hang report %@ (duration %.0fms, state %@)",

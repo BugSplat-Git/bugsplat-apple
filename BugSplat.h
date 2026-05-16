@@ -184,6 +184,10 @@ NS_ASSUME_NONNULL_BEGIN
  * Detection is suppressed when a debugger is attached or the app is not active. This property
  * is a no-op inside app extensions.
  *
+ * When this property is YES, `-start` must be invoked on the main thread - the main
+ * runloop observer is installed and the main thread's Mach port is captured there.
+ * Debug builds assert; Release builds will silently capture the wrong thread.
+ *
  * Default: NO
  */
 @property (nonatomic, assign) BOOL enableHangDetection;

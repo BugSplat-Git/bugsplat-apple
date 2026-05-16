@@ -13,8 +13,11 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  * Delegate protocol for BugSplatHangTracker.
  *
- * Both methods are invoked on the tracker's private watchdog thread, not the main thread.
- * Implementers must not perform UI work directly; dispatch to a queue if needed.
+ * `hangTracker:didDetectHangWithDuration:appState:` is invoked on the tracker's private
+ * watchdog thread. `hangTrackerDidRecoverFromHang:` is invoked on a GCD global utility
+ * queue (dispatched off the main runloop observer so disk I/O doesn't block recovery).
+ * Neither callback runs on the main thread; implementers must not perform UI work directly
+ * and should dispatch to a queue if needed.
  */
 @protocol BugSplatHangTrackerDelegate <NSObject>
 
