@@ -136,7 +136,7 @@ final class ViewController: UIViewController {
 
         let hangCard = EventCardView(icon: "splat_hang",
                                      title: "Hang",
-                                     subtitle: "Freeze main thread for 8 seconds")
+                                     subtitle: "Freeze main thread · force-quit to upload")
         hangCard.addTarget(self, action: #selector(presentHangConfirm), for: .touchUpInside)
 
         [crashCard, errorCard, feedbackCard, hangCard].forEach { cardsStack.addArrangedSubview($0) }
@@ -364,7 +364,7 @@ final class ViewController: UIViewController {
     @objc private func presentHangConfirm() {
         let alert = UIAlertController(
             title: "Simulate Fatal Hang?",
-            message: "The main thread will be blocked for 8 seconds. The UI will freeze; the app will not appear to respond until the freeze ends.",
+            message: "The main thread will be blocked indefinitely. To produce an uploaded hang report you must force-quit the app while it's frozen (swipe up from the app switcher on device, or on the simulator run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-Swift`). On the next launch the report will upload. If you wait it out instead, no report will be sent — fatal-only by design.",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Hang App", style: .destructive) { [weak self] _ in
@@ -376,11 +376,11 @@ final class ViewController: UIViewController {
     private func simulateHang() {
         ActivityLog.record(.hang, detail: "Main thread frozen")
         refreshActivity()
-        // Eight-second freeze - matches the Android demo copy. With the fatal-only
-        // hang detector this won't produce a hang report (main recovers), but the
-        // local activity entry above shows the user that the event was logged.
-        let until = Date(timeIntervalSinceNow: 8)
-        while Date() < until { }
+        // Block main indefinitely so the hang tracker persists a report and the
+        // user can force-quit to produce a real fatal-hang upload on next launch.
+        // Single sleep until distantFuture - simpler than a spin loop and keeps
+        // the CPU quiet while frozen.
+        Thread.sleep(until: .distantFuture)
     }
 
     private func sendFeedback(title: String, description: String) {

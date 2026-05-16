@@ -214,7 +214,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 
     BSPEventCardView *hang = [[BSPEventCardView alloc] initWithIconNamed:@"splat_hang"
                                                                    title:@"Hang"
-                                                                subtitle:@"Freeze main thread for 8 seconds"
+                                                                subtitle:@"Freeze main thread · force-quit to upload"
                                                                 shortcut:@"⌘4"];
     hang.target = self;
     hang.action = @selector(triggerHang:);
@@ -453,8 +453,8 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
 
 - (void)triggerHang:(id)sender {
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"Freeze main thread for 8 seconds?";
-    alert.informativeText = @"The UI will become unresponsive. The app will recover automatically after 8 seconds.";
+    alert.messageText = @"Freeze the main thread?";
+    alert.informativeText = @"The app will hang indefinitely. To produce an uploaded hang report you must force-quit while it's frozen (⌘⌥⎋ → Force Quit, or `killall -9 BugSplatTest-macOS-UIKit-ObjC` from a terminal). On the next launch the report will upload. If you don't force-quit, no report will be sent — fatal-only by design.";
     [alert addButtonWithTitle:@"Freeze"];
     [alert addButtonWithTitle:@"Cancel"];
     if ([alert runModal] != NSAlertFirstButtonReturn) return;
@@ -462,10 +462,10 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
     [BSPActivityLog record:BSPActivityTypeHang detail:@"Main thread frozen"];
     [self renderRecentActivity];
 
-    // Eight-second freeze. Recovers; with the fatal-only hang detector no
-    // report is uploaded but the local entry above documents the event.
-    NSDate *until = [NSDate dateWithTimeIntervalSinceNow:8.0];
-    while ([[NSDate date] compare:until] == NSOrderedAscending) { }
+    // Block main indefinitely so the hang tracker persists a report and the
+    // user can force-quit to produce a real fatal-hang upload on next launch.
+    // Single sleep until distantFuture keeps the CPU quiet while frozen.
+    [NSThread sleepUntilDate:[NSDate distantFuture]];
 }
 
 - (void)openDashboard:(id)sender {

@@ -185,7 +185,7 @@
 
     BSPEventCardView *hangCard = [[BSPEventCardView alloc] initWithIconName:@"splat_hang"
                                                                       title:@"Hang"
-                                                                   subtitle:@"Freeze main thread for 8 seconds"];
+                                                                   subtitle:@"Freeze main thread · force-quit to upload"];
     [hangCard addTarget:self action:@selector(showHangConfirm) forControlEvents:UIControlEventTouchUpInside];
     [cards addArrangedSubview:hangCard];
 
@@ -431,7 +431,7 @@
 - (void)showHangConfirm {
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:@"Simulate Fatal Hang?"
-                         message:@"The main thread will be blocked for 8 seconds. The UI will freeze; the app will not appear to respond until the freeze ends."
+                         message:@"The main thread will be blocked indefinitely. To produce an uploaded hang report you must force-quit the app while it's frozen (swipe up from the app switcher on device, or on the simulator run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-ObjC`). On the next launch the report will upload. If you wait it out instead, no report will be sent — fatal-only by design."
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
                                               style:UIAlertActionStyleCancel
@@ -447,11 +447,10 @@
 - (void)simulateHang {
     [BSPActivityLog record:BSPActivityTypeHang detail:@"Main thread frozen"];
     [self refreshRecentActivity];
-    // Eight-second freeze — matches the Android/SwiftUI demo copy. With the
-    // fatal-only hang detector this won't produce a hang report (main recovers),
-    // but the local activity entry above shows the user the event was logged.
-    NSDate *until = [NSDate dateWithTimeIntervalSinceNow:8.0];
-    while ([[NSDate date] compare:until] == NSOrderedAscending) { }
+    // Block main indefinitely so the hang tracker persists a report and the
+    // user can force-quit to produce a real fatal-hang upload on next launch.
+    // Single sleep until distantFuture keeps the CPU quiet while frozen.
+    [NSThread sleepUntilDate:[NSDate distantFuture]];
 }
 
 - (void)showFeedbackDialog {
