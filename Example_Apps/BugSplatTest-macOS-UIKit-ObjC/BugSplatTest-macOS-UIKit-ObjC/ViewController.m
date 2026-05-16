@@ -69,17 +69,21 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
     stack.alignment = NSLayoutAttributeLeading;
     stack.spacing = 0;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
+    // Make the stack hug its content vertically so arranged subviews stay at
+    // their intrinsic heights instead of stretching to fill the window.
+    [stack setHuggingPriority:NSLayoutPriorityRequired forOrientation:NSLayoutConstraintOrientationVertical];
     [self.view addSubview:stack];
     self.contentStack = stack;
 
     [NSLayoutConstraint activateConstraints:@[
         [stack.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:32],
         [stack.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-32],
-        [stack.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:28],
-        [stack.bottomAnchor constraintLessThanOrEqualToAnchor:self.view.bottomAnchor constant:-28],
+        [stack.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:14],
+        // Intentionally no bottom constraint - the stack takes its intrinsic
+        // height and sits at the top; the window's screenBg fills below.
     ]];
 
-    [self addArranged:[self buildTopBar] spacingAfter:22];
+    [self addArranged:[self buildTopBar] spacingAfter:18];
     [self addArranged:[self buildTitleRow] spacingAfter:6];
     [self addArranged:[self buildSubtitle] spacingAfter:22];
     [self addArranged:[self buildSectionHeader:@"TRIGGER AN EVENT"] spacingAfter:12];
@@ -132,7 +136,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 8;
         [version.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [version.leadingAnchor constraintGreaterThanOrEqualToAnchor:wordmark.trailingAnchor constant:10],
 
-        [bar.heightAnchor constraintGreaterThanOrEqualToConstant:38],
+        [bar.heightAnchor constraintEqualToConstant:38],
     ]];
     return bar;
 }
