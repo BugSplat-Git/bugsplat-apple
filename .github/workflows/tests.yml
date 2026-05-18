@@ -95,8 +95,12 @@ jobs:
     - name: Run iOS Tests
       run: |
         set -o pipefail
+        # -parallel-testing-enabled NO keeps the timing-sensitive
+        # BugSplatHangTrackerTests off a shared simulator host that would
+        # otherwise starve the utility-QoS watchdog thread under load.
         xcodebuild test \
           -workspace BugSplat.xcworkspace \
           -scheme BugSplatIOSTests \
           -destination 'platform=iOS Simulator,OS=latest,name=iPhone 16' \
+          -parallel-testing-enabled NO \
           CODE_SIGNING_ALLOWED=NO
