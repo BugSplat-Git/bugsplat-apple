@@ -62,7 +62,10 @@
     // If the main thread were allowed to recover, the persisted report would be
     // discarded because non-fatal hangs are intentionally not reported.
     NSLog(@"BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.");
-    while (1) { }
+    // Sleep inside the loop instead of busy-spinning so the device
+    // doesn't melt while the demo is running - the main thread is
+    // still blocked, which is what the hang detector cares about.
+    while (1) { [NSThread sleepForTimeInterval:1.0]; }
 }
 
 
