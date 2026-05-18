@@ -6,14 +6,8 @@
 
 #import "BugSplatHangTracker.h"
 
-#import <CoreFoundation/CoreFoundation.h>
+#import <math.h>
 #import <stdatomic.h>
-#import <pthread.h>
-#import <mach/mach.h>
-
-#if TARGET_OS_IOS || TARGET_OS_TV
-#import <UIKit/UIKit.h>
-#endif
 
 static const NSTimeInterval kMinThresholdSeconds = 0.1;
 static const NSTimeInterval kMinPollIntervalSeconds = 0.1;
@@ -48,11 +42,17 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
 
 @implementation BugSplatHangTracker {
     // Number of consecutive watchdog polls during which the main thread has
-    // not serviced a dispatched ping. Each poll dispatches a ping block to the
-    // main queue; the ping block resets this counter to 0. If the counter
+    // not serviced a dispatched ping. Each poll increments this; the ping
+    // block, when serviced on the main queue, resets it to 0. If the counter
     // reaches the threshold-derived limit, the main thread has been blocked
     // for at least `thresholdSeconds`.
     _Atomic(int32_t) _unansweredPings;
+
+    // YES while a ping block is queued on the main queue but has not yet run.
+    // Gates dispatch so that during a long hang we don't accumulate an
+    // unbounded backlog of pending pings - a single outstanding ping is
+    // sufficient to detect responsiveness either way.
+    _Atomic(bool) _pingOutstanding;
 
     // Set to YES once a hang has been reported for the current window;
     // cleared by the next pong (which also triggers a recovery callback).
@@ -104,6 +104,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
             };
         }
         atomic_init(&_unansweredPings, 0);
+        atomic_init(&_pingOutstanding, false);
         atomic_init(&_hangReportedForCurrentWindow, false);
     }
     return self;
@@ -122,6 +123,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
     }
     self.running = YES;
     atomic_store(&_unansweredPings, 0);
+    atomic_store(&_pingOutstanding, false);
     atomic_store(&_hangReportedForCurrentWindow, false);
 
     NSThread *thread = [[NSThread alloc] initWithTarget:self
@@ -157,10 +159,14 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
 
     while (self.isRunning) {
         @autoreleasepool {
-            // Send a ping to the main queue. If the main thread is healthy it
-            // will service this block before the next poll; if it is hung the
-            // block will sit on the main queue and our counter will tick up.
-            self.pingDispatcher(ping);
+            // Send a ping to the main queue if there isn't one already in flight.
+            // A single outstanding ping is sufficient to observe responsiveness;
+            // dispatching on every poll during a long hang would accumulate an
+            // unbounded backlog that all flushes the moment main resumes.
+            bool wasOutstanding = atomic_exchange(&_pingOutstanding, true);
+            if (!wasOutstanding) {
+                self.pingDispatcher(ping);
+            }
 
             CFAbsoluteTime sleepStart = self.clockBlock();
             [NSThread sleepForTimeInterval:pollInterval];
@@ -228,6 +234,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
 /// just-ended window, dispatches a recovery callback so the integrator can
 /// discard any persisted hang report.
 - (void)handleMainQueuePong {
+    atomic_store(&_pingOutstanding, false);
     atomic_store(&_unansweredPings, 0);
     bool wasReported = atomic_exchange(&_hangReportedForCurrentWindow, false);
     if (!wasReported) {

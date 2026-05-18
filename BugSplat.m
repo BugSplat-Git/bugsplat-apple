@@ -491,8 +491,12 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         return;
     }
 
+    // Use millisecond precision so a hang -> recover -> hang cycle inside the
+    // same second can't generate two reports with the same filename. Keeps
+    // monotonic sort order without introducing a separator that the existing
+    // path parsing would have to learn about.
     NSString *hangFilename = [NSString stringWithFormat:@"%.0f%@",
-                              [NSDate timeIntervalSinceReferenceDate],
+                              [NSDate timeIntervalSinceReferenceDate] * 1000.0,
                               kBugSplatHangFilenameSuffix];
 
     NSData *textData = [reportText dataUsingEncoding:NSUTF8StringEncoding];
