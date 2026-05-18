@@ -30,6 +30,39 @@
         [feedbackButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [feedbackButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:40]
     ]];
+
+    // Add a "Simulate Hang" button for demoing fatal-hang detection.
+    NSButton *hangButton = [[NSButton alloc] initWithFrame:NSZeroRect];
+    hangButton.title = @"Simulate Hang";
+    hangButton.bezelStyle = NSBezelStyleRounded;
+    hangButton.target = self;
+    hangButton.action = @selector(simulateHang:);
+    hangButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:hangButton];
+    [NSLayoutConstraint activateConstraints:@[
+        [hangButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [hangButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:80]
+    ]];
+}
+
+- (IBAction)simulateHang:(id)sender {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Simulate Fatal Hang?";
+    alert.informativeText = @"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app (Cmd+Option+Esc, then Force Quit) or kill the process from a terminal (`killall -9 BugSplatTest-macOS-UIKit-ObjC`). On the next launch, a fatal-hang report will be uploaded. Continue?";
+    alert.alertStyle = NSAlertStyleWarning;
+    [alert addButtonWithTitle:@"Hang App"];
+    [alert addButtonWithTitle:@"Cancel"];
+
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    // Blocks the main thread forever so the only way to exit is to force-quit the
+    // app. That produces a fatal-hang report that is uploaded on the next launch.
+    // If the main thread were allowed to recover, the persisted report would be
+    // discarded because non-fatal hangs are intentionally not reported.
+    NSLog(@"BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.");
+    while (1) { }
 }
 
 

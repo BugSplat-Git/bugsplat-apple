@@ -35,6 +35,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bugSplat.set("<!-- 'value is > or < before' --> \(Date.now)", for: "CommentExample")
         bugSplat.set("This value will get XML escaping because of 'this' and & and < and >", for: "EscapingExample")
 
+        // Opt in to fatal hang detection.
+        bugSplat.enableHangDetection = true
+
         // Don't forget to call start after you've finished configuring BugSplat
         bugSplat.start()
         

@@ -49,7 +49,12 @@ struct BugSplatTestSwiftUIApp: App {
         bugSplat.set("Launch Date <![CDATA[\(Date.now)]]> Value", for: "CDATAExample")
         bugSplat.set("<!-- 'value is > or < before' --> \(Date.now)", for: "CommentExample")
         bugSplat.set("This value will get XML escaping because of 'this' and & and < and >", for: "EscapingExample")
-    
+
+        // Opt in to fatal hang detection. When the main thread is blocked past the built-in
+        // threshold and the app is subsequently terminated without recovering, a hang report
+        // is uploaded on the next launch using the same pipeline as crash reports.
+        bugSplat.enableHangDetection = true
+
         // Don't forget to call start after you've finished configuring BugSplat
         bugSplat.start()
     }

@@ -33,11 +33,39 @@
         [feedbackButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [feedbackButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:60]
     ]];
+
+    // Add a "Simulate Hang" button for demoing fatal-hang detection.
+    UIButton *hangButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [hangButton setTitle:@"Simulate Hang" forState:UIControlStateNormal];
+    [hangButton addTarget:self action:@selector(simulateHang) forControlEvents:UIControlEventTouchUpInside];
+    hangButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:hangButton];
+    [NSLayoutConstraint activateConstraints:@[
+        [hangButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [hangButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:100]
+    ]];
 }
 
 - (IBAction)crashApp:(id)sender {
     NSNumber *number = [self.array objectAtIndex:2];
     NSLog(@"number = %ld", [number longValue]);
+}
+
+- (void)simulateHang {
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:@"Simulate Fatal Hang?"
+                         message:@"The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-ObjC` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?"
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Hang App" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        // Blocks the main thread forever so the only way to exit is to force-quit the
+        // app. That produces a fatal-hang report that is uploaded on the next launch.
+        // If the main thread were allowed to recover, the persisted report would be
+        // discarded because non-fatal hangs are intentionally not reported.
+        NSLog(@"BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.");
+        while (1) { }
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showFeedbackDialog {
