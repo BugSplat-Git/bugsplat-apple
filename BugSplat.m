@@ -13,11 +13,16 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <pthread.h>
+#import <stdatomic.h>
+#import <mach/mach.h>
+
 #import "BugSplatUtilities.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatZipHelper.h"
 #import "BugSplatTestSupport.h"
 #import "BugSplat+Testing.h"
+#import "BugSplatHangTracker.h"
 
 #if TARGET_OS_OSX
 #import "BugSplatCrashReportWindow.h"
@@ -35,6 +40,15 @@ static NSString *const kBugSplatCrashFileExtension = @"crash";
 static NSString *const kBugSplatMetaFileExtension = @"meta";
 static NSString *const kBugSplatAttachmentFileExtension = @"data";
 
+// Suffix appended to hang-report filenames so they can be distinguished from crash filenames on disk.
+static NSString *const kBugSplatHangFilenameSuffix = @"-hang";
+
+// Attribute keys attached to hang reports (and to crash reports sharing the same launch).
+static NSString *const kBugSplatHangAttrDurationMs = @"bugsplat-hang-duration-ms";
+static NSString *const kBugSplatHangAttrDetectedAt = @"bugsplat-hang-detected-at";
+static NSString *const kBugSplatHangAttrAppState = @"bugsplat-hang-app-state";
+static NSString *const kBugSplatHangAttrLaunchId = @"bugsplat-hang-launch-id";
+
 // Keys for crash metadata
 static NSString *const kBugSplatMetaKeyUserName = @"userName";
 static NSString *const kBugSplatMetaKeyUserEmail = @"userEmail";
@@ -50,7 +64,7 @@ static NSString *const kBugSplatMetaKeyApplicationVersion = @"applicationVersion
 static NSString *const kBugSplatMetaKeyAppKey = @"appKey";
 static NSString *const kBugSplatMetaKeyNotes = @"notes";
 
-@interface BugSplat ()
+@interface BugSplat () <BugSplatHangTrackerDelegate>
 
 @property (atomic, assign) BOOL isStartInvoked;
 @property (atomic, assign) BOOL sendingInProgress;
@@ -62,6 +76,11 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 @property (nonatomic, strong, nullable) BugSplatUploadService *uploadService;
 @property (nonatomic, copy, nullable) NSString *currentCrashFilename;
 @property (nonatomic, assign) BOOL isTestInstance;
+
+@property (nonatomic, strong, nullable) BugSplatHangTracker *hangTracker;
+@property (atomic, copy, nullable) NSString *currentHangFilename;
+@property (nonatomic, copy, nullable) NSString *launchId;
+@property (nonatomic, strong, nullable) dispatch_queue_t hangQueue;
 
 #if TARGET_OS_OSX
 @property (nonatomic, strong, nullable) BugSplatCrashReportWindow *crashReportWindow;
@@ -75,6 +94,14 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     NSString *_applicationName;
     NSString *_applicationVersion;
     NSNumber *_debuggerAttachedOverride;
+
+    // Mach port of the main thread, captured on the main thread during -start (or test
+    // setup). Used to mark main as the crashed thread when generating a live hang report
+    // from the hang queue. MACH_PORT_NULL until captured.
+    //
+    // pthread_mach_thread_np does not add a port reference, so no cleanup is needed and
+    // the port remains valid for the lifetime of the main thread (i.e. the process).
+    mach_port_t _mainThreadMachPort;
 }
 
 + (instancetype)shared
@@ -114,6 +141,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.sendingInProgress = NO;
         self.currentCrashFilename = nil;
         self.isTestInstance = NO;
+        self.hangDetectionThreshold = 2.0;
 
         // Configure PLCrashReporter
         // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
@@ -161,7 +189,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.sendingInProgress = NO;
         self.currentCrashFilename = nil;
         self.isTestInstance = YES;
-        
+        self.hangDetectionThreshold = 2.0;
+
         _crashReporterInternal = crashReporter;
         _crashStorageInternal = crashStorage;
         _userDefaultsInternal = userDefaults;
@@ -247,7 +276,284 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         return;
     }
 
+    [self startHangDetectionIfEnabled];
+
     self.isStartInvoked = YES;
+}
+
+#pragma mark - Hang Detection
+
+/// Returns YES when the current executable is an app extension (.appex bundle).
+- (BOOL)isRunningInAppExtension
+{
+    NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
+    return [bundlePath hasSuffix:@".appex"];
+}
+
+- (void)startHangDetectionIfEnabled
+{
+    if (!self.enableHangDetection) {
+        return;
+    }
+    if (self.hangTracker) {
+        return;
+    }
+    if (self.isTestInstance) {
+        // Tests exercise the tracker directly; do not auto-start a real one.
+        return;
+    }
+    if ([self isRunningInAppExtension]) {
+        NSLog(@"BugSplat: Hang detection not supported in app extensions; skipping");
+        return;
+    }
+
+    // Capture the main thread's mach port while we are definitely on main, so the live
+    // hang report can mark main as the crashed thread (the report is generated later
+    // from the hang queue, where pthread_self would yield the wrong thread).
+    NSAssert([NSThread isMainThread], @"BugSplat -start must be invoked on the main thread for hang detection");
+    if (_mainThreadMachPort == MACH_PORT_NULL) {
+        _mainThreadMachPort = pthread_mach_thread_np(pthread_self());
+    }
+
+    // Generate a per-launch id and attach it as an attribute so crashes from this launch
+    // can be correlated with any fatal hang that was persisted before termination.
+    if (!self.launchId) {
+        self.launchId = [[NSUUID UUID] UUIDString];
+        [self setValue:self.launchId forAttribute:kBugSplatHangAttrLaunchId];
+    }
+
+    // Serialize hang delegate callbacks so detect / recover can't race on file I/O.
+    if (!self.hangQueue) {
+        self.hangQueue = dispatch_queue_create("com.bugsplat.hang-handler", DISPATCH_QUEUE_SERIAL);
+    }
+
+#if TARGET_OS_IOS || TARGET_OS_TV
+    // Install the notification observers that maintain the cached application-active
+    // state the watchdog polls. Idempotent.
+    [BugSplat installApplicationActiveObservers];
+#endif
+
+    __weak __typeof(self) weakSelf = self;
+    NSTimeInterval threshold = self.hangDetectionThreshold;
+    self.hangTracker = [[BugSplatHangTracker alloc] initWithThresholdSeconds:threshold
+                                                                    delegate:self
+                                                      isDebuggerAttachedBlock:^BOOL {
+        __strong __typeof(weakSelf) strongSelf = weakSelf;
+        return strongSelf ? [strongSelf isDebuggerAttached] : NO;
+    }
+                                                            isAppActiveBlock:^BOOL {
+        return [BugSplat isApplicationActive];
+    }];
+
+    [self.hangTracker start];
+    NSLog(@"BugSplat: Hang detection enabled (threshold %.2fs)", self.hangTracker.thresholdSeconds);
+}
+
+#if TARGET_OS_IOS || TARGET_OS_TV
+/// Cached foreground-active state, updated via NSNotificationCenter on the main thread
+/// and read without locking (or dispatching) from the hang-tracker watchdog thread.
+///
+/// Using dispatch_sync to the main queue here would deadlock: when the main thread is
+/// actually hung (exactly the case we want to report), the watchdog can never acquire
+/// main to read applicationState, so no hang report would ever be persisted.
+static _Atomic(bool) sBugSplatApplicationActive = true;
+
++ (void)installApplicationActiveObservers
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSOperationQueue *mainQueue = [NSOperationQueue mainQueue];
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+
+        // Seed the cached state from the current application state.
+        atomic_store(&sBugSplatApplicationActive,
+                     [UIApplication sharedApplication].applicationState == UIApplicationStateActive);
+
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, true);
+        }];
+        [center addObserverForName:UIApplicationWillResignActiveNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+        [center addObserverForName:UIApplicationWillEnterForegroundNotification
+                            object:nil
+                             queue:mainQueue
+                        usingBlock:^(NSNotification *note) {
+            // Foreground but not yet active - treat as inactive for hang purposes,
+            // DidBecomeActive will flip the flag shortly.
+            atomic_store(&sBugSplatApplicationActive, false);
+        }];
+    });
+}
+#endif
+
+/// Lock-free check for whether the app is currently active. Safe to call from any thread,
+/// including while the main thread is hung.
++ (BOOL)isApplicationActive
+{
+#if TARGET_OS_IOS || TARGET_OS_TV
+    return atomic_load(&sBugSplatApplicationActive);
+#else
+    return YES;
+#endif
+}
+
+#pragma mark - BugSplatHangTrackerDelegate
+
+- (void)hangTracker:(BugSplatHangTracker *)tracker
+didDetectHangWithDuration:(NSTimeInterval)duration
+           appState:(NSString *)appState
+{
+    // Callback runs on the tracker's watchdog thread; marshal to our serial queue.
+    dispatch_async(self.hangQueue, ^{
+        [self persistHangReportWithDuration:duration appState:appState];
+    });
+}
+
+- (void)hangTrackerDidRecoverFromHang:(BugSplatHangTracker *)tracker
+{
+    dispatch_async(self.hangQueue, ^{
+        NSString *filename = self.currentHangFilename;
+        self.currentHangFilename = nil;
+        if (filename) {
+            [self cleanupCrashReportWithFilename:filename];
+            NSLog(@"BugSplat: Main thread recovered from hang; removed persisted report %@", filename);
+        }
+    });
+}
+
+/**
+ * Capture a live report via PLCrashReporter with a synthetic "App Hang (Fatal)" exception,
+ * text-format it, and persist it (plus metadata) to the crashes directory so the normal
+ * next-launch scanner uploads it through the existing pipeline. Called on the hang queue.
+ */
+- (void)persistHangReportWithDuration:(NSTimeInterval)duration appState:(NSString *)appState
+{
+    NSString *reason = [NSString stringWithFormat:@"Main thread unresponsive for %.0f ms", duration * 1000.0];
+    NSException *hangException = [NSException exceptionWithName:@"App Hang (Fatal)"
+                                                         reason:reason
+                                                       userInfo:nil];
+
+    NSError *error = nil;
+    NSData *liveReportData = nil;
+    PLCrashReporter *plCrashReporter = (PLCrashReporter *)self.crashReporterInternal;
+    mach_port_t mainThreadPort = _mainThreadMachPort;
+    @try {
+        if (mainThreadPort != MACH_PORT_NULL) {
+            // Mark main as the crashed thread so the dashboard's crashed-thread view
+            // points at what's actually hung, rather than the hang-queue worker.
+            liveReportData = [plCrashReporter generateLiveReportWithThread:mainThreadPort
+                                                                 exception:hangException
+                                                                     error:&error];
+        } else {
+            liveReportData = [plCrashReporter generateLiveReportWithException:hangException error:&error];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception generating live hang report: %@ - %@", exception.name, exception.reason);
+        return;
+    }
+
+    if (!liveReportData || liveReportData.length == 0) {
+        NSLog(@"BugSplat: Failed to generate live hang report: %@", error);
+        return;
+    }
+
+    NSString *reportText = nil;
+    @try {
+        PLCrashReport *parsed = [[PLCrashReport alloc] initWithData:liveReportData error:&error];
+        if (parsed) {
+            reportText = [PLCrashReportTextFormatter stringValueForCrashReport:parsed
+                                                                withTextFormat:PLCrashReportTextFormatiOS];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception formatting live hang report: %@ - %@", exception.name, exception.reason);
+    }
+
+    if (reportText.length == 0) {
+        reportText = [NSString stringWithFormat:@"App Hang (Fatal)\n%@\n[Hang report text unavailable]\n", reason];
+    }
+
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        NSLog(@"BugSplat: Failed to get crashes directory for hang report");
+        return;
+    }
+
+    // Use millisecond precision so a hang -> recover -> hang cycle inside the
+    // same second can't generate two reports with the same filename. Keeps
+    // monotonic sort order without introducing a separator that the existing
+    // path parsing would have to learn about.
+    NSString *hangFilename = [NSString stringWithFormat:@"%.0f%@",
+                              [NSDate timeIntervalSinceReferenceDate] * 1000.0,
+                              kBugSplatHangFilenameSuffix];
+
+    NSData *textData = [reportText dataUsingEncoding:NSUTF8StringEncoding];
+    NSString *crashFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
+                               stringByAppendingPathExtension:kBugSplatCrashFileExtension];
+    if (![textData writeToFile:crashFilePath atomically:YES]) {
+        NSLog(@"BugSplat: Failed to write hang report to disk");
+        return;
+    }
+
+    // Build metadata. Unlike crashes there is no PLCrashReporter customData to extract from,
+    // so we snapshot current values directly - this is safe because the main thread is hung
+    // and nothing else is mutating these properties while this runs.
+    NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
+    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
+    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    NSDate *now = [NSDate date];
+    NSString *nowISO = [isoFormatter stringFromDate:now];
+
+    metadata[kBugSplatMetaKeyTimestamp] = nowISO;
+    metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
+    metadata[kBugSplatMetaKeyApplicationName] = self.resolvedApplicationName;
+    metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
+    if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
+    if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
+    if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
+    if (self.notes) metadata[kBugSplatMetaKeyNotes] = self.notes;
+
+    NSMutableDictionary<NSString *, NSString *> *attributes = self.attributes
+        ? [self.attributes mutableCopy]
+        : [NSMutableDictionary dictionary];
+    attributes[kBugSplatHangAttrDurationMs] = [NSString stringWithFormat:@"%.0f", duration * 1000.0];
+    attributes[kBugSplatHangAttrDetectedAt] = nowISO;
+    attributes[kBugSplatHangAttrAppState] = appState ?: @"unknown";
+    if (self.launchId) {
+        attributes[kBugSplatHangAttrLaunchId] = self.launchId;
+    }
+    metadata[kBugSplatMetaKeyAttributes] = attributes;
+
+    // Mark auto-submittable so the next-launch scanner uploads silently without showing a dialog.
+    metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+    if (![metadata writeToFile:metaFilePath atomically:YES]) {
+        // Without the .meta file the next-launch scanner sees an orphan .crash that
+        // lacks userSubmitted=YES, database, and attributes - it would either fail to
+        // upload or surface a dialog instead of the intended silent submit. Drop the
+        // .crash too so we don't leak a half-formed report.
+        NSLog(@"BugSplat: Failed to write hang metadata; removing orphan crash file");
+        [[NSFileManager defaultManager] removeItemAtPath:crashFilePath error:nil];
+        return;
+    }
+
+    self.currentHangFilename = hangFilename;
+    NSLog(@"BugSplat: Persisted hang report %@ (duration %.0fms, state %@)",
+          hangFilename, duration * 1000.0, appState);
 }
 
 #pragma mark - Crash Report Handling
@@ -1556,6 +1862,26 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 - (void)setDebuggerAttachedOverride:(NSNumber *)value
 {
     _debuggerAttachedOverride = value;
+}
+
+- (void)setupHangInfrastructureForTesting
+{
+    if (!self.hangQueue) {
+        self.hangQueue = dispatch_queue_create("com.bugsplat.hang-handler.test", DISPATCH_QUEUE_SERIAL);
+    }
+    if (!self.launchId) {
+        self.launchId = [[NSUUID UUID] UUIDString];
+    }
+    // XCTest invokes setUp on the main thread, so capturing here yields the same port
+    // as the production path. Required by persistHangReportWithDuration:.
+    if (_mainThreadMachPort == MACH_PORT_NULL) {
+        _mainThreadMachPort = pthread_mach_thread_np(pthread_self());
+    }
+}
+
+- (dispatch_queue_t)hangQueueForTesting
+{
+    return self.hangQueue;
 }
 
 @end

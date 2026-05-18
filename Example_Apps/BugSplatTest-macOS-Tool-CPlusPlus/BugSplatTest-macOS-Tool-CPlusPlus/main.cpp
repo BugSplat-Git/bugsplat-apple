@@ -6,6 +6,8 @@
 //
 
 #include <iostream>
+#include <thread>
+#include <chrono>
 #include "BugSplatInit.hpp"
 
 int setAttributeAndValue()
@@ -58,9 +60,33 @@ int checkInput(std::string input)
     {
         return sendFeedback();
     }
+    else if (input == "hang")
+    {
+        std::cout << "\nAbout to simulate a fatal main-thread hang.\n"
+                  << "The process will stop responding and the only way to exit is to kill it\n"
+                  << "(Ctrl+C, or `kill -9 <pid>` from another shell). On the next run, a fatal-hang\n"
+                  << "report will be uploaded.\n"
+                  << "Type 'yes' to continue, anything else to cancel: " << std::flush;
+        std::string confirm;
+        std::getline(std::cin, confirm);
+        if (confirm != "yes") {
+            std::cout << "Cancelled." << std::endl;
+            return 0;
+        }
+        // Blocks the main thread forever. If the main thread were allowed to recover,
+        // the persisted report would be discarded because non-fatal hangs are
+        // intentionally not reported.
+        //
+        // sleep_for keeps the loop observably side-effectful so the C++ forward-progress
+        // rule cannot let an optimizer elide it; a bare `while (true) {}` is UB in C++.
+        std::cout << "Simulating main-thread hang. Kill the process to see a fatal-hang report uploaded on the next run." << std::endl;
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
     else
     {
-        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', or 'q' to quit" << std::endl;
+        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', 'hang', or 'q' to quit" << std::endl;
     }
 
     return 0;

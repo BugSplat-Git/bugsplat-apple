@@ -16,6 +16,7 @@ struct ContentView: View {
     @State var feedbackTitle = ""
     @State var feedbackDescription = ""
     @State var feedbackStatus: String?
+    @State var showHangConfirm = false
 
     let prop: Int? = nil
 
@@ -56,6 +57,14 @@ struct ContentView: View {
             .background(Color.accentColor)
             .cornerRadius(10)
 
+            Button("Simulate Hang") {
+                showHangConfirm = true
+            }
+            .padding()
+            .foregroundColor(.white)
+            .background(Color.orange)
+            .cornerRadius(10)
+
             Button("Send Feedback") {
                 showFeedbackAlert = true
             }
@@ -85,6 +94,24 @@ struct ContentView: View {
             Button("Send") { sendFeedback() }
             Button("Cancel", role: .cancel) { }
         }
+        .alert("Simulate Fatal Hang?", isPresented: $showHangConfirm) {
+            Button("Hang App", role: .destructive) { simulateHang() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-SwiftUI` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?")
+        }
+    }
+
+    func simulateHang() {
+        // Blocks the main thread forever so the only way to exit is to force-quit
+        // the app. That produces a fatal-hang report that is uploaded on the next
+        // launch. If the main thread were allowed to recover, the persisted report
+        // would be discarded because non-fatal hangs are intentionally not reported.
+        print("BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.")
+        // Sleep inside the loop instead of busy-spinning so the device
+        // doesn't melt while the demo is running - the main thread is
+        // still blocked, which is what the hang detector cares about.
+        while true { Thread.sleep(forTimeInterval: 1.0) }
     }
 
     func update(attribute: String, value: String?) {

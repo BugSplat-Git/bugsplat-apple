@@ -41,7 +41,10 @@
     [[BugSplat shared] setValue:[NSString stringWithFormat:@"Launch Date <![CDATA[%@]]> Value", [NSDate date]] forAttribute:@"CDATAExample"];
     [[BugSplat shared] setValue:[NSString stringWithFormat:@"<!-- 'value is > or < before' --> %@", [NSDate date]] forAttribute:@"CommentExample"];
     [[BugSplat shared] setValue:@"This value will get XML escaping because of 'this' and & and < and >" forAttribute:@"EscapingExample"];
-    
+
+    // Opt in to fatal hang detection.
+    [[BugSplat shared] setEnableHangDetection:YES];
+
     // Don't forget to call start after you've finished configuring BugSplat
     [[BugSplat shared] start];
 }

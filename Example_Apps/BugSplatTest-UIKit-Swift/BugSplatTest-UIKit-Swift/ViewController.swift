@@ -31,12 +31,43 @@ class ViewController: UIViewController {
             feedbackButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             feedbackButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 60)
         ])
+
+        // Add a "Simulate Hang" button for demoing fatal-hang detection.
+        let hangButton = UIButton(type: .system)
+        hangButton.setTitle("Simulate Hang", for: .normal)
+        hangButton.addTarget(self, action: #selector(simulateHang), for: .touchUpInside)
+        hangButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(hangButton)
+        NSLayoutConstraint.activate([
+            hangButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            hangButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 100)
+        ])
     }
 
     @IBAction func crashApp(_ sender: Any) {
         // intentially crash app here to demonstrate BugSplat's crash reporting capabilities
         let description = nonOptional!.debugDescription
         print(description)
+    }
+
+    @objc func simulateHang() {
+        let alert = UIAlertController(
+            title: "Simulate Fatal Hang?",
+            message: "The main thread will be blocked indefinitely. The UI will freeze and the only way to recover is to force-quit the app.\n\nOn a real device, swipe up from the app switcher. On the iOS Simulator, swipe-up only backgrounds the app - run `xcrun simctl terminate booted com.bugsplat.BugSplatTest-UIKit-Swift` from a terminal instead.\n\nOn the next launch, a fatal-hang report will be uploaded. Continue?",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Hang App", style: .destructive) { _ in
+            // Blocks the main thread forever so the only way to exit is to force-quit
+            // the app. That produces a fatal-hang report that is uploaded on the next
+            // launch. If the main thread were allowed to recover, the persisted report
+            // would be discarded because non-fatal hangs are intentionally not reported.
+            print("BugSplat sample: Simulating main-thread hang. Force-quit to see a fatal-hang report on the next launch.")
+            // Sleep inside the loop instead of busy-spinning so the device
+            // doesn't melt while the demo is running - the main thread is
+            // still blocked, which is what the hang detector cares about.
+            while true { Thread.sleep(forTimeInterval: 1.0) }
+        })
+        present(alert, animated: true)
     }
 
     @objc func showFeedbackDialog() {

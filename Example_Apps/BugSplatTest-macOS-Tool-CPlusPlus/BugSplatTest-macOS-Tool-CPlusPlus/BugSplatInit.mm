@@ -65,6 +65,9 @@ int bugSplatInit(const char * bugSplatDatabase)
         // Set the BugSplatDatabase name before calling start
         [[BugSplat shared] setBugSplatDatabase:databaseName];
 
+        // Opt in to fatal hang detection.
+        [[BugSplat shared] setEnableHangDetection:YES];
+
         // Don't forget to call start after you've finished configuring BugSplat
         [[BugSplat shared] start];
 
