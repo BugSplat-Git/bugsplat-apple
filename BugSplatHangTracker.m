@@ -42,12 +42,14 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
 @property (nonatomic, weak) id<BugSplatHangTrackerDelegate> delegate;
 @property (nonatomic, copy, nullable) BOOL(^isDebuggerAttachedBlock)(void);
 @property (nonatomic, copy, nullable) BOOL(^isAppActiveBlock)(void);
+@property (nonatomic, copy) CFAbsoluteTime(^clockBlock)(void);
+@property (nonatomic, copy) void(^recoveryDispatcher)(dispatch_block_t);
 @property (nonatomic, strong, nullable) NSThread *watchdogThread;
 @end
 
 
 @implementation BugSplatHangTracker {
-    // Wall-clock timestamp (CFAbsoluteTime) of the last AfterWaiting transition.
+    // Wall-clock timestamp (via clockBlock) of the last AfterWaiting transition.
     // 0.0 means the runloop is currently idle / waiting.
     _Atomic(double) _processingStartWallClock;
 
@@ -61,6 +63,12 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
     // boolean so that stop/start in quick succession cannot revive an old thread.
     _Atomic(uint64_t) _watchdogGeneration;
 
+    // Per-tracker state for the suspension-overshoot heuristic. Stored on self
+    // (rather than as locals in watchdogThreadMain) so tests can drive single
+    // polls via -_pollAtTime: without spawning a real thread.
+    _Atomic(double) _previousPollEnd;
+    _Atomic(bool) _hasPolledOnce;
+
     CFRunLoopObserverRef _observer;
 }
 
@@ -68,14 +76,42 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
                          isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock {
+    return [self initWithThresholdSeconds:thresholdSeconds
+                                 delegate:delegate
+                   isDebuggerAttachedBlock:isDebuggerAttachedBlock
+                          isAppActiveBlock:isAppActiveBlock
+                                clockBlock:nil
+                        recoveryDispatcher:nil];
+}
+
+- (instancetype)initWithThresholdSeconds:(NSTimeInterval)thresholdSeconds
+                                 delegate:(id<BugSplatHangTrackerDelegate>)delegate
+                   isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
+                         isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock
+                                clockBlock:(CFAbsoluteTime(^)(void))clockBlock
+                       recoveryDispatcher:(void(^)(dispatch_block_t))recoveryDispatcher {
     if (self = [super init]) {
         _thresholdSeconds = thresholdSeconds < kMinThresholdSeconds ? kMinThresholdSeconds : thresholdSeconds;
         _delegate = delegate;
         _isDebuggerAttachedBlock = [isDebuggerAttachedBlock copy];
         _isAppActiveBlock = [isAppActiveBlock copy];
+        if (clockBlock) {
+            _clockBlock = [clockBlock copy];
+        } else {
+            _clockBlock = ^CFAbsoluteTime{ return CFAbsoluteTimeGetCurrent(); };
+        }
+        if (recoveryDispatcher) {
+            _recoveryDispatcher = [recoveryDispatcher copy];
+        } else {
+            _recoveryDispatcher = ^(dispatch_block_t b) {
+                dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), b);
+            };
+        }
         atomic_init(&_processingStartWallClock, 0.0);
         atomic_init(&_hangReportedForCurrentWindow, false);
         atomic_init(&_watchdogGeneration, 0);
+        atomic_init(&_previousPollEnd, 0.0);
+        atomic_init(&_hasPolledOnce, false);
     }
     return self;
 }
@@ -95,8 +131,11 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
     // Seed the processing start timestamp so that if we are already executing main-thread
     // work outside a runloop (e.g., during app startup or in unit tests), a hang is still
     // detectable before the first runloop transition.
-    atomic_store(&_processingStartWallClock, CFAbsoluteTimeGetCurrent());
+    CFAbsoluteTime now = self.clockBlock();
+    atomic_store(&_processingStartWallClock, now);
     atomic_store(&_hangReportedForCurrentWindow, false);
+    atomic_store(&_previousPollEnd, now);
+    atomic_store(&_hasPolledOnce, false);
 
     [self installRunLoopObserver];
 
@@ -164,7 +203,7 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
 }
 
 - (void)handleRunLoopActivity:(CFRunLoopActivity)activity {
-    // Called on the main thread.
+    // Called on the main thread (or, in tests, from -_simulateRunLoopActivity:).
     //
     // The runloop signals we care about:
     //   Entry / AfterWaiting / Exit -> main is executing (or resumed / transitioned
@@ -181,7 +220,7 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
     if (activity == kCFRunLoopBeforeWaiting) {
         atomic_store(&_processingStartWallClock, 0.0);
     } else {
-        atomic_store(&_processingStartWallClock, CFAbsoluteTimeGetCurrent());
+        atomic_store(&_processingStartWallClock, self.clockBlock());
     }
 
     if (!wasReported) {
@@ -197,9 +236,10 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
     }
 
     // Dispatch off the main thread so the delegate can do disk I/O without
-    // blocking the runloop we just observed recovering.
+    // blocking the runloop we just observed recovering. Tests inject a
+    // synchronous dispatcher so recovery is observable inline.
     __weak __typeof(self) weakSelf = self;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+    self.recoveryDispatcher(^{
         __strong __typeof(weakSelf) strongSelf = weakSelf;
         if (strongSelf) {
             [delegate hangTrackerDidRecoverFromHang:strongSelf];
@@ -212,10 +252,6 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
 - (void)watchdogThreadMain:(NSNumber *)generationNumber {
     uint64_t myGeneration = generationNumber.unsignedLongLongValue;
     NSTimeInterval pollInterval = BugSplatHangPollInterval(self.thresholdSeconds);
-    NSTimeInterval threshold = self.thresholdSeconds;
-    NSTimeInterval suspensionOvershoot = BugSplatHangSuspensionOvershoot(threshold);
-    CFAbsoluteTime previousPollEnd = CFAbsoluteTimeGetCurrent();
-    BOOL isFirstPoll = YES;
 
     while (atomic_load(&_watchdogGeneration) == myGeneration) {
         @autoreleasepool {
@@ -225,62 +261,79 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
                 break;
             }
 
-            CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-            CFAbsoluteTime expectedWake = previousPollEnd + pollInterval;
-            NSTimeInterval overshoot = now - expectedWake;
-            previousPollEnd = now;
-
-            // Wall-clock guard: if we overslept far beyond the poll interval,
-            // the device likely slept or the process was suspended. Skip.
-            // Skipped on the first poll because previousPollEnd was seeded at
-            // thread creation time, not at first wake - a slow initial scheduling
-            // event (common on loaded CI runners) would otherwise falsely trip
-            // the guard and reset the processing-start timestamp, causing the
-            // tracker to miss a hang already in progress on the main thread.
-            if (!isFirstPoll && overshoot > suspensionOvershoot) {
-                // Reset so we don't treat the long gap itself as a hang.
-                atomic_store(&_processingStartWallClock, now);
-                continue;
-            }
-            isFirstPoll = NO;
-
-            // Debugger guard.
-            BOOL(^debuggerCheck)(void) = self.isDebuggerAttachedBlock;
-            if (debuggerCheck && debuggerCheck()) {
-                continue;
-            }
-
-            // App-active guard.
-            BOOL(^activeCheck)(void) = self.isAppActiveBlock;
-            if (activeCheck && !activeCheck()) {
-                continue;
-            }
-
-            // Throttle: only one hang report per processing window.
-            if (atomic_load(&_hangReportedForCurrentWindow)) {
-                continue;
-            }
-
-            double startWallClock = atomic_load(&_processingStartWallClock);
-            if (startWallClock == 0.0) {
-                // Main runloop is idle / waiting - healthy.
-                continue;
-            }
-
-            NSTimeInterval elapsed = now - startWallClock;
-            if (elapsed < threshold) {
-                continue;
-            }
-
-            // Claim the window so we only fire once per hang.
-            bool expected = false;
-            if (!atomic_compare_exchange_strong(&_hangReportedForCurrentWindow, &expected, true)) {
-                continue;
-            }
-
-            [self notifyDelegateOfHangWithDuration:elapsed];
+            [self _pollAtTime:self.clockBlock()];
         }
     }
+}
+
+/// Runs one iteration of the watchdog state machine using the supplied wall-clock
+/// time. The watchdog thread calls this with `clockBlock()`; tests call it with
+/// a deterministic value to make detection / throttling / suspension behavior
+/// observable without depending on real thread scheduling.
+- (void)_pollAtTime:(CFAbsoluteTime)now {
+    NSTimeInterval pollInterval = BugSplatHangPollInterval(self.thresholdSeconds);
+    NSTimeInterval threshold = self.thresholdSeconds;
+    NSTimeInterval suspensionOvershoot = BugSplatHangSuspensionOvershoot(threshold);
+
+    CFAbsoluteTime previousPollEnd = atomic_load(&_previousPollEnd);
+    CFAbsoluteTime expectedWake = previousPollEnd + pollInterval;
+    NSTimeInterval overshoot = now - expectedWake;
+    atomic_store(&_previousPollEnd, now);
+
+    // Wall-clock guard: if we overslept far beyond the poll interval, the device
+    // likely slept or the process was suspended. Skip. Skipped on the first poll
+    // because previousPollEnd was seeded when the watchdog started, not at first
+    // wake - a slow initial scheduling event (common on loaded CI runners) would
+    // otherwise falsely trip the guard and reset the processing-start timestamp,
+    // causing the tracker to miss a hang already in progress on the main thread.
+    bool hadPolledBefore = atomic_exchange(&_hasPolledOnce, true);
+    if (hadPolledBefore && overshoot > suspensionOvershoot) {
+        // Reset so we don't treat the long gap itself as a hang.
+        atomic_store(&_processingStartWallClock, now);
+        return;
+    }
+
+    // Debugger guard.
+    BOOL(^debuggerCheck)(void) = self.isDebuggerAttachedBlock;
+    if (debuggerCheck && debuggerCheck()) {
+        return;
+    }
+
+    // App-active guard.
+    BOOL(^activeCheck)(void) = self.isAppActiveBlock;
+    if (activeCheck && !activeCheck()) {
+        return;
+    }
+
+    // Throttle: only one hang report per processing window.
+    if (atomic_load(&_hangReportedForCurrentWindow)) {
+        return;
+    }
+
+    double startWallClock = atomic_load(&_processingStartWallClock);
+    if (startWallClock == 0.0) {
+        // Main runloop is idle / waiting - healthy.
+        return;
+    }
+
+    NSTimeInterval elapsed = now - startWallClock;
+    if (elapsed < threshold) {
+        return;
+    }
+
+    // Claim the window so we only fire once per hang.
+    bool expected = false;
+    if (!atomic_compare_exchange_strong(&_hangReportedForCurrentWindow, &expected, true)) {
+        return;
+    }
+
+    [self notifyDelegateOfHangWithDuration:elapsed];
+}
+
+/// Test helper: invoke the runloop-activity handler synchronously without
+/// installing a real CFRunLoopObserver.
+- (void)_simulateRunLoopActivity:(CFRunLoopActivity)activity {
+    [self handleRunLoopActivity:activity];
 }
 
 - (void)notifyDelegateOfHangWithDuration:(NSTimeInterval)duration {

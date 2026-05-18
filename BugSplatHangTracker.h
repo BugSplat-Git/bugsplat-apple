@@ -73,7 +73,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (instancetype)initWithThresholdSeconds:(NSTimeInterval)thresholdSeconds
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(nullable BOOL(^)(void))isDebuggerAttachedBlock
-                         isAppActiveBlock:(nullable BOOL(^)(void))isAppActiveBlock NS_DESIGNATED_INITIALIZER;
+                         isAppActiveBlock:(nullable BOOL(^)(void))isAppActiveBlock;
 
 - (instancetype)init NS_UNAVAILABLE;
 
