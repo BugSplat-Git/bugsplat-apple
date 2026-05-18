@@ -187,9 +187,10 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * This property is a no-op inside app extensions.
  *
- * When this property is YES, `-start` must be invoked on the main thread - the main
- * runloop observer is installed and the main thread's Mach port is captured there.
- * Debug builds assert; Release builds will silently capture the wrong thread.
+ * When this property is YES, `-start` must be invoked on the main thread - the
+ * main thread's Mach port is captured there so the hang report identifies the
+ * correct thread. Debug builds assert; Release builds will silently capture the
+ * wrong thread.
  *
  * Default: NO
  */
