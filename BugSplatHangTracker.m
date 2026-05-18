@@ -18,10 +18,22 @@
 static const NSTimeInterval kMinThresholdSeconds = 0.1;
 static const NSTimeInterval kMinPollIntervalSeconds = 0.1;
 
+/// Floor for the "device slept / process suspended" guard. Scheduler jitter on
+/// loaded CI machines can easily exceed the hang threshold (which may be a few
+/// hundred ms in tests), so the suspension guard uses a much larger value.
+static const NSTimeInterval kMinSuspensionOvershootSeconds = 2.0;
+
 /// Poll interval is threshold / 5, clamped to a reasonable floor.
 static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) {
     NSTimeInterval interval = threshold / 5.0;
     return interval < kMinPollIntervalSeconds ? kMinPollIntervalSeconds : interval;
+}
+
+/// Overshoot beyond this value is treated as the device having slept or the
+/// process having been suspended, rather than a legitimate hang.
+static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval threshold) {
+    NSTimeInterval guard = threshold * 5.0;
+    return guard < kMinSuspensionOvershootSeconds ? kMinSuspensionOvershootSeconds : guard;
 }
 
 
@@ -43,8 +55,11 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
     // Cleared in BeforeWaiting to re-arm detection for the next processing window.
     _Atomic(bool) _hangReportedForCurrentWindow;
 
-    // Signal from -stop to the watchdog thread.
-    _Atomic(bool) _shouldStop;
+    // Monotonically increasing generation. Every -start captures the current value
+    // for its own watchdog thread; -stop bumps it, which signals the running thread
+    // to exit on its next iteration. This is per-thread rather than a shared
+    // boolean so that stop/start in quick succession cannot revive an old thread.
+    _Atomic(uint64_t) _watchdogGeneration;
 
     CFRunLoopObserverRef _observer;
 }
@@ -60,7 +75,7 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
         _isAppActiveBlock = [isAppActiveBlock copy];
         atomic_init(&_processingStartWallClock, 0.0);
         atomic_init(&_hangReportedForCurrentWindow, false);
-        atomic_init(&_shouldStop, false);
+        atomic_init(&_watchdogGeneration, 0);
     }
     return self;
 }
@@ -85,8 +100,10 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
 
     [self installRunLoopObserver];
 
-    atomic_store(&_shouldStop, false);
-    NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(watchdogThreadMain) object:nil];
+    uint64_t generation = atomic_fetch_add(&_watchdogGeneration, 1) + 1;
+    NSThread *thread = [[NSThread alloc] initWithTarget:self
+                                               selector:@selector(watchdogThreadMain:)
+                                                 object:@(generation)];
     thread.name = @"com.bugsplat.hang-tracker";
     thread.qualityOfService = NSQualityOfServiceUtility;
     self.watchdogThread = thread;
@@ -99,7 +116,9 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
         return;
     }
     self.running = NO;
-    atomic_store(&_shouldStop, true);
+    // Bumping the generation signals any running watchdog thread (and any future
+    // thread that has not yet observed the bump) to exit on its next iteration.
+    atomic_fetch_add(&_watchdogGeneration, 1);
     [self removeRunLoopObserver];
     self.watchdogThread = nil;
 }
@@ -190,16 +209,18 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
 
 #pragma mark - Watchdog Thread
 
-- (void)watchdogThreadMain {
+- (void)watchdogThreadMain:(NSNumber *)generationNumber {
+    uint64_t myGeneration = generationNumber.unsignedLongLongValue;
     NSTimeInterval pollInterval = BugSplatHangPollInterval(self.thresholdSeconds);
     NSTimeInterval threshold = self.thresholdSeconds;
+    NSTimeInterval suspensionOvershoot = BugSplatHangSuspensionOvershoot(threshold);
     CFAbsoluteTime previousPollEnd = CFAbsoluteTimeGetCurrent();
 
-    while (!atomic_load(&_shouldStop)) {
+    while (atomic_load(&_watchdogGeneration) == myGeneration) {
         @autoreleasepool {
             [NSThread sleepForTimeInterval:pollInterval];
 
-            if (atomic_load(&_shouldStop)) {
+            if (atomic_load(&_watchdogGeneration) != myGeneration) {
                 break;
             }
 
@@ -208,9 +229,9 @@ static inline NSTimeInterval BugSplatHangPollInterval(NSTimeInterval threshold) 
             NSTimeInterval overshoot = now - expectedWake;
             previousPollEnd = now;
 
-            // Wall-clock guard: if we overslept by more than the threshold,
+            // Wall-clock guard: if we overslept far beyond the poll interval,
             // the device likely slept or the process was suspended. Skip.
-            if (overshoot > threshold) {
+            if (overshoot > suspensionOvershoot) {
                 // Reset so we don't treat the long gap itself as a hang.
                 atomic_store(&_processingStartWallClock, now);
                 continue;
