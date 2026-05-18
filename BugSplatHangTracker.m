@@ -215,6 +215,7 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
     NSTimeInterval threshold = self.thresholdSeconds;
     NSTimeInterval suspensionOvershoot = BugSplatHangSuspensionOvershoot(threshold);
     CFAbsoluteTime previousPollEnd = CFAbsoluteTimeGetCurrent();
+    BOOL isFirstPoll = YES;
 
     while (atomic_load(&_watchdogGeneration) == myGeneration) {
         @autoreleasepool {
@@ -231,11 +232,17 @@ static inline NSTimeInterval BugSplatHangSuspensionOvershoot(NSTimeInterval thre
 
             // Wall-clock guard: if we overslept far beyond the poll interval,
             // the device likely slept or the process was suspended. Skip.
-            if (overshoot > suspensionOvershoot) {
+            // Skipped on the first poll because previousPollEnd was seeded at
+            // thread creation time, not at first wake - a slow initial scheduling
+            // event (common on loaded CI runners) would otherwise falsely trip
+            // the guard and reset the processing-start timestamp, causing the
+            // tracker to miss a hang already in progress on the main thread.
+            if (!isFirstPoll && overshoot > suspensionOvershoot) {
                 // Reset so we don't treat the long gap itself as a hang.
                 atomic_store(&_processingStartWallClock, now);
                 continue;
             }
+            isFirstPoll = NO;
 
             // Debugger guard.
             BOOL(^debuggerCheck)(void) = self.isDebuggerAttachedBlock;
