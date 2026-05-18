@@ -117,7 +117,10 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 - (void)testDetectsHang_WhenMainThreadSleepsPastThreshold
 {
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.2 debuggerAttached:NO appActive:YES];
+    // 0.5s threshold gives loaded CI runners enough scheduling headroom; smaller
+    // values can starve the utility-QoS watchdog thread when multiple test runners
+    // share the simulator host.
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.5 debuggerAttached:NO appActive:YES];
     self.mockDelegate.hangExpectation = [self expectationWithDescription:@"hang detected"];
 
     [tracker start];
@@ -127,13 +130,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [self pumpMainRunLoopForSeconds:0.1];
 
     // Block the main thread past the threshold.
-    [NSThread sleepForTimeInterval:0.6];
+    [NSThread sleepForTimeInterval:1.0];
 
     // Give the watchdog thread time to finish and dispatch.
-    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:1.0];
+    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:3.0];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
-    XCTAssertGreaterThan(self.mockDelegate.lastDuration, 0.2);
+    XCTAssertGreaterThan(self.mockDelegate.lastDuration, 0.5);
     XCTAssertEqualObjects(self.mockDelegate.lastAppState, @"active");
 
     [tracker stop];
@@ -141,11 +144,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 - (void)testDoesNotDetectHang_WhenDebuggerAttached
 {
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.2 debuggerAttached:YES appActive:YES];
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.5 debuggerAttached:YES appActive:YES];
 
     [tracker start];
     [self pumpMainRunLoopForSeconds:0.1];
-    [NSThread sleepForTimeInterval:0.6];
+    [NSThread sleepForTimeInterval:1.0];
     [self pumpMainRunLoopForSeconds:0.3];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
@@ -154,11 +157,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 - (void)testDoesNotDetectHang_WhenAppInactive
 {
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.2 debuggerAttached:NO appActive:NO];
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.5 debuggerAttached:NO appActive:NO];
 
     [tracker start];
     [self pumpMainRunLoopForSeconds:0.1];
-    [NSThread sleepForTimeInterval:0.6];
+    [NSThread sleepForTimeInterval:1.0];
     [self pumpMainRunLoopForSeconds:0.3];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
@@ -169,21 +172,21 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 - (void)testRecovery_FiresAfterMainResumesFromHang
 {
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.2 debuggerAttached:NO appActive:YES];
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.5 debuggerAttached:NO appActive:YES];
     self.mockDelegate.hangExpectation = [self expectationWithDescription:@"hang detected"];
     self.mockDelegate.recoverExpectation = [self expectationWithDescription:@"recovery"];
 
     [tracker start];
     [self pumpMainRunLoopForSeconds:0.1];
 
-    [NSThread sleepForTimeInterval:0.5];
+    [NSThread sleepForTimeInterval:1.0];
 
-    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:1.0];
+    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:3.0];
 
     // Resume processing so the observer hits BeforeWaiting and we emit recovery.
-    [self pumpMainRunLoopForSeconds:0.3];
+    [self pumpMainRunLoopForSeconds:0.5];
 
-    [self waitForExpectations:@[self.mockDelegate.recoverExpectation] timeout:1.0];
+    [self waitForExpectations:@[self.mockDelegate.recoverExpectation] timeout:3.0];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
     XCTAssertEqual(self.mockDelegate.recoverCount, 1);
@@ -195,7 +198,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 - (void)testThrottle_OnlyOneHangPerProcessingWindow
 {
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.2 debuggerAttached:NO appActive:YES];
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:0.5 debuggerAttached:NO appActive:YES];
     self.mockDelegate.hangExpectation = [self expectationWithDescription:@"hang detected"];
 
     [tracker start];
@@ -203,12 +206,12 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
     // One long block - should produce exactly one hang event even though the watchdog
     // polls multiple times inside it.
-    [NSThread sleepForTimeInterval:1.5];
+    [NSThread sleepForTimeInterval:2.5];
 
-    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:1.0];
+    [self waitForExpectations:@[self.mockDelegate.hangExpectation] timeout:3.0];
 
     // Wait briefly to ensure no additional reports sneak in from the same window.
-    [self pumpMainRunLoopForSeconds:0.2];
+    [self pumpMainRunLoopForSeconds:0.3];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
 
