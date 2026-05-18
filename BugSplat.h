@@ -196,6 +196,18 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableHangDetection;
 
 /**
+ * Threshold in seconds for declaring the main thread hung when `enableHangDetection` is YES.
+ *
+ * Must be set before `-start` is invoked. Values below 0.1 are clamped to 0.1 by the
+ * underlying tracker. Typical production values are 1.0-5.0 seconds; choose a value above
+ * any work the app may legitimately do on the main thread (image decoding, JSON parsing,
+ * etc.) to avoid false positives.
+ *
+ * Default: 2.0
+ */
+@property (nonatomic, assign) NSTimeInterval hangDetectionThreshold;
+
+/**
  * Add an attribute and value to a dictionary of attributes that will potentially be included in a crash report.
  * If the attribute is an invalid XML entity name, or the attribute+value pair cannot be set,
  * the method will return NO, otherwise it will return YES.

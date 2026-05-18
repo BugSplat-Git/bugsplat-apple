@@ -141,6 +141,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.sendingInProgress = NO;
         self.currentCrashFilename = nil;
         self.isTestInstance = NO;
+        self.hangDetectionThreshold = 2.0;
 
         // Configure PLCrashReporter
         // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
@@ -188,7 +189,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
         self.sendingInProgress = NO;
         self.currentCrashFilename = nil;
         self.isTestInstance = YES;
-        
+        self.hangDetectionThreshold = 2.0;
+
         _crashReporterInternal = crashReporter;
         _crashStorageInternal = crashStorage;
         _userDefaultsInternal = userDefaults;
@@ -332,7 +334,8 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
 #endif
 
     __weak __typeof(self) weakSelf = self;
-    self.hangTracker = [[BugSplatHangTracker alloc] initWithThresholdSeconds:2.0
+    NSTimeInterval threshold = self.hangDetectionThreshold;
+    self.hangTracker = [[BugSplatHangTracker alloc] initWithThresholdSeconds:threshold
                                                                     delegate:self
                                                       isDebuggerAttachedBlock:^BOOL {
         __strong __typeof(weakSelf) strongSelf = weakSelf;
@@ -343,7 +346,7 @@ static NSString *const kBugSplatMetaKeyNotes = @"notes";
     }];
 
     [self.hangTracker start];
-    NSLog(@"BugSplat: Hang detection enabled (threshold 2.0s)");
+    NSLog(@"BugSplat: Hang detection enabled (threshold %.2fs)", self.hangTracker.thresholdSeconds);
 }
 
 #if TARGET_OS_IOS || TARGET_OS_TV
