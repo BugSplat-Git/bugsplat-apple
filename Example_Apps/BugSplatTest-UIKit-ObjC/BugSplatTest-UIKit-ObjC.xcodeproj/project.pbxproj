@@ -10,6 +10,9 @@
 		6341B24A2BDC3CA2007EE8AC /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B2492BDC3CA2007EE8AC /* AppDelegate.m */; };
 		6341B24D2BDC3CA2007EE8AC /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B24C2BDC3CA2007EE8AC /* SceneDelegate.m */; };
 		6341B2502BDC3CA2007EE8AC /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6341B24F2BDC3CA2007EE8AC /* ViewController.m */; };
+		63D000AC20010000000000A2 /* BSPActivityLog.m in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC20010000000000A1 /* BSPActivityLog.m */; };
+		63D000AC20010000000000B2 /* BSPDemoTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC20010000000000B1 /* BSPDemoTheme.m */; };
+		63D000AC20010000000000C2 /* BSPDemoViews.m in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC20010000000000C1 /* BSPDemoViews.m */; };
 		6341B2532BDC3CA2007EE8AC /* Base in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2522BDC3CA2007EE8AC /* Base */; };
 		6341B2552BDC3CA5007EE8AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2542BDC3CA5007EE8AC /* Assets.xcassets */; };
 		6341B2582BDC3CA5007EE8AC /* Base in Resources */ = {isa = PBXBuildFile; fileRef = 6341B2572BDC3CA5007EE8AC /* Base */; };
@@ -40,6 +43,12 @@
 		6341B24C2BDC3CA2007EE8AC /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
 		6341B24E2BDC3CA2007EE8AC /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		6341B24F2BDC3CA2007EE8AC /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
+		63D000AC20010000000000A0 /* BSPActivityLog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPActivityLog.h; sourceTree = "<group>"; };
+		63D000AC20010000000000A1 /* BSPActivityLog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPActivityLog.m; sourceTree = "<group>"; };
+		63D000AC20010000000000B0 /* BSPDemoTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPDemoTheme.h; sourceTree = "<group>"; };
+		63D000AC20010000000000B1 /* BSPDemoTheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPDemoTheme.m; sourceTree = "<group>"; };
+		63D000AC20010000000000C0 /* BSPDemoViews.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSPDemoViews.h; sourceTree = "<group>"; };
+		63D000AC20010000000000C1 /* BSPDemoViews.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BSPDemoViews.m; sourceTree = "<group>"; };
 		6341B2522BDC3CA2007EE8AC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		6341B2542BDC3CA5007EE8AC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6341B2572BDC3CA5007EE8AC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -86,6 +95,12 @@
 				6341B24C2BDC3CA2007EE8AC /* SceneDelegate.m */,
 				6341B24E2BDC3CA2007EE8AC /* ViewController.h */,
 				6341B24F2BDC3CA2007EE8AC /* ViewController.m */,
+				63D000AC20010000000000A0 /* BSPActivityLog.h */,
+				63D000AC20010000000000A1 /* BSPActivityLog.m */,
+				63D000AC20010000000000B0 /* BSPDemoTheme.h */,
+				63D000AC20010000000000B1 /* BSPDemoTheme.m */,
+				63D000AC20010000000000C0 /* BSPDemoViews.h */,
+				63D000AC20010000000000C1 /* BSPDemoViews.m */,
 				6341B2512BDC3CA2007EE8AC /* Main.storyboard */,
 				6341B2542BDC3CA5007EE8AC /* Assets.xcassets */,
 				6341B2562BDC3CA5007EE8AC /* LaunchScreen.storyboard */,
@@ -201,6 +216,9 @@
 				6341B24A2BDC3CA2007EE8AC /* AppDelegate.m in Sources */,
 				6341B25B2BDC3CA5007EE8AC /* main.m in Sources */,
 				6341B24D2BDC3CA2007EE8AC /* SceneDelegate.m in Sources */,
+				63D000AC20010000000000A2 /* BSPActivityLog.m in Sources */,
+				63D000AC20010000000000B2 /* BSPDemoTheme.m in Sources */,
+				63D000AC20010000000000C2 /* BSPDemoViews.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
