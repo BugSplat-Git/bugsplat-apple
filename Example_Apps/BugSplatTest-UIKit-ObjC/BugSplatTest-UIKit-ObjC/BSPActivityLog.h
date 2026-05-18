@@ -26,8 +26,9 @@ extern NSString * const BSPActivityEntryKeyTimestamp;
 @interface BSPActivityLog : NSObject
 
 /// Insert a new entry at the head of the list (newest first) and persist.
-/// Caps the list at 10 entries. For crash entries, calls `synchronize` so
-/// the record survives the impending process death.
+/// Caps the list at 10 entries. For crash and hang entries, calls
+/// `synchronize` so the record survives the impending process death
+/// (crash) or user-initiated force-quit (hang).
 + (void)record:(NSString *)type detail:(NSString *)detail;
 
 /// All entries, newest first. Each dictionary contains the keys defined above.

@@ -12,8 +12,11 @@ enum DemoColor {
     static let cardBg       = UIColor(hex: 0xFFFFFF)
     static let cardStroke   = UIColor(hex: 0xECEAE2)
     static let textPrimary  = UIColor(hex: 0x0E1116)
-    static let textSecondary = UIColor(hex: 0x6B7280)
-    static let textTertiary = UIColor(hex: 0x9CA3AF)
+    // Both secondary and tertiary clear WCAG AA (≥4.5:1) against the card and
+    // screen backgrounds. Tertiary used to be a lighter gray (#9CA3AF, ~2.5:1)
+    // but small section headers and footers became hard to read.
+    static let textSecondary = UIColor(hex: 0x4B5563)
+    static let textTertiary = UIColor(hex: 0x6B7280)
     static let badgeBg      = UIColor(hex: 0xF1EFE8)
     static let pillStroke   = UIColor(hex: 0xE4E2DA)
     static let connectedDot = UIColor(hex: 0x22C55E)

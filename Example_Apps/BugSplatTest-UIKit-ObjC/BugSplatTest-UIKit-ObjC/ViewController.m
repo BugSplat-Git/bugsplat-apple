@@ -274,7 +274,13 @@
     title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
     title.textColor = BSPDemoTheme.textPrimary;
     [title setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [title setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    // Keep the title from being squeezed by the badge in the normal case, but
+    // stay below `required` so a long database name on a compact iPhone width
+    // can still produce a satisfiable layout (title truncates instead of
+    // breaking constraints).
+    [title setContentCompressionResistancePriority:UILayoutPriorityDefaultHigh + 1 forAxis:UILayoutConstraintAxisHorizontal];
+    title.adjustsFontSizeToFitWidth = NO;
+    title.lineBreakMode = NSLineBreakByTruncatingTail;
     [row addSubview:title];
 
     self.databaseBadge = [[BSPDatabaseBadge alloc] initWithText:[self database]];

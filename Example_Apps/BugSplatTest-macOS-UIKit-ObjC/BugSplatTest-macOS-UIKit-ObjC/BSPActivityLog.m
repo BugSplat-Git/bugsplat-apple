@@ -1,6 +1,6 @@
 //
 //  BSPActivityLog.m
-//  BugSplatTest-UIKit-ObjC
+//  BugSplatTest-macOS-UIKit-ObjC
 //
 //  Copyright © BugSplat, LLC. All rights reserved.
 //
@@ -37,9 +37,10 @@ static const NSUInteger kBSPActivityMaxEntries = 10;
     NSData *data = [NSJSONSerialization dataWithJSONObject:entries options:0 error:&error];
     if (!data) return;
     [[NSUserDefaults standardUserDefaults] setObject:data forKey:kBSPActivityDefaultsKey];
-    if ([type isEqualToString:BSPActivityTypeCrash]) {
-        // Best-effort sync flush before the impending crash. synchronize() is
-        // deprecated but still the closest analog to Android's commit().
+    if ([type isEqualToString:BSPActivityTypeCrash] || [type isEqualToString:BSPActivityTypeHang]) {
+        // Best-effort sync flush. synchronize() is deprecated but still the
+        // closest analog to Android's commit() and the only way to guarantee
+        // persistence before SIGKILL (crash or user force-quit during a hang).
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 }

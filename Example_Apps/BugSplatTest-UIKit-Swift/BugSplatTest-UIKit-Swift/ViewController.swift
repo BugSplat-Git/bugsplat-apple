@@ -19,7 +19,6 @@ final class ViewController: UIViewController {
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let titleRowDatabaseBadgeContainer = UIView()
     private let recentActivityCard = UIView()
     private let recentActivityContent = UIStackView()
     private let footerLabel = UILabel()

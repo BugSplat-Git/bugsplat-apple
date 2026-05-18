@@ -20,8 +20,11 @@ static NSColor *Hex(uint32_t rgb) {
 + (NSColor *)cardBg           { return Hex(0xFFFFFF); }
 + (NSColor *)cardStroke       { return Hex(0xECEAE2); }
 + (NSColor *)textPrimary      { return Hex(0x0E1116); }
-+ (NSColor *)textSecondary    { return Hex(0x6B7280); }
-+ (NSColor *)textTertiary     { return Hex(0x9CA3AF); }
+// Both secondary and tertiary clear WCAG AA (≥4.5:1) against the card and
+// screen backgrounds. Tertiary used to be a lighter gray (#9CA3AF, ~2.5:1)
+// but small section headers and footers became hard to read.
++ (NSColor *)textSecondary    { return Hex(0x4B5563); }
++ (NSColor *)textTertiary     { return Hex(0x6B7280); }
 + (NSColor *)badgeBg          { return Hex(0xF1EFE8); }
 + (NSColor *)pillStroke       { return Hex(0xE4E2DA); }
 + (NSColor *)connectedDot     { return Hex(0x22C55E); }

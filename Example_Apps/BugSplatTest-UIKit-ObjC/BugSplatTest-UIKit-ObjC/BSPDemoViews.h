@@ -24,8 +24,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setText:(NSString *)text;
 @end
 
-/// Tappable card used to trigger a demo event. Action target/selector are set
-/// in the convenience initializer.
+/// Tappable card used to trigger a demo event. Inherits from UIControl so
+/// callers wire the action separately with `-addTarget:action:forControlEvents:`
+/// after construction; the initializer only configures the visual content.
 @interface BSPEventCardView : UIControl
 - (instancetype)initWithIconName:(NSString *)iconName
                            title:(NSString *)title

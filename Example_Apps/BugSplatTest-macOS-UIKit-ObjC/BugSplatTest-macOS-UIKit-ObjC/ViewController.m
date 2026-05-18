@@ -23,6 +23,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 @property (nonatomic, strong) NSStackView *recentActivityList;
 @property (nonatomic, strong) NSTextField *recentEmptyLabel;
 @property (nonatomic, strong) NSTextField *footerLabel;
+@property (nonatomic, strong) NSAttributedString *defaultFooterText;
 @property (nonatomic, strong) id keyDownMonitor;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *pressedKeyCodes;
 @property (nonatomic, assign) NSTimeInterval splatWindowStart;
@@ -351,7 +352,23 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
     label.attributedStringValue = str;
     self.footerLabel = label;
+    self.defaultFooterText = [str copy];
     return label;
+}
+
+/// Replace the footer with a plain status message, or restore the splat-prompt
+/// when `status` is nil. Matches the iOS samples' feedbackStatus behavior so
+/// the user can see success/failure of a feedback submission.
+- (void)showFeedbackStatus:(nullable NSString *)status {
+    if (status.length == 0) {
+        self.footerLabel.attributedStringValue = self.defaultFooterText;
+        return;
+    }
+    NSDictionary *attrs = @{
+        NSFontAttributeName: [NSFont systemFontOfSize:13],
+        NSForegroundColorAttributeName: BSPDemoTheme.textSecondary,
+    };
+    self.footerLabel.attributedStringValue = [[NSAttributedString alloc] initWithString:status attributes:attrs];
 }
 
 #pragma mark - Recent activity rendering
@@ -453,6 +470,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
     // Treat Cancel and empty-title-Send the same way: no submission, no record.
     if (response != NSAlertFirstButtonReturn || title.length == 0) return;
 
+    [self showFeedbackStatus:@"Sending feedback…"];
     [[BugSplat shared] postFeedback:title
                         description:desc
                            userName:nil
@@ -461,11 +479,15 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
                         attachments:nil
                          completion:^(NSError * _Nullable error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (!error) {
-                NSString *detail = [NSString stringWithFormat:@"“%@”", title];
-                [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
-                [self renderRecentActivity];
+            if (error) {
+                NSString *msg = [NSString stringWithFormat:@"Feedback failed: %@", error.localizedDescription];
+                [self showFeedbackStatus:msg];
+                return;
             }
+            NSString *detail = [NSString stringWithFormat:@"“%@”", title];
+            [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
+            [self renderRecentActivity];
+            [self showFeedbackStatus:@"Feedback sent — thank you!"];
         });
     }];
 }

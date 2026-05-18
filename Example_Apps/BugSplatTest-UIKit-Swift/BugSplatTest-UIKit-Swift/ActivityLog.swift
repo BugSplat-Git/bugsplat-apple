@@ -26,8 +26,9 @@ enum ActivityLog {
     private static let key = "bugsplat.example.activity.entries"
     private static let maxEntries = 10
 
-    /// Append a new entry (becomes the newest) and persist. When the entry is a
-    /// crash, write synchronously so it survives the impending process death.
+    /// Append a new entry (becomes the newest) and persist. Crash and hang
+    /// entries are flushed synchronously so the row survives the impending
+    /// process death (crash) or force-quit (hang).
     static func record(_ type: ActivityType, detail: String) {
         var entries = all()
         entries.insert(ActivityEntry(type: type, detail: detail, timestamp: Date()), at: 0)
@@ -36,9 +37,10 @@ enum ActivityLog {
         }
         guard let data = try? JSONEncoder().encode(entries) else { return }
         UserDefaults.standard.set(data, forKey: key)
-        if type == .crash {
-            // Best-effort sync flush before the crash. synchronize() is deprecated
-            // but still the closest analog to Android's SharedPreferences.commit().
+        if type == .crash || type == .hang {
+            // Best-effort sync flush. synchronize() is deprecated but still the
+            // closest analog to Android's SharedPreferences.commit() and the
+            // only way to guarantee persistence before SIGKILL.
             UserDefaults.standard.synchronize()
         }
     }
