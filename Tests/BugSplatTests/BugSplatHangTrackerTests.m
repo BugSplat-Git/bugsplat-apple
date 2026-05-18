@@ -10,19 +10,20 @@
 #import "BugSplatHangTracker.h"
 
 
-/// Private testing surface. The implementations live in `BugSplatHangTracker.m`;
+/// Private testing surface. Implementations live in `BugSplatHangTracker.m`;
 /// this category just makes them visible to the test compilation unit so we can
-/// drive the state machine without spawning a real watchdog thread or relying on
-/// real wall-clock timing.
+/// drive the state machine without spawning a real watchdog thread or relying
+/// on real wall-clock timing.
 @interface BugSplatHangTracker (Testing)
 - (instancetype)initWithThresholdSeconds:(NSTimeInterval)thresholdSeconds
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
                          isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock
                                 clockBlock:(CFAbsoluteTime(^)(void))clockBlock
-                       recoveryDispatcher:(void(^)(dispatch_block_t))recoveryDispatcher;
-- (void)_pollAtTime:(CFAbsoluteTime)now;
-- (void)_simulateRunLoopActivity:(CFRunLoopActivity)activity;
+                       recoveryDispatcher:(void(^)(dispatch_block_t))recoveryDispatcher
+                            pingDispatcher:(void(^)(dispatch_block_t))pingDispatcher;
+- (void)_processPollWithActualSleepDuration:(NSTimeInterval)actualSleep;
+- (void)handleMainQueuePong;
 @end
 
 
@@ -31,7 +32,6 @@
 @property (atomic, assign) NSInteger recoverCount;
 @property (atomic, assign) NSTimeInterval lastDuration;
 @property (atomic, copy, nullable) NSString *lastAppState;
-@property (atomic, strong, nullable) XCTestExpectation *hangExpectation;
 @end
 
 @implementation MockHangTrackerDelegate
@@ -43,7 +43,6 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     self.hangCount += 1;
     self.lastDuration = duration;
     self.lastAppState = appState;
-    [self.hangExpectation fulfill];
 }
 
 - (void)hangTrackerDidRecoverFromHang:(BugSplatHangTracker *)tracker
@@ -54,24 +53,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 @end
 
 
-/// Helper that owns a settable "current time" and produces a clock block
-/// referencing it. Tests advance the time directly via the `now` property.
-@interface FakeClock : NSObject
-@property (atomic, assign) CFAbsoluteTime now;
-- (CFAbsoluteTime(^)(void))block;
-@end
-
-@implementation FakeClock
-- (CFAbsoluteTime(^)(void))block {
-    __weak __typeof(self) weakSelf = self;
-    return ^CFAbsoluteTime{ return weakSelf.now; };
-}
-@end
-
-
 @interface BugSplatHangTrackerTests : XCTestCase
 @property (nonatomic, strong) MockHangTrackerDelegate *mockDelegate;
-@property (nonatomic, strong) FakeClock *clock;
 @end
 
 @implementation BugSplatHangTrackerTests
@@ -80,23 +63,38 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     [super setUp];
     self.mockDelegate = [[MockHangTrackerDelegate alloc] init];
-    self.clock = [[FakeClock alloc] init];
-    self.clock.now = 1000.0;
 }
 
 - (BugSplatHangTracker *)trackerWithThreshold:(NSTimeInterval)threshold
                               debuggerAttached:(BOOL)debuggerAttached
                                      appActive:(BOOL)appActive
 {
-    // Synchronous recovery dispatcher so tests can observe `recoverCount` right
-    // after the runloop activity that triggers recovery, without polling.
-    void(^synchronous)(dispatch_block_t) = ^(dispatch_block_t b) { b(); };
+    // Synchronous recovery dispatcher: tests observe recoverCount inline.
+    void(^synchronousRecovery)(dispatch_block_t) = ^(dispatch_block_t b) { b(); };
+    // No-op ping dispatcher: tests manually drive pongs via -handleMainQueuePong
+    // so a "hung" main thread is simulated by simply not calling it.
+    void(^noopPing)(dispatch_block_t) = ^(dispatch_block_t b) { /* drop */ };
+    // Tests don't need real wall-clock time for the new design; the per-poll
+    // logic takes the actual-sleep duration as a parameter. Return 0 just so
+    // clockBlock isn't nil if production code ever reaches it.
+    CFAbsoluteTime(^zeroClock)(void) = ^{ return (CFAbsoluteTime)0; };
     return [[BugSplatHangTracker alloc] initWithThresholdSeconds:threshold
                                                         delegate:self.mockDelegate
                                           isDebuggerAttachedBlock:^BOOL { return debuggerAttached; }
                                                 isAppActiveBlock:^BOOL { return appActive; }
-                                                       clockBlock:self.clock.block
-                                              recoveryDispatcher:synchronous];
+                                                       clockBlock:zeroClock
+                                              recoveryDispatcher:synchronousRecovery
+                                                   pingDispatcher:noopPing];
+}
+
+/// Simulate N consecutive polls where the main thread never serviced the ping.
+- (void)pollTracker:(BugSplatHangTracker *)tracker times:(NSInteger)n
+{
+    // Use a normal (non-suspension) sleep duration so the guard doesn't reset.
+    NSTimeInterval normalSleep = tracker.thresholdSeconds / 5.0;
+    for (NSInteger i = 0; i < n; i++) {
+        [tracker _processPollWithActualSleepDuration:normalSleep];
+    }
 }
 
 #pragma mark - Initializer
@@ -121,48 +119,30 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 #pragma mark - Detection
 
-- (void)testDetectsHang_WhenProcessingStartIsOlderThanThreshold
+- (void)testDetectsHang_WhenMainNeverServicesPings
 {
+    // threshold=2.0, pollInterval=0.4 -> 5 unanswered polls = hang.
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    // Main runloop just entered processing at t=1000.
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
+    [self pollTracker:tracker times:4];
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 
-    // 1s later: still under the 2s threshold.
-    self.clock.now = 1001.0;
-    [tracker _pollAtTime:self.clock.now];
-    XCTAssertEqual(self.mockDelegate.hangCount, 0);
-
-    // 3s after entry: hung.
-    self.clock.now = 1003.0;
-    [tracker _pollAtTime:self.clock.now];
+    [self pollTracker:tracker times:1];
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
-    XCTAssertGreaterThan(self.mockDelegate.lastDuration, 2.0);
+    XCTAssertGreaterThanOrEqual(self.mockDelegate.lastDuration, 2.0);
     XCTAssertEqualObjects(self.mockDelegate.lastAppState, @"active");
 }
 
-- (void)testDoesNotDetect_WhenStillUnderThreshold
+- (void)testDoesNotDetect_WhenMainServicesPingsEachRound
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1001.9;
-    [tracker _pollAtTime:self.clock.now];
+    // Each poll is followed by a pong - main is responsive.
+    for (NSInteger i = 0; i < 10; i++) {
+        [self pollTracker:tracker times:1];
+        [tracker handleMainQueuePong];
+    }
 
-    XCTAssertEqual(self.mockDelegate.hangCount, 0);
-}
-
-- (void)testDoesNotDetect_WhenRunloopIsIdle
-{
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
-
-    // BeforeWaiting clears the processing-start timestamp; subsequent polls
-    // should never see a hang regardless of how far the clock advances.
-    [tracker _simulateRunLoopActivity:kCFRunLoopBeforeWaiting];
-
-    self.clock.now = 1100.0;
-    [tracker _pollAtTime:self.clock.now];
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 }
 
@@ -170,9 +150,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:YES appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1010.0;
-    [tracker _pollAtTime:self.clock.now];
+    [self pollTracker:tracker times:10];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 }
@@ -181,44 +159,23 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:NO];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1010.0;
-    [tracker _pollAtTime:self.clock.now];
+    [self pollTracker:tracker times:10];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 }
 
 #pragma mark - Recovery
 
-- (void)testRecovery_FiresAfterRunloopActivityFollowingHang
+- (void)testRecovery_FiresAfterPongFollowingHang
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1003.0;
-    [tracker _pollAtTime:self.clock.now];
+    [self pollTracker:tracker times:5];
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
     XCTAssertEqual(self.mockDelegate.recoverCount, 0);
 
-    // Main thread reaches BeforeWaiting -> recovery fires synchronously thanks
-    // to the test dispatcher.
-    [tracker _simulateRunLoopActivity:kCFRunLoopBeforeWaiting];
-    XCTAssertEqual(self.mockDelegate.recoverCount, 1);
-}
-
-- (void)testRecovery_FiresWhenMainResumesIntoNewProcessingWindow
-{
-    BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
-
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1003.0;
-    [tracker _pollAtTime:self.clock.now];
-    XCTAssertEqual(self.mockDelegate.hangCount, 1);
-
-    // AfterWaiting (or any non-BeforeWaiting activity) also signals recovery
-    // because the main thread visibly transitioned away from the hung state.
-    self.clock.now = 1004.0;
-    [tracker _simulateRunLoopActivity:kCFRunLoopAfterWaiting];
+    // Main thread services a ping -> recovery fires.
+    [tracker handleMainQueuePong];
     XCTAssertEqual(self.mockDelegate.recoverCount, 1);
 }
 
@@ -226,9 +183,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    [tracker _simulateRunLoopActivity:kCFRunLoopBeforeWaiting];
-
+    [tracker handleMainQueuePong];
     XCTAssertEqual(self.mockDelegate.recoverCount, 0);
 }
 
@@ -238,15 +193,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1003.0;
-    [tracker _pollAtTime:self.clock.now];
-
-    // Subsequent polls within the same processing window must not refire.
-    self.clock.now = 1005.0;
-    [tracker _pollAtTime:self.clock.now];
-    self.clock.now = 1010.0;
-    [tracker _pollAtTime:self.clock.now];
+    // Many extra polls inside the same hung window must not refire.
+    [self pollTracker:tracker times:20];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
 }
@@ -255,61 +203,47 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1003.0;
-    [tracker _pollAtTime:self.clock.now];
+    [self pollTracker:tracker times:5];
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
 
-    // Recover, then start a new processing window from a fresh timestamp.
-    [tracker _simulateRunLoopActivity:kCFRunLoopBeforeWaiting];
-    self.clock.now = 1010.0;
-    [tracker _simulateRunLoopActivity:kCFRunLoopAfterWaiting];
-
-    self.clock.now = 1013.0;
-    [tracker _pollAtTime:self.clock.now];
+    // Main resumes long enough for one pong, then hangs again.
+    [tracker handleMainQueuePong];
+    [self pollTracker:tracker times:5];
     XCTAssertEqual(self.mockDelegate.hangCount, 2);
 }
 
 #pragma mark - Suspension guard
 
-- (void)testSuspensionGuard_ResetsAfterLargeOvershoot
+- (void)testSuspensionGuard_ResetsCounterAfterLargeSleep
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    // Seed the suspension-guard baseline with a normal first poll.
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1000.4;
-    [tracker _pollAtTime:self.clock.now];
-
-    // Now jump the clock far enough that the overshoot guard fires. Threshold=2.0
-    // means suspensionOvershoot = 10.0; jump 60 seconds.
-    self.clock.now = 1060.0;
-    [tracker _pollAtTime:self.clock.now];
-
-    // The guard should have reset processingStartWallClock to "now" and not
-    // reported a hang despite the 60s elapsed since the runloop entered.
+    // Accumulate some unanswered pings, but not yet enough to fire.
+    [self pollTracker:tracker times:3];
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 
-    // A short additional poll right after should not retroactively fire either.
-    self.clock.now = 1060.5;
-    [tracker _pollAtTime:self.clock.now];
+    // A long sleep (e.g. device suspended) - guard resets the counter.
+    [tracker _processPollWithActualSleepDuration:30.0];
+    XCTAssertEqual(self.mockDelegate.hangCount, 0);
+
+    // The next few polls should not be enough to fire because the counter
+    // was reset by the suspension guard.
+    [self pollTracker:tracker times:3];
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
 }
 
-- (void)testSuspensionGuard_FirstPollDoesNotResetState
+- (void)testSuspensionGuard_NormalSleepDoesNotReset
 {
     BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0 debuggerAttached:NO appActive:YES];
 
-    // The runloop entered at t=1000. The watchdog thread doesn't get scheduled
-    // until t=1060 - a 60s gap that would falsely trip the suspension guard
-    // if the guard ran on the first poll. The fix is to skip the guard on the
-    // first poll so we still report the hang in progress.
-    [tracker _simulateRunLoopActivity:kCFRunLoopEntry];
-    self.clock.now = 1060.0;
-    [tracker _pollAtTime:self.clock.now];
-
+    // Sleep durations that hover slightly over the poll interval should not
+    // count as suspension - real hangs need to be detectable across noisy
+    // scheduling.
+    NSTimeInterval slightlyLong = 0.45;
+    for (NSInteger i = 0; i < 5; i++) {
+        [tracker _processPollWithActualSleepDuration:slightlyLong];
+    }
     XCTAssertEqual(self.mockDelegate.hangCount, 1);
-    XCTAssertGreaterThan(self.mockDelegate.lastDuration, 50.0);
 }
 
 #pragma mark - Start / stop wiring (smoke)

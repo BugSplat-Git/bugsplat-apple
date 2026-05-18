@@ -15,9 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * `hangTracker:didDetectHangWithDuration:appState:` is invoked on the tracker's private
  * watchdog thread. `hangTrackerDidRecoverFromHang:` is invoked on a GCD global utility
- * queue (dispatched off the main runloop observer so disk I/O doesn't block recovery).
- * Neither callback runs on the main thread; implementers must not perform UI work directly
- * and should dispatch to a queue if needed.
+ * queue (dispatched off the main thread so disk I/O can't block recovery). Neither
+ * callback runs on the main thread; implementers must not perform UI work directly and
+ * should dispatch to a queue if needed.
  */
 @protocol BugSplatHangTrackerDelegate <NSObject>
 
@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
  * Called when the main thread has been unresponsive for at least the configured threshold.
  *
  * @param tracker    The tracker that detected the hang.
- * @param duration   Elapsed time since the main runloop last transitioned, in seconds.
+ * @param duration   Approximate elapsed time the main thread has been unresponsive, in seconds.
  * @param appState   Short string describing the app state at detection time
  *                   ("active", "background", or "unknown").
  */
@@ -44,15 +44,17 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 
 
 /**
- * Monitors the main runloop for hangs using a CFRunLoopObserver plus a dedicated watchdog thread.
+ * Monitors the main thread for hangs.
  *
- * Detection is based on the time elapsed between main runloop state transitions
- * (kCFRunLoopAfterWaiting -> kCFRunLoopBeforeWaiting). If the runloop stays in the
- * processing phase for longer than the configured threshold without returning to wait,
- * the delegate is notified.
+ * A dedicated low-QoS watchdog thread polls every `threshold / 5` seconds (clamped to
+ * at least 100ms). Each poll dispatches a small "ping" block to the main queue and
+ * increments an atomic counter; the ping block, when serviced, resets that counter.
+ * If the counter accumulates enough unanswered pings to cover `thresholdSeconds`, the
+ * main thread is considered hung and the delegate is notified. When the main thread
+ * later services a ping, a recovery callback fires so the integrator can discard a
+ * previously persisted hang report.
  *
- * Callers are expected to invoke `-start` from the main thread. The main thread's
- * Mach port is captured at start time for use by any subsequent stack capture.
+ * Callers are expected to invoke `-start` from the main thread.
  */
 @interface BugSplatHangTracker : NSObject
 
@@ -78,14 +80,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (instancetype)init NS_UNAVAILABLE;
 
 /**
- * Start monitoring. Installs the CFRunLoopObserver on the main runloop and spawns the
- * watchdog thread. Must be called from the main thread.
+ * Start monitoring. Spawns the watchdog thread, which will begin pinging the main
+ * queue on its poll interval. Must be called from the main thread.
  */
 - (void)start;
 
 /**
- * Stop monitoring. Removes the observer and signals the watchdog thread to exit.
- * Safe to call multiple times.
+ * Stop monitoring. Signals the watchdog thread to exit. Safe to call multiple times.
  */
 - (void)stop;
 
