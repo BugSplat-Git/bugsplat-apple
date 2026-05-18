@@ -11,6 +11,7 @@
 
 #import "BugSplatTestSupport.h"
 #import "BugSplatUploadService.h"
+#import "BugSplatHangTracker.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -18,11 +19,12 @@ NS_ASSUME_NONNULL_BEGIN
  * Class extension to expose private methods for testing.
  * These methods are implemented in the main BugSplat class.
  */
-@interface BugSplat ()
+@interface BugSplat () <BugSplatHangTrackerDelegate>
 
 - (BOOL)shouldSendCrashSilently:(NSDictionary *)metadata;
 - (NSString *)resolvedApplicationName;
 - (NSString *)resolvedApplicationVersion;
+- (nullable NSString *)crashesDirectoryPath;
 
 @end
 
@@ -82,6 +84,22 @@ NS_ASSUME_NONNULL_BEGIN
  * Pass @YES to simulate debugger attached, @NO to simulate no debugger, nil to use real detection.
  */
 - (void)setDebuggerAttachedOverride:(nullable NSNumber *)value;
+
+#pragma mark - Hang Detection Testing
+
+/**
+ * Create the internal plumbing (serial queue, launch id) that `-start` would
+ * normally set up for hang detection. Lets tests exercise the hang delegate
+ * methods without starting the real tracker or enabling the crash reporter.
+ */
+- (void)setupHangInfrastructureForTesting;
+
+/// Serial queue that hang delegate callbacks dispatch onto; `dispatch_sync` on
+/// this queue to wait for pending hang work to drain.
+- (nullable dispatch_queue_t)hangQueueForTesting;
+
+/// The basename of the hang report most recently persisted by the hang delegate.
+- (nullable NSString *)currentHangFilename;
 
 @end
 
