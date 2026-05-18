@@ -169,10 +169,10 @@ NS_ASSUME_NONNULL_BEGIN
  * Enable detection and reporting of fatal main-thread hangs.
  *
  * When set to YES before `-start` is invoked, BugSplat monitors the main runloop for
- * prolonged unresponsive periods. If a hang is detected and the app is subsequently
- * terminated without the main thread recovering (launch/resume watchdog kills, background
- * task expirations, user force-quit), a hang report is uploaded on the next launch using
- * the same pipeline as crash reports.
+ * prolonged unresponsive periods while the app is active in the foreground. If a hang
+ * is detected and the app is subsequently terminated without the main thread recovering
+ * (launch/resume watchdog kills, user force-quit), a hang report is uploaded on the next
+ * launch using the same pipeline as crash reports.
  *
  * If the main thread resumes after a hang is detected, the persisted report is discarded -
  * non-fatal hangs are not reported in this version.
@@ -181,8 +181,11 @@ NS_ASSUME_NONNULL_BEGIN
  * with `bugsplat-hang-` (duration, detection time, app state, launch id) that can be used
  * to correlate with crashes from the same launch.
  *
- * Detection is suppressed when a debugger is attached or the app is not active. This property
- * is a no-op inside app extensions.
+ * Detection is suppressed when a debugger is attached or the app is not active. As a
+ * consequence, hangs that begin while the app is in the background (including those
+ * terminated by background-task expiration) are not reported.
+ *
+ * This property is a no-op inside app extensions.
  *
  * When this property is YES, `-start` must be invoked on the main thread - the main
  * runloop observer is installed and the main thread's Mach port is captured there.
