@@ -9,6 +9,7 @@
 #import "BSPDemoTheme.h"
 #import "BSPDemoViews.h"
 #import "BSPActivityLog.h"
+#import "BSPFeedbackViewController.h"
 #import <BugSplat/BugSplat.h>
 
 // Splat gesture: 6 distinct keys within a tight 0.5s window. 6 is below the
@@ -23,7 +24,6 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 @property (nonatomic, strong) NSStackView *recentActivityList;
 @property (nonatomic, strong) NSTextField *recentEmptyLabel;
 @property (nonatomic, strong) NSTextField *footerLabel;
-@property (nonatomic, strong) NSAttributedString *defaultFooterText;
 @property (nonatomic, strong) id keyDownMonitor;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *pressedKeyCodes;
 @property (nonatomic, assign) NSTimeInterval splatWindowStart;
@@ -352,23 +352,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
     label.attributedStringValue = str;
     self.footerLabel = label;
-    self.defaultFooterText = [str copy];
     return label;
-}
-
-/// Replace the footer with a plain status message, or restore the splat-prompt
-/// when `status` is nil. Matches the iOS samples' feedbackStatus behavior so
-/// the user can see success/failure of a feedback submission.
-- (void)showFeedbackStatus:(nullable NSString *)status {
-    if (status.length == 0) {
-        self.footerLabel.attributedStringValue = self.defaultFooterText;
-        return;
-    }
-    NSDictionary *attrs = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:13],
-        NSForegroundColorAttributeName: BSPDemoTheme.textSecondary,
-    };
-    self.footerLabel.attributedStringValue = [[NSAttributedString alloc] initWithString:status attributes:attrs];
 }
 
 #pragma mark - Recent activity rendering
@@ -436,60 +420,28 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 }
 
 - (void)triggerFeedback:(id)sender {
+    // Don't stack a second feedback sheet if one is already showing.
+    for (NSViewController *vc in self.presentedViewControllers) {
+        if ([vc isKindOfClass:[BSPFeedbackViewController class]]) return;
+    }
+
+    // Block the splat gesture / Cmd+digit while the sheet is up so typing in
+    // the feedback form doesn't re-trigger feedback.
     self.feedbackInProgress = YES;
     [self.pressedKeyCodes removeAllObjects];
     self.splatWindowStart = 0;
 
-    NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"Send Feedback";
-    [alert addButtonWithTitle:@"Send"];
-    [alert addButtonWithTitle:@"Cancel"];
-
-    NSTextField *titleField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 22)];
-    titleField.placeholderString = @"Title";
-    NSTextField *descField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 22)];
-    descField.placeholderString = @"Description (optional)";
-
-    NSStackView *stack = [[NSStackView alloc] initWithFrame:NSMakeRect(0, 0, 320, 52)];
-    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-    stack.spacing = 8;
-    [stack addArrangedSubview:titleField];
-    [stack addArrangedSubview:descField];
-    alert.accessoryView = stack;
-    [alert.window setInitialFirstResponder:titleField];
-
-    NSModalResponse response = [alert runModal];
-    NSString *title = [titleField.stringValue
-                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    NSString *desc = descField.stringValue.length > 0 ? descField.stringValue : nil;
-
-    self.feedbackInProgress = NO;
-    [self.pressedKeyCodes removeAllObjects];
-    self.splatWindowStart = 0;
-
-    // Treat Cancel and empty-title-Send the same way: no submission, no record.
-    if (response != NSAlertFirstButtonReturn || title.length == 0) return;
-
-    [self showFeedbackStatus:@"Sending feedback…"];
-    [[BugSplat shared] postFeedback:title
-                        description:desc
-                           userName:nil
-                          userEmail:nil
-                             appKey:nil
-                        attachments:nil
-                         completion:^(NSError * _Nullable error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (error) {
-                NSString *msg = [NSString stringWithFormat:@"Feedback failed: %@", error.localizedDescription];
-                [self showFeedbackStatus:msg];
-                return;
-            }
-            NSString *detail = [NSString stringWithFormat:@"“%@”", title];
-            [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
-            [self renderRecentActivity];
-            [self showFeedbackStatus:@"Feedback sent — thank you!"];
-        });
-    }];
+    BSPFeedbackViewController *feedback = [[BSPFeedbackViewController alloc] init];
+    __weak typeof(self) weakSelf = self;
+    feedback.onDismiss = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        strongSelf.feedbackInProgress = NO;
+        [strongSelf.pressedKeyCodes removeAllObjects];
+        strongSelf.splatWindowStart = 0;
+        [strongSelf renderRecentActivity];
+    };
+    [self presentViewControllerAsSheet:feedback];
 }
 
 - (void)triggerHang:(id)sender {

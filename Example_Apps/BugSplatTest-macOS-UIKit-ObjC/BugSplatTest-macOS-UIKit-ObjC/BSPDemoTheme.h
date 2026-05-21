@@ -29,6 +29,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (class, readonly) NSColor *activityFeedback;
 @property (class, readonly) NSColor *activityHang;
 
+/// Primary action green used by the feedback sheet (form + thank-you buttons).
+@property (class, readonly) NSColor *feedbackAccent;
+@property (class, readonly) NSColor *footerBg;
+@property (class, readonly) NSColor *asterisk;
+
 @end
 
 NS_ASSUME_NONNULL_END

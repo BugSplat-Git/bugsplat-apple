@@ -35,4 +35,8 @@ static NSColor *Hex(uint32_t rgb) {
 + (NSColor *)activityFeedback { return Hex(0x22C55E); }
 + (NSColor *)activityHang     { return Hex(0xE5B142); }
 
++ (NSColor *)feedbackAccent   { return Hex(0x4E9D78); }
++ (NSColor *)footerBg         { return Hex(0xF4F2EA); }
++ (NSColor *)asterisk         { return Hex(0xDC2626); }
+
 @end

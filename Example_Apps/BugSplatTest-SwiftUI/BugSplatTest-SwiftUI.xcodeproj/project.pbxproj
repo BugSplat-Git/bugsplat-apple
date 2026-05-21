@@ -12,6 +12,7 @@
 		63D006E42BBF4A5500587FBF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D006E32BBF4A5500587FBF /* ContentView.swift */; };
 		63D000AC10010000000000A2 /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC10010000000000A1 /* ActivityLog.swift */; };
 		63D000AC10010000000000D2 /* ShakeNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC10010000000000D1 /* ShakeNotification.swift */; };
+		FEEDBAC010010000000000A1 /* FeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDBAC010010000000000A2 /* FeedbackSheet.swift */; };
 		63D000AC10010000000000B2 /* DemoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC10010000000000B1 /* DemoTheme.swift */; };
 		63D000AC10010000000000C2 /* DemoComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D000AC10010000000000C1 /* DemoComponents.swift */; };
 		63D006E92BBF4A5700587FBF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */; };
@@ -40,6 +41,7 @@
 		63D006E32BBF4A5500587FBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		63D000AC10010000000000A1 /* ActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 		63D000AC10010000000000D1 /* ShakeNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeNotification.swift; sourceTree = "<group>"; };
+		FEEDBAC010010000000000A2 /* FeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheet.swift; sourceTree = "<group>"; };
 		63D000AC10010000000000B1 /* DemoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoTheme.swift; sourceTree = "<group>"; };
 		63D000AC10010000000000C1 /* DemoComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoComponents.swift; sourceTree = "<group>"; };
 		63D006E82BBF4A5700587FBF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 				63D006E32BBF4A5500587FBF /* ContentView.swift */,
 				63D000AC10010000000000A1 /* ActivityLog.swift */,
 				63D000AC10010000000000D1 /* ShakeNotification.swift */,
+				FEEDBAC010010000000000A2 /* FeedbackSheet.swift */,
 				63D000AC10010000000000B1 /* DemoTheme.swift */,
 				63D000AC10010000000000C1 /* DemoComponents.swift */,
 				63D006E72BBF4A5700587FBF /* Preview Content */,
@@ -207,6 +210,7 @@
 				63D006E42BBF4A5500587FBF /* ContentView.swift in Sources */,
 				63D000AC10010000000000A2 /* ActivityLog.swift in Sources */,
 				63D000AC10010000000000D2 /* ShakeNotification.swift in Sources */,
+				FEEDBAC010010000000000A1 /* FeedbackSheet.swift in Sources */,
 				63D000AC10010000000000B2 /* DemoTheme.swift in Sources */,
 				63D000AC10010000000000C2 /* DemoComponents.swift in Sources */,
 				63D006E22BBF4A5500587FBF /* BugSplatTest-SwiftUIApp.swift in Sources */,
