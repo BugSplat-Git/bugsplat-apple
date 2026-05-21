@@ -6,6 +6,7 @@
 
 #import <Foundation/Foundation.h>
 #import "BugSplatAttachment.h"
+#import "BugSplatFeedbackResult.h"
 #import "BugSplatTestSupport.h"
 
 NS_ASSUME_NONNULL_BEGIN
@@ -54,8 +55,18 @@ NS_ASSUME_NONNULL_BEGIN
  * @param success YES if the upload was successful.
  * @param error Error object if the upload failed, nil otherwise.
  * @param infoUrl URL to the crash report details page (only provided on success).
+ * @param crashId The BugSplat report id parsed from the commit response
+ *                (only provided on success; may be nil if the server omitted it).
  */
-typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error, NSString * _Nullable infoUrl);
+typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error, NSString * _Nullable infoUrl, NSNumber * _Nullable crashId);
+
+/**
+ * Completion handler for feedback upload operations.
+ *
+ * @param result Non-nil on success, carrying the report id and infoUrl.
+ * @param error Non-nil on failure.
+ */
+typedef void(^BugSplatFeedbackUploadCompletion)(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error);
 
 /**
  * Service for uploading crash reports to BugSplat servers.
@@ -121,7 +132,7 @@ typedef void(^BugSplatUploadCompletion)(BOOL success, NSError * _Nullable error,
            description:(nullable NSString *)description
            attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
               metadata:(BugSplatCrashMetadata *)metadata
-            completion:(void (^)(NSError * _Nullable error))completion;
+            completion:(nullable BugSplatFeedbackUploadCompletion)completion;
 
 /**
  * Cancels any in-progress upload.
