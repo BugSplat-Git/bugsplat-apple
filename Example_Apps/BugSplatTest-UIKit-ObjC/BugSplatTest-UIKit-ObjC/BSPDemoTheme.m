@@ -35,4 +35,8 @@
 + (UIColor *)activityFeedback { return [self colorWithHex:0x22C55E]; }
 + (UIColor *)activityHang     { return [self colorWithHex:0xE5B142]; }
 
++ (UIColor *)feedbackAccent   { return [self colorWithHex:0x4E9D78]; }
++ (UIColor *)footerBg         { return [self colorWithHex:0xF4F2EA]; }
++ (UIColor *)asterisk         { return [self colorWithHex:0xDC2626]; }
+
 @end

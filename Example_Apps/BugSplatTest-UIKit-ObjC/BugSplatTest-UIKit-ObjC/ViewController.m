@@ -14,6 +14,7 @@
 #import "BSPActivityLog.h"
 #import "BSPDemoTheme.h"
 #import "BSPDemoViews.h"
+#import "BSPFeedbackViewController.h"
 
 @interface ViewController ()
 
@@ -30,9 +31,6 @@
 
 // Footer line at the bottom of the scroll view.
 @property (nonatomic, strong) UILabel *footerLabel;
-
-// Sticky session-only feedback status message (matches SwiftUI feedbackStatus).
-@property (nonatomic, copy, nullable) NSString *feedbackStatus;
 
 @end
 
@@ -404,15 +402,6 @@
     }
 }
 
-#pragma mark - Footer
-
-- (void)setFeedbackStatus:(NSString *)feedbackStatus {
-    _feedbackStatus = [feedbackStatus copy];
-    self.footerLabel.text = feedbackStatus.length > 0
-        ? feedbackStatus
-        : @"Shake the device to send feedback anytime.";
-}
-
 #pragma mark - Actions
 
 - (void)triggerCrash {
@@ -467,62 +456,19 @@
 }
 
 - (void)showFeedbackDialog {
-    UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:@"Send Feedback"
-                         message:nil
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"Title";
-    }];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"Description";
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
+    // Don't stack a second feedback sheet if one is already showing (e.g. a
+    // shake while the sheet is up).
+    if ([self.presentedViewController isKindOfClass:[BSPFeedbackViewController class]]) return;
+    BSPFeedbackViewController *feedback = [[BSPFeedbackViewController alloc] init];
+    feedback.modalPresentationStyle = UIModalPresentationPageSheet;
     __weak typeof(self) weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Send"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        NSString *title = alert.textFields[0].text ?: @"";
-        NSString *descText = alert.textFields[1].text ?: @"";
-        NSString *description = descText.length > 0 ? descText : nil;
-        [strongSelf sendFeedbackWithTitle:title description:description];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)sendFeedbackWithTitle:(NSString *)title description:(NSString *)description {
-    NSString *trimmed = [title stringByTrimmingCharactersInSet:
-                         [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    // Treat an empty title the same as Cancel - don't submit, don't record.
-    if (trimmed.length == 0) return;
-
-    self.feedbackStatus = @"Sending...";
-    __weak typeof(self) weakSelf = self;
-    [[BugSplat shared] postFeedback:trimmed
-                        description:description
-                           userName:nil
-                          userEmail:nil
-                             appKey:nil
-                        attachments:nil
-                         completion:^(NSError * _Nullable error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
-            if (error) {
-                strongSelf.feedbackStatus = [NSString stringWithFormat:@"Feedback failed: %@",
-                                              error.localizedDescription];
-            } else {
-                strongSelf.feedbackStatus = @"Feedback sent — thank you!";
-                NSString *detail = [NSString stringWithFormat:@"“%@”", trimmed];
-                [BSPActivityLog record:BSPActivityTypeFeedback detail:detail];
-                [strongSelf refreshRecentActivity];
-            }
-        });
-    }];
+    feedback.onDismiss = ^{ [weakSelf refreshRecentActivity]; };
+    UISheetPresentationController *sheet = feedback.sheetPresentationController;
+    if (sheet) {
+        sheet.detents = @[ [UISheetPresentationControllerDetent largeDetent] ];
+        sheet.prefersGrabberVisible = YES;
+    }
+    [self presentViewController:feedback animated:YES completion:nil];
 }
 
 - (void)openDashboard {

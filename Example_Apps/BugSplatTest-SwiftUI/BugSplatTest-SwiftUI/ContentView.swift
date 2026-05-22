@@ -13,9 +13,6 @@ struct ContentView: View {
     @State private var entries: [ActivityEntry] = ActivityLog.all()
     @State private var showFeedbackSheet = false
     @State private var showHangConfirm = false
-    @State private var feedbackTitle = ""
-    @State private var feedbackDescription = ""
-    @State private var feedbackStatus: String?
     @Environment(\.scenePhase) private var scenePhase
 
     private var database: String {
@@ -61,7 +58,7 @@ struct ContentView: View {
 
                 recentActivityCard.padding(.top, 18)
 
-                Text(feedbackStatus ?? "Shake the device to send feedback anytime.")
+                Text("Shake the device to send feedback anytime.")
                     .font(.system(size: 13))
                     .foregroundColor(DemoColor.textTertiary)
                     .frame(maxWidth: .infinity)
@@ -78,11 +75,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { entries = ActivityLog.all() }
         }
-        .alert("Send Feedback", isPresented: $showFeedbackSheet) {
-            TextField("Title", text: $feedbackTitle)
-            TextField("Description", text: $feedbackDescription)
-            Button("Send") { sendFeedback() }
-            Button("Cancel", role: .cancel) { }
+        .sheet(isPresented: $showFeedbackSheet, onDismiss: { entries = ActivityLog.all() }) {
+            FeedbackSheet()
         }
         .alert("Simulate Fatal Hang?", isPresented: $showHangConfirm) {
             Button("Hang App", role: .destructive) { simulateHang() }
@@ -185,37 +179,6 @@ struct ContentView: View {
         // Single sleep until distantFuture (~year 4001) - simpler than a spin
         // loop and keeps the CPU quiet while frozen.
         Thread.sleep(until: .distantFuture)
-    }
-
-    private func sendFeedback() {
-        let title = feedbackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Treat an empty title the same as Cancel - don't submit, don't record.
-        guard !title.isEmpty else {
-            feedbackTitle = ""
-            feedbackDescription = ""
-            return
-        }
-        feedbackStatus = "Sending..."
-        BugSplat.shared().postFeedback(
-            title: title,
-            description: feedbackDescription.isEmpty ? nil : feedbackDescription,
-            userName: nil,
-            userEmail: nil,
-            appKey: nil,
-            attachments: nil
-        ) { error in
-            DispatchQueue.main.async {
-                if let error {
-                    feedbackStatus = "Feedback failed: \(error.localizedDescription)"
-                } else {
-                    feedbackStatus = "Feedback sent — thank you!"
-                    ActivityLog.record(.feedback, detail: "\u{201C}\(title)\u{201D}")
-                    entries = ActivityLog.all()
-                    feedbackTitle = ""
-                    feedbackDescription = ""
-                }
-            }
-        }
     }
 
     private func openDashboard() {

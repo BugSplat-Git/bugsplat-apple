@@ -13,7 +13,6 @@ final class ViewController: UIViewController {
     // MARK: - State
 
     private var entries: [ActivityEntry] = []
-    private var feedbackStatus: String?
 
     // MARK: - Views
 
@@ -341,7 +340,7 @@ final class ViewController: UIViewController {
     }
 
     private func renderFooter() {
-        footerLabel.text = feedbackStatus ?? "Shake the device to send feedback anytime."
+        footerLabel.text = "Shake the device to send feedback anytime."
     }
 
     // MARK: - Actions
@@ -363,16 +362,17 @@ final class ViewController: UIViewController {
     }
 
     @objc private func presentFeedbackSheet() {
-        let alert = UIAlertController(title: "Send Feedback", message: nil, preferredStyle: .alert)
-        alert.addTextField { $0.placeholder = "Title" }
-        alert.addTextField { $0.placeholder = "Description" }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Send", style: .default) { [weak self, weak alert] _ in
-            let title = alert?.textFields?[0].text ?? ""
-            let description = alert?.textFields?[1].text ?? ""
-            self?.sendFeedback(title: title, description: description)
-        })
-        present(alert, animated: true)
+        // Don't stack a second feedback sheet if one is already showing (e.g. a
+        // shake while the sheet is up).
+        if presentedViewController is FeedbackViewController { return }
+        let feedback = FeedbackViewController()
+        feedback.modalPresentationStyle = .pageSheet
+        feedback.onDismiss = { [weak self] in self?.refreshActivity() }
+        if let sheet = feedback.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(feedback, animated: true)
     }
 
     @objc private func presentHangConfirm() {
@@ -395,34 +395,6 @@ final class ViewController: UIViewController {
         // Single sleep until distantFuture - simpler than a spin loop and keeps
         // the CPU quiet while frozen.
         Thread.sleep(until: .distantFuture)
-    }
-
-    private func sendFeedback(title: String, description: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Treat an empty title the same as Cancel - don't submit, don't record.
-        guard !trimmed.isEmpty else { return }
-        feedbackStatus = "Sending..."
-        renderFooter()
-        BugSplat.shared().postFeedback(
-            title: trimmed,
-            description: description.isEmpty ? nil : description,
-            userName: nil,
-            userEmail: nil,
-            appKey: nil,
-            attachments: nil
-        ) { [weak self] error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let error = error {
-                    self.feedbackStatus = "Feedback failed: \(error.localizedDescription)"
-                    self.renderFooter()
-                } else {
-                    self.feedbackStatus = "Feedback sent — thank you!"
-                    ActivityLog.record(.feedback, detail: "\u{201C}\(trimmed)\u{201D}")
-                    self.refreshActivity()
-                }
-            }
-        }
     }
 
     @objc private func openDashboard() {

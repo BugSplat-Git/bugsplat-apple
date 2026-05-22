@@ -21,6 +21,11 @@ enum DemoColor {
     static let pillStroke   = Color(hex: 0xE4E2DA)
     static let connectedDot = Color(hex: 0x22C55E)
     static let link         = Color(hex: 0x1F73E8)
+    // Primary action green used by the feedback sheet (form + thank-you buttons).
+    static let feedbackAccent = Color(hex: 0x4E9D78)
+    static let fieldBg      = Color(hex: 0xFFFFFF)
+    static let footerBg     = Color(hex: 0xF4F2EA)
+    static let asterisk     = Color(hex: 0xDC2626)
 
     static let activityCrash    = Color(hex: 0x1F73E8)
     static let activityError    = Color(hex: 0xE5B142)

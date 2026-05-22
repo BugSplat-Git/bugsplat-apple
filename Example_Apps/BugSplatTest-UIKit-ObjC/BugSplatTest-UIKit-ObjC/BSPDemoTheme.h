@@ -29,6 +29,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (UIColor *)activityFeedback;
 + (UIColor *)activityHang;
 
+/// Primary action green used by the feedback sheet (form + thank-you buttons).
++ (UIColor *)feedbackAccent;
++ (UIColor *)footerBg;
++ (UIColor *)asterisk;
+
 /// Build a UIColor from a packed 0xRRGGBB integer.
 + (UIColor *)colorWithHex:(uint32_t)hex;
 

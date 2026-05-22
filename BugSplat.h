@@ -17,6 +17,7 @@ FOUNDATION_EXPORT const unsigned char BugSplatVersionString[];
 
 #import <BugSplat/BugSplatDelegate.h>
 #import <BugSplat/BugSplatAttachment.h>
+#import <BugSplat/BugSplatFeedbackResult.h>
 #if TARGET_OS_OSX
 #import <BugSplat/BugSplatMac.h>
 #endif
@@ -267,6 +268,10 @@ NS_ASSUME_NONNULL_BEGIN
  * @param attachments Optional array of file attachments to include with the feedback.
  * @param completion Optional completion handler called when the upload finishes.
  *                   The error parameter is nil on success.
+ *
+ * @note To send custom attributes with the feedback, or to receive the report id
+ *       of the submitted feedback, use
+ *       `-postFeedback:description:userName:userEmail:appKey:attributes:attachments:completion:`.
  */
 - (void)postFeedback:(NSString *)title
          description:(nullable NSString *)description
@@ -276,6 +281,40 @@ NS_ASSUME_NONNULL_BEGIN
          attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
           completion:(nullable void (^)(NSError * _Nullable error))completion
     NS_SWIFT_NAME(postFeedback(title:description:userName:userEmail:appKey:attachments:completion:));
+
+/**
+ * Submits user feedback (non-crash) to BugSplat, with custom attributes, and reports
+ * the resulting report id.
+ *
+ * Behaves identically to
+ * `-postFeedback:description:userName:userEmail:appKey:attachments:completion:` with
+ * two additions:
+ *  - the supplied `attributes` are sent with the feedback and are searchable in the
+ *    BugSplat dashboard, and
+ *  - on success the completion handler receives a `BugSplatFeedbackResult` containing
+ *    the report id (`crashId`) and `infoUrl` of the submitted feedback.
+ *
+ * @param title The feedback title (required).
+ * @param description Optional description providing additional detail.
+ * @param userName Optional user name. Falls back to the `userName` property if nil.
+ * @param userEmail Optional user email. Falls back to the `userEmail` property if nil.
+ * @param appKey Optional application key. Falls back to the `appKey` property if nil.
+ * @param attributes Optional custom string key/value attributes to associate with the
+ *                   feedback, e.g. @{@"category": @"Bug"}.
+ * @param attachments Optional array of file attachments to include with the feedback.
+ * @param completion Optional completion handler called when the upload finishes.
+ *                   On success, `result` is non-nil and `error` is nil.
+ *                   On failure, `result` is nil and `error` is set.
+ */
+- (void)postFeedback:(NSString *)title
+         description:(nullable NSString *)description
+            userName:(nullable NSString *)userName
+           userEmail:(nullable NSString *)userEmail
+              appKey:(nullable NSString *)appKey
+          attributes:(nullable NSDictionary<NSString *, NSString *> *)attributes
+         attachments:(nullable NSArray<BugSplatAttachment *> *)attachments
+          completion:(nullable void (^)(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error))completion
+    NS_SWIFT_NAME(postFeedback(title:description:userName:userEmail:appKey:attributes:attachments:completion:));
 
 // macOS specific API
 #if TARGET_OS_OSX

@@ -85,7 +85,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Crash data is empty"}];
-            completion(NO, error, nil);
+            completion(NO, error, nil, nil);
             return;
         }
         
@@ -118,7 +118,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Failed to create ZIP archive"}];
-            completion(NO, error, nil);
+            completion(NO, error, nil, nil);
             return;
         }
         
@@ -131,14 +131,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                     size:zipData.length
                               completion:^(NSString *presignedURL, NSError *error) {
             if (error) {
-                completion(NO, error, nil);
+                completion(NO, error, nil, nil);
                 return;
             }
             
             // Step 2: Upload to S3
             [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
                 if (!success) {
-                    completion(NO, uploadError, nil);
+                    completion(NO, uploadError, nil, nil);
                     return;
                 }
                 
@@ -157,7 +157,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                              code:BugSplatUploadErrorCodeInvalidData
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
-        completion(NO, error, nil);
+        completion(NO, error, nil, nil);
     }
 }
 
@@ -165,10 +165,10 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
            description:(NSString *)description
            attachments:(NSArray<BugSplatAttachment *> *)attachments
               metadata:(BugSplatCrashMetadata *)metadata
-            completion:(void (^)(NSError * _Nullable error))completion
+            completion:(BugSplatFeedbackUploadCompletion)completion
 {
     // Substitute a no-op block so the upload proceeds even without a caller-supplied completion
-    void (^safeCompletion)(NSError * _Nullable) = completion ?: ^(NSError * _Nullable __unused error) {};
+    BugSplatFeedbackUploadCompletion safeCompletion = completion ?: ^(BugSplatFeedbackResult * _Nullable __unused result, NSError * _Nullable __unused error) {};
 
     @try {
         // Validate that title is non-nil and non-empty
@@ -176,7 +176,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Feedback title is required and cannot be empty"}];
-            safeCompletion(error);
+            safeCompletion(nil, error);
             return;
         }
 
@@ -190,7 +190,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         NSError *jsonError;
         NSData *jsonData = [NSJSONSerialization dataWithJSONObject:feedbackDict options:0 error:&jsonError];
         if (jsonError) {
-            safeCompletion(jsonError);
+            safeCompletion(nil, jsonError);
             return;
         }
 
@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                  code:BugSplatUploadErrorCodeInvalidData
                                              userInfo:@{NSLocalizedDescriptionKey: @"Failed to create feedback ZIP archive"}];
-            safeCompletion(error);
+            safeCompletion(nil, error);
             return;
         }
 
@@ -234,14 +234,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                     size:zipData.length
                               completion:^(NSString *presignedURL, NSError *error) {
             if (error) {
-                safeCompletion(error);
+                safeCompletion(nil, error);
                 return;
             }
 
             // Step 2: Upload to S3
             [self uploadData:zipData toPresignedURL:presignedURL completion:^(BOOL success, NSError *uploadError) {
                 if (!success) {
-                    safeCompletion(uploadError);
+                    safeCompletion(nil, uploadError);
                     return;
                 }
 
@@ -252,12 +252,14 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                             applicationName:appName
                          applicationVersion:appVersion
                                    metadata:metadata
-                                 completion:^(BOOL commitSuccess, NSError *commitError, NSString *infoUrl) {
+                                 completion:^(BOOL commitSuccess, NSError *commitError, NSString *infoUrl, NSNumber *crashId) {
                     if (commitSuccess) {
                         NSLog(@"BugSplat: User feedback uploaded successfully");
-                        safeCompletion(nil);
+                        BugSplatFeedbackResult *result = [[BugSplatFeedbackResult alloc] initWithCrashId:crashId
+                                                                                                 infoUrl:infoUrl];
+                        safeCompletion(result, nil);
                     } else {
-                        safeCompletion(commitError);
+                        safeCompletion(nil, commitError);
                     }
                 }];
             }];
@@ -267,7 +269,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         NSError *error = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                              code:BugSplatUploadErrorCodeInvalidData
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Exception: %@", exception.reason]}];
-        safeCompletion(error);
+        safeCompletion(nil, error);
     }
 }
 
@@ -495,7 +497,7 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     self.currentTask = [self.urlSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                completion(NO, error, nil);
+                completion(NO, error, nil, nil);
             });
             return;
         }
@@ -507,27 +509,47 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                                                        code:BugSplatUploadErrorCodeServerError
                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Commit failed with status %ld: %@", (long)httpResponse.statusCode, responseBody ?: @""]}];
             dispatch_async(dispatch_get_main_queue(), ^{
-                completion(NO, commitError, nil);
+                completion(NO, commitError, nil, nil);
             });
             return;
         }
         
-        // Parse response to extract infoUrl
+        // Parse response to extract infoUrl and the report id (crashId)
         NSString *infoUrl = nil;
+        NSNumber *crashId = nil;
         if (data.length > 0) {
             NSError *jsonError = nil;
             NSDictionary *responseJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
             if (!jsonError && [responseJson isKindOfClass:[NSDictionary class]]) {
-                infoUrl = responseJson[@"infoUrl"];
-                if (infoUrl) {
+                id rawInfoUrl = responseJson[@"infoUrl"];
+                if ([rawInfoUrl isKindOfClass:[NSString class]]) {
+                    infoUrl = rawInfoUrl;
                     NSLog(@"BugSplat: Crash report info URL: %@", infoUrl);
+                }
+                // crashId is a JSON integer, but tolerate a string-encoded value too.
+                id rawCrashId = responseJson[@"crashId"];
+                if ([rawCrashId isKindOfClass:[NSNumber class]]) {
+                    crashId = rawCrashId;
+                } else if ([rawCrashId isKindOfClass:[NSString class]]) {
+                    // Only accept a string that is entirely a valid integer —
+                    // -longLongValue would otherwise turn garbage into @0.
+                    NSString *trimmed = [(NSString *)rawCrashId
+                        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    NSScanner *scanner = [NSScanner scannerWithString:trimmed];
+                    long long parsed = 0;
+                    if (trimmed.length > 0 && [scanner scanLongLong:&parsed] && scanner.atEnd) {
+                        crashId = @(parsed);
+                    }
+                }
+                if (crashId) {
+                    NSLog(@"BugSplat: Crash report id: %@", crashId);
                 }
             }
         }
-        
+
         NSLog(@"BugSplat: Crash report uploaded successfully");
         dispatch_async(dispatch_get_main_queue(), ^{
-            completion(YES, nil, infoUrl);
+            completion(YES, nil, infoUrl, crashId);
         });
     }];
     

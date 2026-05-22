@@ -77,7 +77,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertTrue(success);
         XCTAssertNil(error);
         XCTAssertEqualObjects(infoUrl, @"https://bugsplat.com/crash/123");
@@ -112,7 +112,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         [expectation fulfill];
     }];
     
@@ -150,7 +150,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         [expectation fulfill];
     }];
     
@@ -184,7 +184,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         [expectation fulfill];
     }];
     
@@ -206,7 +206,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         [expectation fulfill];
@@ -223,7 +223,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         [expectation fulfill];
@@ -246,7 +246,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         XCTAssertEqual(error.code, NSURLErrorNotConnectedToInternet);
@@ -269,7 +269,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         // Rate limit error code is 4
@@ -292,7 +292,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         [expectation fulfill];
@@ -315,7 +315,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         [expectation fulfill];
@@ -339,7 +339,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertFalse(success);
         XCTAssertNotNil(error);
         [expectation fulfill];
@@ -378,7 +378,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:metadata
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         [expectation fulfill];
     }];
     
@@ -429,7 +429,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:nil
                                  metadata:metadata
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         [expectation fulfill];
     }];
     
@@ -478,7 +478,7 @@
                             crashFilename:@"crash.crashlog"
                               attachments:@[attachment]
                                  metadata:nil
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         XCTAssertTrue(success);
         [expectation fulfill];
     }];
@@ -568,8 +568,9 @@
                            description:@"A test description"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNil(error);
+        XCTAssertNotNil(result);
         [expectation fulfill];
     }];
 
@@ -602,7 +603,7 @@
                            description:@"Desc"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         [expectation fulfill];
     }];
 
@@ -641,7 +642,7 @@
                            description:@"Desc"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         [expectation fulfill];
     }];
 
@@ -667,7 +668,7 @@
                            description:@"Desc"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNotNil(error);
         XCTAssertTrue([error.localizedDescription containsString:@"title"]);
         [expectation fulfill];
@@ -688,7 +689,7 @@
                            description:@"Desc"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNotNil(error);
         [expectation fulfill];
     }];
@@ -750,7 +751,7 @@
                            description:@"Desc"
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNotNil(error);
         [expectation fulfill];
     }];
@@ -788,7 +789,7 @@
                            description:@"Desc"
                            attachments:@[attachment]
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNil(error);
         [expectation fulfill];
     }];
@@ -828,13 +829,173 @@
                            description:nil
                            attachments:nil
                               metadata:metadata
-                            completion:^(NSError * _Nullable error) {
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
         XCTAssertNil(error);
         [expectation fulfill];
     }];
 
     [self waitForExpectationsWithTimeout:5.0 handler:nil];
     XCTAssertEqual(self.mockSession.requestCount, 3);
+}
+
+- (void)testUploadFeedback_SurfacesCrashIdAndInfoUrl
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    // commitS3CrashUpload returns crashId (integer) and infoUrl
+    NSDictionary *commitResponse = @{@"status": @"success",
+                                     @"crashId": @987654,
+                                     @"infoUrl": @"https://app.bugsplat.com/v2/crash?id=987654"};
+    NSData *commitData = [NSJSONSerialization dataWithJSONObject:commitResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:commitData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        XCTAssertNil(error);
+        XCTAssertNotNil(result);
+        XCTAssertEqualObjects(result.crashId, @987654);
+        XCTAssertEqualObjects(result.infoUrl, @"https://app.bugsplat.com/v2/crash?id=987654");
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
+- (void)testUploadFeedback_SurfacesStringEncodedCrashId
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    // Tolerate a crashId delivered as a JSON string
+    NSDictionary *commitResponse = @{@"status": @"success", @"crashId": @"42"};
+    NSData *commitData = [NSJSONSerialization dataWithJSONObject:commitResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:commitData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        XCTAssertNil(error);
+        XCTAssertNotNil(result);
+        XCTAssertEqualObjects(result.crashId, @42);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
+- (void)testUploadFeedback_IgnoresNonNumericStringCrashId
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    // A malformed (non-numeric) crashId must not be surfaced as a bogus @0.
+    NSDictionary *commitResponse = @{@"status": @"success",
+                                     @"crashId": @"not-a-number",
+                                     @"infoUrl": @"https://app.bugsplat.com/v2/crash"};
+    NSData *commitData = [NSJSONSerialization dataWithJSONObject:commitResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:commitData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        XCTAssertNil(error);
+        XCTAssertNotNil(result);
+        XCTAssertNil(result.crashId, @"A non-numeric string crashId should be dropped, not parsed to @0");
+        XCTAssertEqualObjects(result.infoUrl, @"https://app.bugsplat.com/v2/crash");
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
+- (void)testUploadFeedback_SendsAttributesInCommitRequest
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+    metadata.attributes = @{@"category": @"Bug"};
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // The commit request (3rd request) should carry the attributes as a JSON form field
+    MockURLSessionRequest *commitRequest = self.mockSession.recordedRequests[2];
+    NSString *bodyString = [[NSString alloc] initWithData:commitRequest.request.HTTPBody encoding:NSUTF8StringEncoding];
+    XCTAssertTrue([bodyString containsString:@"attributes"]);
+    XCTAssertTrue([bodyString containsString:@"category"]);
+    XCTAssertTrue([bodyString containsString:@"Bug"]);
 }
 
 @end

@@ -1264,7 +1264,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                             crashFilename:@"crash.crashlog"
                               attachments:attachments
                                  metadata:uploadMetadata
-                               completion:^(BOOL success, NSError *error, NSString *infoUrl) {
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         
@@ -1335,6 +1335,32 @@ didDetectHangWithDuration:(NSTimeInterval)duration
          attachments:(NSArray<BugSplatAttachment *> *)attachments
           completion:(void (^)(NSError * _Nullable error))completion
 {
+    // Backward-compatible shim: delegate to the attributes/result variant and adapt
+    // the result-carrying completion down to the historical error-only signature.
+    [self postFeedback:title
+           description:description
+              userName:userName
+             userEmail:userEmail
+                appKey:appKey
+            attributes:nil
+           attachments:attachments
+            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        if (completion)
+        {
+            completion(error);
+        }
+    }];
+}
+
+- (void)postFeedback:(NSString *)title
+         description:(NSString *)description
+            userName:(NSString *)userName
+           userEmail:(NSString *)userEmail
+              appKey:(NSString *)appKey
+          attributes:(NSDictionary<NSString *, NSString *> *)attributes
+         attachments:(NSArray<BugSplatAttachment *> *)attachments
+          completion:(void (^)(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error))completion
+{
     BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
     metadata.database = self.bugSplatDatabase;
     metadata.applicationName = self.resolvedApplicationName;
@@ -1345,6 +1371,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     metadata.applicationKey = appKey ?: self.appKey;
     metadata.notes = self.notes;
     metadata.crashTypeId = @"36";
+    metadata.attributes = attributes;
 
     [self.uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
 }
