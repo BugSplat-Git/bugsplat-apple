@@ -60,6 +60,10 @@ final class FeedbackViewController: UIViewController {
 
     private let formContainer = UIView()
     private let thanksContainer = UIView()
+    private let formScrollView = UIScrollView()
+
+    /// Lifted by the keyboard handler so the footer + scroll view stay above the keyboard.
+    private var layoutBottomConstraint: NSLayoutConstraint!
 
     private let segmented = UISegmentedControl(items: FeedbackCategory.allCases.map { $0.rawValue })
     private let titleField = UITextField()
@@ -86,6 +90,7 @@ final class FeedbackViewController: UIViewController {
         buildThanksPlaceholder()
         renderAttachmentRow()
         updateSendEnabled()
+        installKeyboardHandling()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -113,7 +118,7 @@ final class FeedbackViewController: UIViewController {
         let footer = makeFormFooter()
 
         // Scrollable field content
-        let scrollView = UIScrollView()
+        let scrollView = formScrollView
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.keyboardDismissMode = .interactive
 
@@ -167,11 +172,13 @@ final class FeedbackViewController: UIViewController {
         layout.alignment = .fill
         formContainer.addSubview(layout)
 
+        layoutBottomConstraint = layout.bottomAnchor.constraint(equalTo: formContainer.bottomAnchor)
+
         NSLayoutConstraint.activate([
             layout.topAnchor.constraint(equalTo: formContainer.safeAreaLayoutGuide.topAnchor),
             layout.leadingAnchor.constraint(equalTo: formContainer.leadingAnchor),
             layout.trailingAnchor.constraint(equalTo: formContainer.trailingAnchor),
-            layout.bottomAnchor.constraint(equalTo: formContainer.bottomAnchor),
+            layoutBottomConstraint,
 
             fields.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20),
             fields.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20),
@@ -442,6 +449,49 @@ final class FeedbackViewController: UIViewController {
         divider.backgroundColor = DemoColor.cardStroke
         divider.heightAnchor.constraint(equalToConstant: 1).isActive = true
         return divider
+    }
+
+    // MARK: - Keyboard handling
+
+    /// Lifts the form (footer + scroll view) above the keyboard and lets a tap
+    /// outside any field dismiss it.
+    private func installKeyboardHandling() {
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(keyboardFrameWillChange),
+            name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tap.cancelsTouchesInView = false  // let buttons/controls still receive the tap
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    @objc private func keyboardFrameWillChange(_ note: Notification) {
+        guard let info = note.userInfo,
+              let endFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        else { return }
+        let duration = (info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let curveRaw = (info[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 0
+
+        let endInView = view.convert(endFrame, from: nil)
+        let overlap = max(0, view.bounds.maxY - endInView.minY)
+        layoutBottomConstraint.constant = -overlap
+
+        UIView.animate(withDuration: duration, delay: 0,
+                       options: UIView.AnimationOptions(rawValue: UInt(curveRaw) << 16),
+                       animations: { self.view.layoutIfNeeded() },
+                       completion: { _ in self.scrollActiveFieldToVisible() })
+    }
+
+    /// Keeps the focused field visible after the scroll view shrinks for the keyboard.
+    private func scrollActiveFieldToVisible() {
+        let fields: [UIView] = [titleField, descriptionView, nameField, emailField]
+        guard let active = fields.first(where: { $0.isFirstResponder }) else { return }
+        let rect = formScrollView.convert(active.bounds, from: active)
+        formScrollView.scrollRectToVisible(rect.insetBy(dx: 0, dy: -16), animated: true)
     }
 
     // MARK: - Actions

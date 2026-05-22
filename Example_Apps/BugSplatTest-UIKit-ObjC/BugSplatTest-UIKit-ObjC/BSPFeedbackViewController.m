@@ -70,6 +70,10 @@
 @property (nonatomic, strong, nullable) NSData *pickedFileData;
 @property (nonatomic, assign) BOOL submitting;
 
+// Keyboard handling
+@property (nonatomic, strong) UIScrollView *formScrollView;
+@property (nonatomic, strong) NSLayoutConstraint *layoutBottomConstraint;
+
 @end
 
 @implementation BSPFeedbackViewController
@@ -94,6 +98,7 @@
     [self buildThanksContainer];
     [self renderAttachmentRow];
     [self updateSendEnabled];
+    [self installKeyboardHandling];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -121,6 +126,7 @@
     UIScrollView *scrollView = [UIScrollView new];
     scrollView.translatesAutoresizingMaskIntoConstraints = NO;
     scrollView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
+    self.formScrollView = scrollView;
 
     UIStackView *fields = [UIStackView new];
     fields.translatesAutoresizingMaskIntoConstraints = NO;
@@ -174,11 +180,15 @@
     layout.alignment = UIStackViewAlignmentFill;
     [self.formContainer addSubview:layout];
 
+    // Held onto so the keyboard handler can lift the whole layout (scroll view
+    // + footer) above the keyboard.
+    self.layoutBottomConstraint = [layout.bottomAnchor constraintEqualToAnchor:self.formContainer.bottomAnchor];
+
     [NSLayoutConstraint activateConstraints:@[
         [layout.topAnchor constraintEqualToAnchor:self.formContainer.safeAreaLayoutGuide.topAnchor],
         [layout.leadingAnchor constraintEqualToAnchor:self.formContainer.leadingAnchor],
         [layout.trailingAnchor constraintEqualToAnchor:self.formContainer.trailingAnchor],
-        [layout.bottomAnchor constraintEqualToAnchor:self.formContainer.bottomAnchor],
+        self.layoutBottomConstraint,
 
         [fields.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor constant:20],
         [fields.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor constant:-20],
@@ -465,6 +475,58 @@
     divider.backgroundColor = [BSPDemoTheme cardStroke];
     [divider.heightAnchor constraintEqualToConstant:1].active = YES;
     return divider;
+}
+
+#pragma mark - Keyboard handling
+
+/// Lifts the form (footer + scroll view) above the keyboard and lets a tap
+/// outside any field dismiss it.
+- (void)installKeyboardHandling {
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardFrameWillChange:)
+                                                 name:UIKeyboardWillChangeFrameNotification
+                                               object:nil];
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+        initWithTarget:self action:@selector(dismissKeyboard)];
+    tap.cancelsTouchesInView = NO;  // let buttons/controls still receive the tap
+    [self.view addGestureRecognizer:tap];
+}
+
+- (void)dismissKeyboard {
+    [self.view endEditing:YES];
+}
+
+- (void)keyboardFrameWillChange:(NSNotification *)note {
+    NSDictionary *info = note.userInfo;
+    CGRect endFrame = [info[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    NSTimeInterval duration = [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+    UIViewAnimationCurve curve = (UIViewAnimationCurve)[info[UIKeyboardAnimationCurveUserInfoKey] integerValue];
+
+    CGRect endInView = [self.view convertRect:endFrame fromView:nil];
+    CGFloat overlap = MAX(0.0, CGRectGetMaxY(self.view.bounds) - CGRectGetMinY(endInView));
+    self.layoutBottomConstraint.constant = -overlap;
+
+    [UIView animateWithDuration:duration
+                          delay:0
+                        options:(UIViewAnimationOptions)(curve << 16)
+                     animations:^{ [self.view layoutIfNeeded]; }
+                     completion:^(BOOL finished) { [self scrollActiveFieldToVisible]; }];
+}
+
+/// Keeps the focused field visible after the scroll view shrinks for the keyboard.
+- (void)scrollActiveFieldToVisible {
+    UIView *active = nil;
+    for (UIView *field in @[ self.titleField, self.descriptionView, self.nameField, self.emailField ]) {
+        if (field.isFirstResponder) { active = field; break; }
+    }
+    if (!active) return;
+    CGRect rect = [self.formScrollView convertRect:active.bounds fromView:active];
+    [self.formScrollView scrollRectToVisible:CGRectInset(rect, 0, -16) animated:YES];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 #pragma mark - Form actions
