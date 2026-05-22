@@ -227,12 +227,6 @@
 }
 
 - (UIView *)makeFormFooter {
-    UILabel *hint = [UILabel new];
-    hint.text = @"Triggered by shaking the device.";
-    hint.font = [UIFont systemFontOfSize:13];
-    hint.textColor = [BSPDemoTheme textTertiary];
-    hint.textAlignment = NSTextAlignmentCenter;
-
     self.sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.sendButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.sendButton setTitle:@"Send feedback  →" forState:UIControlStateNormal];
@@ -254,13 +248,13 @@
         [self.sendSpinner.centerYAnchor constraintEqualToAnchor:self.sendButton.centerYAnchor],
     ]];
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[ hint, self.sendButton ]];
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[ self.sendButton ]];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 12;
     stack.alignment = UIStackViewAlignmentFill;
     stack.layoutMarginsRelativeArrangement = YES;
-    stack.layoutMargins = UIEdgeInsetsMake(14, 20, 20, 20);
+    stack.layoutMargins = UIEdgeInsetsMake(20, 20, 20, 20);
 
     return [self footerContainerWithContent:stack];
 }

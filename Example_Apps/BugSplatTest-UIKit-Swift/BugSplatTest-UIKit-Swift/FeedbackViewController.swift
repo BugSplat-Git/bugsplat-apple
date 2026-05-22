@@ -217,12 +217,6 @@ final class FeedbackViewController: UIViewController {
     }
 
     private func makeFormFooter() -> UIView {
-        let hint = UILabel()
-        hint.text = "Triggered by shaking the device."
-        hint.font = .systemFont(ofSize: 13)
-        hint.textColor = DemoColor.textTertiary
-        hint.textAlignment = .center
-
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         sendButton.setTitle("Send feedback  →", for: .normal)
         sendButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
@@ -242,13 +236,13 @@ final class FeedbackViewController: UIViewController {
             sendSpinner.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
         ])
 
-        let stack = UIStackView(arrangedSubviews: [hint, sendButton])
+        let stack = UIStackView(arrangedSubviews: [sendButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
         stack.spacing = 12
         stack.alignment = .fill
         stack.isLayoutMarginsRelativeArrangement = true
-        stack.layoutMargins = UIEdgeInsets(top: 14, left: 20, bottom: 20, right: 20)
+        stack.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
 
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false

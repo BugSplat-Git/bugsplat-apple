@@ -83,7 +83,7 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 #pragma mark - Lifecycle
 
 - (void)loadView {
-    NSView *root = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, kBSPFeedbackWidth, 640)];
+    NSView *root = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, kBSPFeedbackWidth, 616)];
     root.wantsLayer = YES;
     root.layer.backgroundColor = [BSPDemoTheme cardBg].CGColor;
     self.view = root;
@@ -91,7 +91,7 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.preferredContentSize = NSMakeSize(kBSPFeedbackWidth, 640);
+    self.preferredContentSize = NSMakeSize(kBSPFeedbackWidth, 616);
     [self buildForm];
     [self renderAttachmentRow];
     [self updateSendEnabled];
@@ -128,18 +128,28 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
     [self addArrangedField:self.segmented to:fields];
 
     self.titleField = [self makeTextField];
-    [fields addArrangedSubview:[self makeFieldWithLabel:@"Title" required:YES input:[self boxedInput:self.titleField height:36]]];
+    [self addArrangedField:[self makeFieldWithLabel:@"Title" required:YES
+                                              input:[self boxedInput:self.titleField height:36]]
+                        to:fields];
 
     NSScrollView *descScroll = [self makeDescriptionScroll];
-    [fields addArrangedSubview:[self makeFieldWithLabel:@"Description" required:NO input:descScroll]];
+    [self addArrangedField:[self makeFieldWithLabel:@"Description" required:NO
+                                              input:[self boxedScroll:descScroll height:84]]
+                        to:fields];
 
     self.nameField = [self makeTextField];
-    [fields addArrangedSubview:[self makeFieldWithLabel:@"Name" required:NO input:[self boxedInput:self.nameField height:36]]];
+    [self addArrangedField:[self makeFieldWithLabel:@"Name" required:NO
+                                              input:[self boxedInput:self.nameField height:36]]
+                        to:fields];
 
     self.emailField = [self makeTextField];
-    [fields addArrangedSubview:[self makeFieldWithLabel:@"Email" required:NO input:[self boxedInput:self.emailField height:36]]];
+    [self addArrangedField:[self makeFieldWithLabel:@"Email" required:NO
+                                              input:[self boxedInput:self.emailField height:36]]
+                        to:fields];
 
-    [fields addArrangedSubview:[self makeFieldWithLabel:@"Attachment" required:NO input:[self makeAttachmentRow]]];
+    [self addArrangedField:[self makeFieldWithLabel:@"Attachment" required:NO
+                                              input:[self makeAttachmentRow]]
+                        to:fields];
 
     [self addArrangedField:[self makeIncludeLogsRow] to:fields];
 
@@ -211,11 +221,6 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 }
 
 - (NSView *)makeFormFooter {
-    NSTextField *hint = [NSTextField labelWithString:@"Press any 6 keys at once to send feedback."];
-    hint.font = [NSFont systemFontOfSize:12];
-    hint.textColor = [BSPDemoTheme textTertiary];
-    hint.alignment = NSTextAlignmentCenter;
-
     self.sendButton = [NSButton buttonWithTitle:@"Send feedback  →" target:self action:@selector(submitTapped)];
     self.sendButton.translatesAutoresizingMaskIntoConstraints = NO;
     self.sendButton.bezelStyle = NSBezelStyleRounded;
@@ -235,12 +240,12 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
         [self.sendSpinner.centerYAnchor constraintEqualToAnchor:self.sendButton.centerYAnchor],
     ]];
 
-    NSStackView *stack = [NSStackView stackViewWithViews:@[ hint, self.sendButton ]];
+    NSStackView *stack = [NSStackView stackViewWithViews:@[ self.sendButton ]];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     stack.orientation = NSUserInterfaceLayoutOrientationVertical;
     stack.alignment = NSLayoutAttributeCenterX;
     stack.spacing = 10;
-    stack.edgeInsets = NSEdgeInsetsMake(14, 20, 20, 20);
+    stack.edgeInsets = NSEdgeInsetsMake(16, 20, 20, 20);
 
     return [self footerContainerWithContent:stack stretchView:self.sendButton];
 }
@@ -275,20 +280,21 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
     scroll.hasVerticalScroller = YES;
     scroll.borderType = NSNoBorder;
     scroll.drawsBackground = NO;
-    scroll.wantsLayer = YES;
-    scroll.layer.cornerRadius = 8;
-    scroll.layer.borderWidth = 1;
-    scroll.layer.borderColor = [BSPDemoTheme cardStroke].CGColor;
-    [scroll.heightAnchor constraintEqualToConstant:84].active = YES;
 
     self.descriptionView = [[NSTextView alloc] initWithFrame:NSZeroRect];
     self.descriptionView.font = [NSFont systemFontOfSize:13];
     self.descriptionView.textColor = [BSPDemoTheme textPrimary];
-    self.descriptionView.drawsBackground = YES;
-    self.descriptionView.backgroundColor = [BSPDemoTheme cardBg];
+    self.descriptionView.drawsBackground = NO;
     self.descriptionView.textContainerInset = NSMakeSize(6, 7);
     self.descriptionView.richText = NO;
     self.descriptionView.automaticQuoteSubstitutionEnabled = NO;
+    // Standard text-view-in-scroll-view sizing so typed text wraps to the box.
+    self.descriptionView.autoresizingMask = NSViewWidthSizable;
+    self.descriptionView.minSize = NSMakeSize(0, 0);
+    self.descriptionView.maxSize = NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX);
+    self.descriptionView.verticallyResizable = YES;
+    self.descriptionView.horizontallyResizable = NO;
+    self.descriptionView.textContainer.widthTracksTextView = YES;
     scroll.documentView = self.descriptionView;
     return scroll;
 }
@@ -435,6 +441,28 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
     return box;
 }
 
+/// Wraps a scroll view in a rounded, outlined box. The box (a plain NSView)
+/// draws the border — a border set on the scroll view's own layer is not
+/// rendered reliably by AppKit.
+- (NSView *)boxedScroll:(NSScrollView *)scroll height:(CGFloat)height {
+    NSView *box = [NSView new];
+    box.translatesAutoresizingMaskIntoConstraints = NO;
+    box.wantsLayer = YES;
+    box.layer.backgroundColor = [BSPDemoTheme cardBg].CGColor;
+    box.layer.cornerRadius = 8;
+    box.layer.borderWidth = 1;
+    box.layer.borderColor = [BSPDemoTheme cardStroke].CGColor;
+    [box addSubview:scroll];
+    [NSLayoutConstraint activateConstraints:@[
+        [box.heightAnchor constraintEqualToConstant:height],
+        [scroll.topAnchor constraintEqualToAnchor:box.topAnchor constant:1],
+        [scroll.bottomAnchor constraintEqualToAnchor:box.bottomAnchor constant:-1],
+        [scroll.leadingAnchor constraintEqualToAnchor:box.leadingAnchor constant:1],
+        [scroll.trailingAnchor constraintEqualToAnchor:box.trailingAnchor constant:-1],
+    ]];
+    return box;
+}
+
 /// A labeled field: a header row (label + red asterisk or "optional") above the input.
 - (NSView *)makeFieldWithLabel:(NSString *)label required:(BOOL)required input:(NSView *)input {
     NSMutableAttributedString *attributed = [[NSMutableAttributedString alloc]
@@ -508,7 +536,15 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 }
 
 - (void)closeTapped {
-    [self dismissViewController:self];
+    // Dismiss via the presenter so its -presentedViewControllers is properly
+    // cleared — otherwise the presenter's "already showing?" guard keeps the
+    // feedback sheet from being opened again.
+    NSViewController *presenter = self.presentingViewController;
+    if (presenter) {
+        [presenter dismissViewController:self];
+    } else {
+        [self dismissViewController:self];
+    }
 }
 
 - (void)updateSendEnabled {

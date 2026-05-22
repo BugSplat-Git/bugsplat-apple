@@ -269,9 +269,6 @@ struct FeedbackSheet: View {
 
     private var footer: some View {
         VStack(spacing: 12) {
-            Text("Triggered by shaking the device.")
-                .font(.system(size: 13))
-                .foregroundColor(DemoColor.textTertiary)
             Button(action: submit) {
                 HStack(spacing: 8) {
                     if isSubmitting {
@@ -296,7 +293,7 @@ struct FeedbackSheet: View {
             .disabled(!canSubmit)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 14)
+        .padding(.top, 20)
         .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
         .background(DemoColor.footerBg.ignoresSafeArea(edges: .bottom))
