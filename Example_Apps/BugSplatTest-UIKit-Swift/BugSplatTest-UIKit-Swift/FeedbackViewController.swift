@@ -95,7 +95,11 @@ final class FeedbackViewController: UIViewController {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        onDismiss?()
+        // Only when the sheet is actually going away — not when it is merely
+        // covered by a controller it presented (e.g. the document picker).
+        if isBeingDismissed {
+            onDismiss?()
+        }
     }
 
     // MARK: - Form layout

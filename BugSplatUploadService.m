@@ -530,8 +530,16 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
                 id rawCrashId = responseJson[@"crashId"];
                 if ([rawCrashId isKindOfClass:[NSNumber class]]) {
                     crashId = rawCrashId;
-                } else if ([rawCrashId isKindOfClass:[NSString class]] && [(NSString *)rawCrashId length] > 0) {
-                    crashId = @([(NSString *)rawCrashId longLongValue]);
+                } else if ([rawCrashId isKindOfClass:[NSString class]]) {
+                    // Only accept a string that is entirely a valid integer —
+                    // -longLongValue would otherwise turn garbage into @0.
+                    NSString *trimmed = [(NSString *)rawCrashId
+                        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    NSScanner *scanner = [NSScanner scannerWithString:trimmed];
+                    long long parsed = 0;
+                    if (trimmed.length > 0 && [scanner scanLongLong:&parsed] && scanner.atEnd) {
+                        crashId = @(parsed);
+                    }
                 }
                 if (crashId) {
                     NSLog(@"BugSplat: Crash report id: %@", crashId);

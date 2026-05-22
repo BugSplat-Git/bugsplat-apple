@@ -917,6 +917,47 @@
     [self waitForExpectationsWithTimeout:5.0 handler:nil];
 }
 
+- (void)testUploadFeedback_IgnoresNonNumericStringCrashId
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    // A malformed (non-numeric) crashId must not be surfaced as a bogus @0.
+    NSDictionary *commitResponse = @{@"status": @"success",
+                                     @"crashId": @"not-a-number",
+                                     @"infoUrl": @"https://app.bugsplat.com/v2/crash"};
+    NSData *commitData = [NSJSONSerialization dataWithJSONObject:commitResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:commitData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Feedback upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = @"testdb";
+    metadata.applicationName = @"TestApp";
+    metadata.applicationVersion = @"1.0.0";
+
+    [self.uploadService uploadFeedback:@"Title"
+                           description:@"Desc"
+                           attachments:nil
+                              metadata:metadata
+                            completion:^(BugSplatFeedbackResult * _Nullable result, NSError * _Nullable error) {
+        XCTAssertNil(error);
+        XCTAssertNotNil(result);
+        XCTAssertNil(result.crashId, @"A non-numeric string crashId should be dropped, not parsed to @0");
+        XCTAssertEqualObjects(result.infoUrl, @"https://app.bugsplat.com/v2/crash");
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
 - (void)testUploadFeedback_SendsAttributesInCommitRequest
 {
     NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/test"};

@@ -103,7 +103,9 @@
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
-    if (self.onDismiss) self.onDismiss();
+    // Only when the sheet is actually going away - not when it is merely
+    // covered by a controller it presented (e.g. the document picker).
+    if (self.isBeingDismissed && self.onDismiss) self.onDismiss();
 }
 
 #pragma mark - Form layout

@@ -8,7 +8,7 @@
 
 @implementation BugSplatFeedbackResult
 
-- (instancetype)initWithCrashId:(NSNumber *)crashId infoUrl:(NSString *)infoUrl
+- (instancetype)initWithCrashId:(nullable NSNumber *)crashId infoUrl:(nullable NSString *)infoUrl
 {
     if ((self = [super init]))
     {
