@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/BugSplat-Git/bugsplat-apple",
       "state" : {
-        "revision" : "728d8581d71daf5738169c8ce0c616ac65f7c516",
-        "version" : "3.1.0"
+        "revision" : "37da8561e428eaefbf7441bb3c1ba9e88b787424",
+        "version" : "3.3.1"
       }
     }
   ],
