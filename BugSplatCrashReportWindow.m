@@ -18,7 +18,7 @@ static const CGFloat kButtonWidth = 100.0;
 static const CGFloat kButtonHeight = 32.0;
 static const CGFloat kDetailsHeight = 200.0;
 
-@interface BugSplatCrashReportWindow () <NSTextStorageDelegate>
+@interface BugSplatCrashReportWindow () <NSTextStorageDelegate, NSWindowDelegate>
 
 @property (nonatomic, strong) NSStackView *mainStackView;
 @property (nonatomic, strong) NSImageView *bannerImageView;
@@ -44,6 +44,8 @@ static const CGFloat kDetailsHeight = 200.0;
 
 @property (nonatomic, copy) BugSplatCrashReportCompletion completion;
 @property (nonatomic, strong) NSLayoutConstraint *detailsHeightConstraint;
+@property (nonatomic, assign) BugSplatUserAction pendingAction;
+@property (nonatomic, assign) BOOL isModal;
 
 @end
 
@@ -59,7 +61,15 @@ static const CGFloat kDetailsHeight = 200.0;
     self = [super initWithWindow:window];
     if (self) {
         _askUserDetails = YES;
-        
+
+        // Default to Cancel so dismissing via the title bar's red close button
+        // discards the report (see windowWillClose:).
+        _pendingAction = BugSplatUserActionCancel;
+
+        // Become the window delegate so every dismissal funnels through
+        // windowWillClose:, our single exit point.
+        window.delegate = self;
+
         [self setupUI];
     }
     return self;
@@ -482,6 +492,8 @@ static const CGFloat kDetailsHeight = 200.0;
 - (void)showWithCompletion:(BugSplatCrashReportCompletion)completion
 {
     self.completion = completion;
+    self.isModal = NO;
+    self.pendingAction = BugSplatUserActionCancel;
     [self updateUI];
     
     // Let Auto Layout calculate the size
@@ -506,6 +518,8 @@ static const CGFloat kDetailsHeight = 200.0;
 - (void)showModalWithCompletion:(BugSplatCrashReportCompletion)completion
 {
     self.completion = completion;
+    self.isModal = YES;
+    self.pendingAction = BugSplatUserActionCancel;
     [self updateUI];
     
     // Let Auto Layout calculate the size
@@ -543,26 +557,14 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (void)sendClicked:(id)sender
 {
-    NSString *name = self.nameField.stringValue ?: @"";
-    NSString *email = self.emailField.stringValue ?: @"";
-    NSString *comments = self.commentsTextView.string ?: @"";
-    
+    self.pendingAction = BugSplatUserActionSend;
     [self.window close];
-    [NSApp stopModal];
-    
-    if (self.completion) {
-        self.completion(BugSplatUserActionSend, name, email, comments);
-    }
 }
 
 - (void)cancelClicked:(id)sender
 {
+    self.pendingAction = BugSplatUserActionCancel;
     [self.window close];
-    [NSApp stopModal];
-    
-    if (self.completion) {
-        self.completion(BugSplatUserActionCancel, nil, nil, nil);
-    }
 }
 
 - (void)placeholderClicked:(NSGestureRecognizer *)gesture
@@ -597,6 +599,36 @@ static const CGFloat kDetailsHeight = 200.0;
         [self.window.animator setFrame:frame display:YES];
         
     } completionHandler:nil];
+}
+
+#pragma mark - NSWindowDelegate
+
+- (void)windowWillClose:(NSNotification *)notification
+{
+    BugSplatCrashReportCompletion completion = self.completion;
+    self.completion = nil;
+    if (!completion) {
+        return; // Already handled (guards against a second close notification).
+    }
+
+    NSString *name = nil, *email = nil, *comments = nil;
+    if (self.pendingAction == BugSplatUserActionSend) {
+        name = self.nameField.stringValue ?: @"";
+        email = self.emailField.stringValue ?: @"";
+        comments = self.commentsTextView.string ?: @"";
+    }
+
+    if (self.isModal) {
+        [NSApp stopModal];
+    }
+
+    // Defer the completion to the next runloop tick. It releases this controller
+    // (BugSplat sets crashReportWindow = nil), so running it now would deallocate
+    // the window while it is still mid-close.
+    BugSplatUserAction action = self.pendingAction;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        completion(action, name, email, comments);
+    });
 }
 
 #pragma mark - NSTextStorageDelegate
