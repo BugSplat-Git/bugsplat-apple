@@ -44,7 +44,7 @@ static const CGFloat kDetailsHeight = 200.0;
 
 @property (nonatomic, copy) BugSplatCrashReportCompletion completion;
 @property (nonatomic, strong) NSLayoutConstraint *detailsHeightConstraint;
-@property (nonatomic, assign) BOOL didFinish;
+@property (nonatomic, assign) BugSplatUserAction pendingAction;
 @property (nonatomic, assign) BOOL isModal;
 
 @end
@@ -62,8 +62,12 @@ static const CGFloat kDetailsHeight = 200.0;
     if (self) {
         _askUserDetails = YES;
 
-        // Become the window delegate so we can treat the title bar's red close
-        // button the same as Cancel (see windowWillClose:).
+        // Default to Cancel so dismissing via the title bar's red close button
+        // discards the report (see windowWillClose:).
+        _pendingAction = BugSplatUserActionCancel;
+
+        // Become the window delegate so every dismissal funnels through
+        // windowWillClose:, our single exit point.
         window.delegate = self;
 
         [self setupUI];
@@ -550,51 +554,14 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (void)sendClicked:(id)sender
 {
-    NSString *name = self.nameField.stringValue ?: @"";
-    NSString *email = self.emailField.stringValue ?: @"";
-    NSString *comments = self.commentsTextView.string ?: @"";
-
-    [self finishWithAction:BugSplatUserActionSend userName:name userEmail:email comments:comments];
+    self.pendingAction = BugSplatUserActionSend;
+    [self.window close];
 }
 
 - (void)cancelClicked:(id)sender
 {
-    [self finishWithAction:BugSplatUserActionCancel userName:nil userEmail:nil comments:nil];
-}
-
-// Single exit point for the dialog. Routes Send, Cancel, and the title bar's
-// red close button through the same teardown so the modal session is always
-// ended and the completion handler always fires exactly once.
-- (void)finishWithAction:(BugSplatUserAction)action
-                userName:(nullable NSString *)userName
-               userEmail:(nullable NSString *)userEmail
-                comments:(nullable NSString *)comments
-{
-    if (self.didFinish) {
-        return;
-    }
-    self.didFinish = YES;
-
-    // Hold a strong reference for the duration of this method: invoking the
-    // completion handler typically releases the only external reference to this
-    // controller (BugSplat sets crashReportWindow = nil), which would otherwise
-    // deallocate self mid-method.
-    __strong typeof(self) strongSelf = self;
-
-    BugSplatCrashReportCompletion completion = strongSelf.completion;
-    strongSelf.completion = nil;
-
-    // Closing the window triggers windowWillClose:, but didFinish guards against
-    // re-entrancy so this is safe to call here.
-    [strongSelf.window close];
-
-    if (strongSelf.isModal) {
-        [NSApp stopModal];
-    }
-
-    if (completion) {
-        completion(action, userName, userEmail, comments);
-    }
+    self.pendingAction = BugSplatUserActionCancel;
+    [self.window close];
 }
 
 - (void)placeholderClicked:(NSGestureRecognizer *)gesture
@@ -635,15 +602,30 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-    // Reached when the user clicks the title bar's red close button (Send/Cancel
-    // set didFinish first via finishWithAction:). Treat it as Cancel so the crash
-    // report is discarded, the modal session ends, and the delegate is notified —
-    // instead of leaving the report pending and, in modal mode, hanging the app.
-    if (self.didFinish) {
-        return;
+    BugSplatCrashReportCompletion completion = self.completion;
+    self.completion = nil;
+    if (!completion) {
+        return; // Already handled (guards against a second close notification).
     }
 
-    [self finishWithAction:BugSplatUserActionCancel userName:nil userEmail:nil comments:nil];
+    NSString *name = nil, *email = nil, *comments = nil;
+    if (self.pendingAction == BugSplatUserActionSend) {
+        name = self.nameField.stringValue ?: @"";
+        email = self.emailField.stringValue ?: @"";
+        comments = self.commentsTextView.string ?: @"";
+    }
+
+    if (self.isModal) {
+        [NSApp stopModal];
+    }
+
+    // Defer the completion to the next runloop tick. It releases this controller
+    // (BugSplat sets crashReportWindow = nil), so running it now would deallocate
+    // the window while it is still mid-close.
+    BugSplatUserAction action = self.pendingAction;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        completion(action, name, email, comments);
+    });
 }
 
 #pragma mark - NSTextStorageDelegate
