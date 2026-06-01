@@ -18,7 +18,7 @@ static const CGFloat kButtonWidth = 100.0;
 static const CGFloat kButtonHeight = 32.0;
 static const CGFloat kDetailsHeight = 200.0;
 
-@interface BugSplatCrashReportWindow () <NSTextStorageDelegate>
+@interface BugSplatCrashReportWindow () <NSTextStorageDelegate, NSWindowDelegate>
 
 @property (nonatomic, strong) NSStackView *mainStackView;
 @property (nonatomic, strong) NSImageView *bannerImageView;
@@ -44,6 +44,8 @@ static const CGFloat kDetailsHeight = 200.0;
 
 @property (nonatomic, copy) BugSplatCrashReportCompletion completion;
 @property (nonatomic, strong) NSLayoutConstraint *detailsHeightConstraint;
+@property (nonatomic, assign) BOOL didFinish;
+@property (nonatomic, assign) BOOL isModal;
 
 @end
 
@@ -59,7 +61,11 @@ static const CGFloat kDetailsHeight = 200.0;
     self = [super initWithWindow:window];
     if (self) {
         _askUserDetails = YES;
-        
+
+        // Become the window delegate so we can treat the title bar's red close
+        // button the same as Cancel (see windowWillClose:).
+        window.delegate = self;
+
         [self setupUI];
     }
     return self;
@@ -506,6 +512,7 @@ static const CGFloat kDetailsHeight = 200.0;
 - (void)showModalWithCompletion:(BugSplatCrashReportCompletion)completion
 {
     self.completion = completion;
+    self.isModal = YES;
     [self updateUI];
     
     // Let Auto Layout calculate the size
@@ -546,22 +553,47 @@ static const CGFloat kDetailsHeight = 200.0;
     NSString *name = self.nameField.stringValue ?: @"";
     NSString *email = self.emailField.stringValue ?: @"";
     NSString *comments = self.commentsTextView.string ?: @"";
-    
-    [self.window close];
-    [NSApp stopModal];
-    
-    if (self.completion) {
-        self.completion(BugSplatUserActionSend, name, email, comments);
-    }
+
+    [self finishWithAction:BugSplatUserActionSend userName:name userEmail:email comments:comments];
 }
 
 - (void)cancelClicked:(id)sender
 {
-    [self.window close];
-    [NSApp stopModal];
-    
-    if (self.completion) {
-        self.completion(BugSplatUserActionCancel, nil, nil, nil);
+    [self finishWithAction:BugSplatUserActionCancel userName:nil userEmail:nil comments:nil];
+}
+
+// Single exit point for the dialog. Routes Send, Cancel, and the title bar's
+// red close button through the same teardown so the modal session is always
+// ended and the completion handler always fires exactly once.
+- (void)finishWithAction:(BugSplatUserAction)action
+                userName:(nullable NSString *)userName
+               userEmail:(nullable NSString *)userEmail
+                comments:(nullable NSString *)comments
+{
+    if (self.didFinish) {
+        return;
+    }
+    self.didFinish = YES;
+
+    // Hold a strong reference for the duration of this method: invoking the
+    // completion handler typically releases the only external reference to this
+    // controller (BugSplat sets crashReportWindow = nil), which would otherwise
+    // deallocate self mid-method.
+    __strong typeof(self) strongSelf = self;
+
+    BugSplatCrashReportCompletion completion = strongSelf.completion;
+    strongSelf.completion = nil;
+
+    // Closing the window triggers windowWillClose:, but didFinish guards against
+    // re-entrancy so this is safe to call here.
+    [strongSelf.window close];
+
+    if (strongSelf.isModal) {
+        [NSApp stopModal];
+    }
+
+    if (completion) {
+        completion(action, userName, userEmail, comments);
     }
 }
 
@@ -597,6 +629,21 @@ static const CGFloat kDetailsHeight = 200.0;
         [self.window.animator setFrame:frame display:YES];
         
     } completionHandler:nil];
+}
+
+#pragma mark - NSWindowDelegate
+
+- (void)windowWillClose:(NSNotification *)notification
+{
+    // Reached when the user clicks the title bar's red close button (Send/Cancel
+    // set didFinish first via finishWithAction:). Treat it as Cancel so the crash
+    // report is discarded, the modal session ends, and the delegate is notified —
+    // instead of leaving the report pending and, in modal mode, hanging the app.
+    if (self.didFinish) {
+        return;
+    }
+
+    [self finishWithAction:BugSplatUserActionCancel userName:nil userEmail:nil comments:nil];
 }
 
 #pragma mark - NSTextStorageDelegate
