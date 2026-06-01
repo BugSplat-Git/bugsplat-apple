@@ -80,7 +80,6 @@ struct FeedbackSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     @State private var phase: Phase = .form
 
@@ -337,10 +336,14 @@ struct FeedbackSheet: View {
             do {
                 let data = try Data(contentsOf: url)
                 pickedFile = PickedAttachment(name: url.lastPathComponent, data: data)
+                errorMessage = nil
             } catch {
                 errorMessage = "Couldn't read the selected file: \(error.localizedDescription)"
             }
         case .failure(let error):
+            // The system file importer reports user cancellation as a failure on
+            // some OS versions; don't surface that as an error message.
+            if (error as? CocoaError)?.code == .userCancelled { return }
             errorMessage = "File selection failed: \(error.localizedDescription)"
         }
     }

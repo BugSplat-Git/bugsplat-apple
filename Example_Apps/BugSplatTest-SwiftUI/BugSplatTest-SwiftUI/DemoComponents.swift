@@ -62,6 +62,7 @@ struct EventCard: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 52, height: 52)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 17, weight: .bold))
