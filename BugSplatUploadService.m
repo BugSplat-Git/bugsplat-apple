@@ -29,6 +29,11 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 @property (nonatomic, strong) id<BugSplatURLSessionProtocol> urlSession;
 @property (nonatomic, strong, nullable) NSURLSessionTask *currentTask;
 
+// Delivers completion handlers (default: async on the main queue). Private;
+// exposed to tests via BugSplatUploadService+Testing.h so they can inject a
+// synchronous dispatcher. See -deliverCompletion:.
+@property (nonatomic, copy) void (^completionDispatcher)(dispatch_block_t block);
+
 @end
 
 @implementation BugSplatUploadService
@@ -59,6 +64,12 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         _applicationName = [applicationName copy];
         _applicationVersion = [applicationVersion copy];
         _urlSession = urlSession;
+        // Production always delivers completions asynchronously on the main
+        // thread. Tests may override this with a synchronous dispatcher so the
+        // multi-step upload flow completes without depending on the run loop.
+        _completionDispatcher = ^(dispatch_block_t block) {
+            dispatch_async(dispatch_get_main_queue(), block);
+        };
     }
     return self;
 }
@@ -66,6 +77,17 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
 - (void)dealloc
 {
     [_urlSession invalidateAndCancel];
+}
+
+/// Routes a completion block through the configured dispatcher (async-on-main in
+/// production). Falls back to async-on-main if a caller nils out the dispatcher.
+- (void)deliverCompletion:(dispatch_block_t)block
+{
+    if (self.completionDispatcher) {
+        self.completionDispatcher(block);
+    } else {
+        dispatch_async(dispatch_get_main_queue(), block);
+    }
 }
 
 - (void)uploadCrashReport:(NSData *)crashData
@@ -308,9 +330,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     
     self.currentTask = [self.urlSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(nil, error);
-            });
+            }];
             return;
         }
         
@@ -320,9 +342,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *rateLimitError = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                           code:BugSplatUploadErrorCodeRateLimited
                                                       userInfo:@{NSLocalizedDescriptionKey: @"Too many requests"}];
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(nil, rateLimitError);
-            });
+            }];
             return;
         }
         
@@ -330,9 +352,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *serverError = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                        code:BugSplatUploadErrorCodeServerError
                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Server returned status %ld", (long)httpResponse.statusCode]}];
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(nil, serverError);
-            });
+            }];
             return;
         }
         
@@ -342,15 +364,15 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *parseError = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                       code:BugSplatUploadErrorCodeServerError
                                                   userInfo:@{NSLocalizedDescriptionKey: @"Invalid server response"}];
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(nil, parseError);
-            });
+            }];
             return;
         }
         
-        dispatch_async(dispatch_get_main_queue(), ^{
+        [self deliverCompletion:^{
             completion(json[@"url"], nil);
-        });
+        }];
     }];
     
     [self.currentTask resume];
@@ -378,9 +400,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     
     self.currentTask = [self.urlSession uploadTaskWithRequest:request fromData:data completionHandler:^(NSData *responseData, NSURLResponse *response, NSError *error) {
         if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(NO, error);
-            });
+            }];
             return;
         }
         
@@ -389,15 +411,15 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *uploadError = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                        code:BugSplatUploadErrorCodeServerError
                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"S3 upload failed with status %ld", (long)httpResponse.statusCode]}];
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(NO, uploadError);
-            });
+            }];
             return;
         }
         
-        dispatch_async(dispatch_get_main_queue(), ^{
+        [self deliverCompletion:^{
             completion(YES, nil);
-        });
+        }];
     }];
     
     [self.currentTask resume];
@@ -496,9 +518,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
     
     self.currentTask = [self.urlSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(NO, error, nil, nil);
-            });
+            }];
             return;
         }
         
@@ -508,9 +530,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
             NSError *commitError = [NSError errorWithDomain:BugSplatUploadErrorDomain
                                                        code:BugSplatUploadErrorCodeServerError
                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Commit failed with status %ld: %@", (long)httpResponse.statusCode, responseBody ?: @""]}];
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [self deliverCompletion:^{
                 completion(NO, commitError, nil, nil);
-            });
+            }];
             return;
         }
         
@@ -548,9 +570,9 @@ typedef NS_ENUM(NSInteger, BugSplatUploadErrorCode) {
         }
 
         NSLog(@"BugSplat: Crash report uploaded successfully");
-        dispatch_async(dispatch_get_main_queue(), ^{
+        [self deliverCompletion:^{
             completion(YES, nil, infoUrl, crashId);
-        });
+        }];
     }];
     
     [self.currentTask resume];
