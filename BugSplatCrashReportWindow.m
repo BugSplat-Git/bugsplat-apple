@@ -492,6 +492,8 @@ static const CGFloat kDetailsHeight = 200.0;
 - (void)showWithCompletion:(BugSplatCrashReportCompletion)completion
 {
     self.completion = completion;
+    self.isModal = NO;
+    self.pendingAction = BugSplatUserActionCancel;
     [self updateUI];
     
     // Let Auto Layout calculate the size
@@ -517,6 +519,7 @@ static const CGFloat kDetailsHeight = 200.0;
 {
     self.completion = completion;
     self.isModal = YES;
+    self.pendingAction = BugSplatUserActionCancel;
     [self updateUI];
     
     // Let Auto Layout calculate the size
