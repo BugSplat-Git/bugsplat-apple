@@ -524,8 +524,6 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
 
     [self.heldKeyCodes addObject:@(keyCode)];
 
-    // Trigger only when enough keys are held *simultaneously* — the signature of
-    // slapping the keyboard, not of fast sequential typing.
     if ((NSInteger)self.heldKeyCodes.count >= kBSPSplatGestureKeyCount) {
         [self.heldKeyCodes removeAllObjects];
         self.splatWindowStart = 0;
