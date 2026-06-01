@@ -150,6 +150,7 @@
 		TT00001A2E3FE0000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		TT00001B2E3FE0000000001B /* BugSplatTestSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatTestSupport.h; sourceTree = "<group>"; };
 		TT00001C2E3FE0000000001C /* BugSplat+Testing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "BugSplat+Testing.h"; sourceTree = "<group>"; };
+		TT0000FE2E3FE00000000FFE /* BugSplatUploadService+Testing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "BugSplatUploadService+Testing.h"; sourceTree = "<group>"; };
 		TT0000252E3FE00000000025 /* MockURLSession.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MockURLSession.h; sourceTree = "<group>"; };
 		TT0000262E3FE00000000026 /* MockCrashStorage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MockCrashStorage.h; sourceTree = "<group>"; };
 		TT0000272E3FE00000000027 /* MockCrashReporter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MockCrashReporter.h; sourceTree = "<group>"; };
@@ -227,6 +228,7 @@
 				AA0000142E3FA00000000014 /* BugSplatZipHelper.m */,
 				TT00001B2E3FE0000000001B /* BugSplatTestSupport.h */,
 				TT00001C2E3FE0000000001C /* BugSplat+Testing.h */,
+				TT0000FE2E3FE00000000FFE /* BugSplatUploadService+Testing.h */,
 				TT0000302E3FE00000000030 /* Tests */,
 				63C6E1EE2B92831A00AED3E3 /* Products */,
 				63C6E2062B9285F400AED3E3 /* Frameworks */,

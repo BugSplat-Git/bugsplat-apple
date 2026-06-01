@@ -1,6 +1,6 @@
 //
 //  DemoComponents.swift
-//  BugSplatTest-SwiftUI
+//  BugSplatTest-SwiftUI-SPM
 //
 //  Reusable views for the demo screen: top-bar pill, database badge, event
 //  card, and recent-activity row.

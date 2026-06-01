@@ -1,6 +1,6 @@
 //
 //  FeedbackSheet.swift
-//  BugSplatTest-SwiftUI
+//  BugSplatTest-SwiftUI-SPM
 //
 //  The redesigned User Feedback experience: a bottom-sheet form for composing
 //  feedback, and a thank-you confirmation shown in the same sheet after a

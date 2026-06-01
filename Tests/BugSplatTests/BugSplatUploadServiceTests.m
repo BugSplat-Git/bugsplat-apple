@@ -7,6 +7,7 @@
 
 #import <XCTest/XCTest.h>
 #import "BugSplatUploadService.h"
+#import "BugSplatUploadService+Testing.h"
 #import "MockURLSession.h"
 
 @interface BugSplatUploadServiceTests : XCTestCase
@@ -26,10 +27,24 @@
                                                          applicationName:@"TestApp"
                                                       applicationVersion:@"1.0.0"
                                                               urlSession:self.mockSession];
+    // Deliver completions synchronously so the multi-step upload flow runs to
+    // completion without depending on the run loop draining queued main-queue
+    // blocks (which flakes under heavy CI/simulator load). Production keeps the
+    // default async-on-main dispatcher. Still delivers on the main thread (the
+    // production invariant) even if a future mock completes off-main; guarded
+    // against the dispatch_sync-to-main deadlock when already on main.
+    [self.uploadService setCompletionDispatcher:^(dispatch_block_t block) {
+        if ([NSThread isMainThread]) {
+            block();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), block);
+        }
+    }];
 }
 
 - (void)tearDown
 {
+    [self.uploadService cancelUpload];
     [self.mockSession reset];
     self.uploadService = nil;
     [super tearDown];

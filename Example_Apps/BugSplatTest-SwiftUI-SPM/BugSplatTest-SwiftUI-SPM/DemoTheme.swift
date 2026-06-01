@@ -1,0 +1,43 @@
+//
+//  DemoTheme.swift
+//  BugSplatTest-SwiftUI-SPM
+//
+//  Copyright © BugSplat, LLC. All rights reserved.
+//
+
+import SwiftUI
+
+enum DemoColor {
+    static let screenBg     = Color(hex: 0xFAF8F2)
+    static let cardBg       = Color(hex: 0xFFFFFF)
+    static let cardStroke   = Color(hex: 0xECEAE2)
+    static let textPrimary  = Color(hex: 0x0E1116)
+    // Both secondary and tertiary clear WCAG AA (≥4.5:1) against the card and
+    // screen backgrounds. Tertiary used to be a lighter gray (#9CA3AF, ~2.5:1)
+    // but small section headers and footers became hard to read.
+    static let textSecondary = Color(hex: 0x4B5563)
+    static let textTertiary = Color(hex: 0x6B7280)
+    static let badgeBg      = Color(hex: 0xF1EFE8)
+    static let pillStroke   = Color(hex: 0xE4E2DA)
+    static let connectedDot = Color(hex: 0x22C55E)
+    static let link         = Color(hex: 0x1F73E8)
+    // Primary action green used by the feedback sheet (form + thank-you buttons).
+    static let feedbackAccent = Color(hex: 0x4E9D78)
+    static let fieldBg      = Color(hex: 0xFFFFFF)
+    static let footerBg     = Color(hex: 0xF4F2EA)
+    static let asterisk     = Color(hex: 0xDC2626)
+
+    static let activityCrash    = Color(hex: 0x1F73E8)
+    static let activityError    = Color(hex: 0xE5B142)
+    static let activityFeedback = Color(hex: 0x22C55E)
+    static let activityHang     = Color(hex: 0xE5B142) // reuse error per spec
+}
+
+extension Color {
+    init(hex: UInt32) {
+        let r = Double((hex >> 16) & 0xFF) / 255.0
+        let g = Double((hex >> 8)  & 0xFF) / 255.0
+        let b = Double(hex & 0xFF) / 255.0
+        self = Color(red: r, green: g, blue: b)
+    }
+}

@@ -12,20 +12,24 @@
 #import "BSPFeedbackViewController.h"
 #import <BugSplat/BugSplat.h>
 
-// Splat gesture: 6 distinct keys within a tight 0.5s window. 6 is below the
-// 6-key rollover ceiling most MacBook keyboards enforce, so all simultaneously
-// held fingers actually register. The short window keeps real typing (even at
-// expert speeds, ~6 keys/sec) from triggering it.
+// Splat gesture: a real keyboard "splat" slams several keys down at the *same
+// time*. We track keys that are currently held (key down, not yet released) and
+// trigger only when enough are held simultaneously. Sequential typing — however
+// fast — releases each key before pressing the next, so it never holds enough at
+// once (which is why counting keys-per-window false-triggered on fast typing).
+// 5 is comfortably below the 6-key rollover ceiling most MacBook keyboards
+// enforce, so a palm slam still registers. The window is only a safety reset in
+// case a key-up event is dropped.
 static NSTimeInterval const kBSPSplatGestureWindowSeconds = 0.5;
-static NSInteger const kBSPSplatGestureKeyCount = 6;
+static NSInteger const kBSPSplatGestureKeyCount = 5;
 
 @interface ViewController ()
 @property (nonatomic, strong) NSStackView *contentStack;
 @property (nonatomic, strong) NSStackView *recentActivityList;
 @property (nonatomic, strong) NSTextField *recentEmptyLabel;
 @property (nonatomic, strong) NSTextField *footerLabel;
-@property (nonatomic, strong) id keyDownMonitor;
-@property (nonatomic, strong) NSMutableSet<NSNumber *> *pressedKeyCodes;
+@property (nonatomic, strong) id keyEventMonitor;
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *heldKeyCodes;
 @property (nonatomic, assign) NSTimeInterval splatWindowStart;
 @property (nonatomic, assign) BOOL feedbackInProgress;
 @end
@@ -43,7 +47,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.pressedKeyCodes = [NSMutableSet set];
+    self.heldKeyCodes = [NSMutableSet set];
     [self buildLayout];
     [self renderRecentActivity];
     [self installKeyMonitors];
@@ -60,8 +64,8 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
 - (void)viewWillDisappear {
     [super viewWillDisappear];
-    if (self.keyDownMonitor) [NSEvent removeMonitor:self.keyDownMonitor];
-    self.keyDownMonitor = nil;
+    if (self.keyEventMonitor) [NSEvent removeMonitor:self.keyEventMonitor];
+    self.keyEventMonitor = nil;
 }
 
 #pragma mark - Layout
@@ -428,7 +432,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
     // Block the splat gesture / Cmd+digit while the sheet is up so typing in
     // the feedback form doesn't re-trigger feedback.
     self.feedbackInProgress = YES;
-    [self.pressedKeyCodes removeAllObjects];
+    [self.heldKeyCodes removeAllObjects];
     self.splatWindowStart = 0;
 
     BSPFeedbackViewController *feedback = [[BSPFeedbackViewController alloc] init];
@@ -437,7 +441,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         strongSelf.feedbackInProgress = NO;
-        [strongSelf.pressedKeyCodes removeAllObjects];
+        [strongSelf.heldKeyCodes removeAllObjects];
         strongSelf.splatWindowStart = 0;
         [strongSelf renderRecentActivity];
     };
@@ -471,10 +475,17 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
 - (void)installKeyMonitors {
     __weak typeof(self) weakSelf = self;
-    self.keyDownMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+    self.keyEventMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskKeyUp)
                                                                 handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
         typeof(self) self = weakSelf;
         if (!self) return event;
+
+        // Always track releases so the held-key set stays accurate, even while
+        // the feedback sheet is up.
+        if (event.type == NSEventTypeKeyUp) {
+            [self.heldKeyCodes removeObject:@(event.keyCode)];
+            return event;
+        }
 
         // Stay out of the way while the feedback sheet is up - otherwise typing
         // in the text fields would re-trigger splat or steal Cmd+digit input.
@@ -502,15 +513,19 @@ static NSInteger const kBSPSplatGestureKeyCount = 6;
 
 - (void)trackKeyDown:(unsigned short)keyCode {
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-    if (now - self.splatWindowStart > kBSPSplatGestureWindowSeconds) {
-        // Window expired; start a fresh one.
-        [self.pressedKeyCodes removeAllObjects];
+
+    // Begin a fresh cluster when no keys are held, or when the current cluster
+    // has gone stale (a key-up was probably dropped). Real splats land all their
+    // keys within a few milliseconds.
+    if (self.heldKeyCodes.count == 0 || now - self.splatWindowStart > kBSPSplatGestureWindowSeconds) {
+        [self.heldKeyCodes removeAllObjects];
         self.splatWindowStart = now;
     }
-    [self.pressedKeyCodes addObject:@(keyCode)];
 
-    if ((NSInteger)self.pressedKeyCodes.count >= kBSPSplatGestureKeyCount) {
-        [self.pressedKeyCodes removeAllObjects];
+    [self.heldKeyCodes addObject:@(keyCode)];
+
+    if ((NSInteger)self.heldKeyCodes.count >= kBSPSplatGestureKeyCount) {
+        [self.heldKeyCodes removeAllObjects];
         self.splatWindowStart = 0;
         [self triggerFeedback:nil];
     }
