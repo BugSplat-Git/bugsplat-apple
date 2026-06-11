@@ -21,19 +21,22 @@ enum FeedbackCategory: String, CaseIterable {
     case other = "Other"
 }
 
-/// Locates the `sample_log.txt` file the app writes at launch (see `AppDelegate`)
-/// so it can be attached to feedback when the user opts in.
+/// Locates the current session's log file the app writes at launch (see `AppDelegate`)
+/// so it can be attached to feedback when the user opts in. Each session's log is
+/// named after `BugSplat.shared().sessionID`; since feedback is sent live during the
+/// current session, the current sessionID identifies the right file.
 enum SampleLog {
     static var fileURL: URL? {
         FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
-            .appendingPathComponent("sample_log.txt")
+            .appendingPathComponent("SessionLogs", isDirectory: true)
+            .appendingPathComponent("\(BugSplat.shared().sessionID.uuidString).log")
     }
 
     static func attachment() -> BugSplatAttachment? {
         guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }
-        return BugSplatAttachment(filename: "sample_log.txt",
+        return BugSplatAttachment(filename: "session.log",
                                   attachmentData: data,
                                   contentType: "text/plain")
     }
@@ -348,7 +351,7 @@ final class FeedbackViewController: UIViewController {
         title.textColor = DemoColor.textPrimary
 
         let subtitle = UILabel()
-        subtitle.text = "Attach the app's sample_log.txt"
+        subtitle.text = "Attach this session's log file"
         subtitle.font = .systemFont(ofSize: 12)
         subtitle.textColor = DemoColor.textTertiary
 

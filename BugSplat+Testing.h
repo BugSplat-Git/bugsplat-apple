@@ -25,6 +25,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)resolvedApplicationName;
 - (NSString *)resolvedApplicationVersion;
 - (nullable NSString *)crashesDirectoryPath;
+- (void)handleNewCrashFromPLCrashReporter;
+- (void)processPendingCrashReports;
 
 @end
 
