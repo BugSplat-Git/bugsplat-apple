@@ -10,15 +10,30 @@
 #import <AppKit/AppKit.h> // for NSApplicationDidFinishLaunchingNotification
 #import <BugSplat/BugSplat.h>
 
+/// How long to keep per-session log files before pruning them at startup.
+/// Sessions that end normally never trigger bugSplatDidFinishSendingCrashReport:sessionID:
+/// (there is no crash report to deliver), so their logs must be cleaned up by age instead.
+static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
+
 @interface MyBugSplatDelegate : NSObject <BugSplatDelegate>
 
-/// URL for the sample log file that will be attached to crash reports
-@property (nonatomic, strong) NSURL *logFileURL;
+/// URL for the current session's log file. The file is named after BugSplat's
+/// per-launch sessionID — that name IS the session-to-log mapping, which is what
+/// lets the crashed session's log be found again at the next launch.
+@property (nonatomic, strong) NSURL *sessionLogFileURL;
 
-/// Creates a sample log file for attachment demonstration
-- (void)createSampleLogFile;
+/// Creates this session's log file, named after BugSplat's sessionID.
+/// Must be called after [[BugSplat shared] start] so the sessionID is available.
+- (void)createSessionLogFile;
+
+/// Deletes session logs older than kSessionLogMaxAge (never the current session's)
+- (void)pruneOldSessionLogs;
 
 @end
+
+// BugSplat holds its delegate weakly, so the delegate must be kept alive
+// for the lifetime of the process to receive callbacks
+static MyBugSplatDelegate *gBugSplatDelegate = nil;
 
 
 // Call the C++ function that uses Objective-C
@@ -39,13 +54,10 @@ int bugSplatInit(const char * bugSplatDatabase)
 */
 
         // Initialize BugSplat
-        MyBugSplatDelegate *delegate = [[MyBugSplatDelegate alloc] init];
-        
-        // Create a sample log file for attachment demonstration
-        [delegate createSampleLogFile];
+        gBugSplatDelegate = [[MyBugSplatDelegate alloc] init];
 
         // Set a BugSplatDelegate
-        [[BugSplat shared] setDelegate:delegate];
+        [[BugSplat shared] setDelegate:gBugSplatDelegate];
 
         // Command Line Tools do not have a GUI. setAutoSubmitCrashReport: YES
         [[BugSplat shared] setAutoSubmitCrashReport:YES];
@@ -70,6 +82,20 @@ int bugSplatInit(const char * bugSplatDatabase)
 
         // Don't forget to call start after you've finished configuring BugSplat
         [[BugSplat shared] start];
+
+        // Create this session's log file, named after BugSplat's per-launch sessionID.
+        // WHY: crash reports are processed at the NEXT launch of the tool. A fixed log
+        // path that is overwritten on every launch can never be recovered for the session
+        // that crashed — by the time the report is sent, the file already holds the new
+        // session's log. Naming the file after the sessionID lets
+        // attachmentsForBugSplat:sessionID: look up exactly the crashed session's log
+        // when BugSplat passes that ID back to the delegate.
+        // NOTE: must come after [[BugSplat shared] start] so the sessionID is available.
+        [gBugSplatDelegate createSessionLogFile];
+
+        // Clean up logs from old sessions. Sessions that end normally never get the
+        // delete-on-delivery callback, so their logs are pruned by age at startup.
+        [gBugSplatDelegate pruneOldSessionLogs];
 
         // BugSplat expects a NSApplicationDidFinishLaunchingNotification to be sent before it will process crash reports.
         // In a command line tool without a normal app launch, send the notification manually. This must be sent after [[BugSplat shared] start]
@@ -144,73 +170,165 @@ void mainObjCRunLoop() {
 
 @implementation MyBugSplatDelegate
 
-#pragma mark - Sample Log File
+#pragma mark - Per-Session Log Files
 
-/// Creates a sample log file in the temp directory for attachment demonstration
-- (void)createSampleLogFile {
+/// Directory where per-session log files live: <Application Support>/SessionLogs/
+/// For a command line tool, Application Support in the user domain (~/Library/Application Support) is used
+- (NSURL *)sessionLogsDirectoryURL {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSURL *tempURL = [NSURL fileURLWithPath:NSTemporaryDirectory()];
-    self.logFileURL = [tempURL URLByAppendingPathComponent:@"sample_log.txt"];
-    
+    NSArray<NSURL *> *urls = [fileManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask];
+
+    if (urls.count == 0) {
+        NSLog(@"Could not access Application Support directory");
+        return nil;
+    }
+
+    return [urls.firstObject URLByAppendingPathComponent:@"SessionLogs" isDirectory:YES];
+}
+
+/// Log file URL for a given session ID: SessionLogs/<uuid>.log
+/// The file name itself is the session-to-log mapping — no extra bookkeeping
+/// (databases, plists, etc.) is needed to find the right log later.
+- (NSURL *)logFileURLForSessionID:(NSUUID *)sessionID {
+    NSString *fileName = [NSString stringWithFormat:@"%@.log", sessionID.UUIDString];
+    return [[self sessionLogsDirectoryURL] URLByAppendingPathComponent:fileName];
+}
+
+/// Creates this session's log file (named <sessionID>.log) and writes a few sample
+/// log lines. A real tool would keep appending to this file as the session runs, so
+/// that a crash report carries everything logged up to the moment of the crash.
+- (void)createSessionLogFile {
+    // sessionID is generated by BugSplat at every launch and is stable for the
+    // lifetime of the process. It is embedded in any crash report captured during
+    // this session — which is what ties this file to a future crash report.
+    NSUUID *sessionID = [[BugSplat shared] sessionID];
+
+    NSURL *directoryURL = [self sessionLogsDirectoryURL];
+    if (!directoryURL) {
+        return;
+    }
+
+    NSError *error = nil;
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager createDirectoryAtURL:directoryURL withIntermediateDirectories:YES attributes:nil error:&error]) {
+        NSLog(@"Failed to create SessionLogs directory: %@", error.localizedDescription);
+        return;
+    }
+
+    self.sessionLogFileURL = [self logFileURLForSessionID:sessionID];
+
     NSProcessInfo *processInfo = [NSProcessInfo processInfo];
     NSDate *now = [NSDate date];
-    
+
     NSString *logContent = [NSString stringWithFormat:
         @"=====================================\n"
-        @"BugSplat Sample Log File\n"
+        @"BugSplat Per-Session Log File\n"
         @"=====================================\n"
+        @"Session ID: %@\n"
         @"App Launch: %@\n"
         @"Host Name: %@\n"
         @"OS Version: %@\n"
         @"Process Name: %@\n"
         @"Process ID: %d\n"
         @"\n"
-        @"This is a sample log file demonstrating how to attach\n"
-        @"files to BugSplat crash reports from a command line tool.\n"
+        @"This log file is named after BugSplat's per-launch sessionID.\n"
+        @"If this session crashes, the crash report is processed at the\n"
+        @"NEXT launch of the tool, and BugSplat passes this session's ID\n"
+        @"back to the delegate so this exact file can be attached.\n"
         @"\n"
         @"You can use this pattern to attach:\n"
         @"- Application logs\n"
-        @"- Configuration files\n"
         @"- Diagnostic data\n"
-        @"- Any other relevant debugging information\n"
+        @"- Any other session-scoped debugging information\n"
         @"\n"
         @"Log entries:\n"
         @"[%@] INFO: Command line tool started\n"
         @"[%@] DEBUG: BugSplat initialized\n"
-        @"[%@] INFO: Sample log file created for attachment demo\n"
+        @"[%@] INFO: Session log file created\n"
         @"=====================================\n",
-        now, processInfo.hostName, processInfo.operatingSystemVersionString,
+        sessionID.UUIDString, now, processInfo.hostName, processInfo.operatingSystemVersionString,
         processInfo.processName, processInfo.processIdentifier, now, now, now];
-    
-    NSError *error = nil;
-    BOOL success = [logContent writeToURL:self.logFileURL
+
+    BOOL success = [logContent writeToURL:self.sessionLogFileURL
                                atomically:YES
                                  encoding:NSUTF8StringEncoding
                                     error:&error];
-    
+
     if (success) {
-        NSLog(@"Sample log file created at: %@", self.logFileURL.path);
+        NSLog(@"Session log file created at: %@", self.sessionLogFileURL.path);
     } else {
-        NSLog(@"Failed to create sample log file: %@", error.localizedDescription);
-        self.logFileURL = nil;
+        NSLog(@"Failed to create session log file: %@", error.localizedDescription);
+        self.sessionLogFileURL = nil;
+    }
+}
+
+/// Deletes session logs older than kSessionLogMaxAge. Logs for crashed sessions are
+/// deleted as soon as their report is delivered (see bugSplatDidFinishSendingCrashReport:sessionID:),
+/// but sessions that end normally leave their log behind, so prune by age here.
+/// The current session's log is never deleted.
+- (void)pruneOldSessionLogs {
+    NSURL *directoryURL = [self sessionLogsDirectoryURL];
+    if (!directoryURL) {
+        return;
+    }
+
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSArray<NSURL *> *logFiles = [fileManager contentsOfDirectoryAtURL:directoryURL
+                                            includingPropertiesForKeys:@[NSURLContentModificationDateKey]
+                                                               options:NSDirectoryEnumerationSkipsHiddenFiles
+                                                                 error:nil];
+
+    NSDate *cutoff = [NSDate dateWithTimeIntervalSinceNow:-kSessionLogMaxAge];
+    for (NSURL *logFile in logFiles) {
+        // Never delete the log for the session currently in progress
+        if ([logFile.lastPathComponent isEqualToString:self.sessionLogFileURL.lastPathComponent]) {
+            continue;
+        }
+
+        NSDate *modificationDate = nil;
+        [logFile getResourceValue:&modificationDate forKey:NSURLContentModificationDateKey error:nil];
+
+        if (modificationDate && [modificationDate compare:cutoff] == NSOrderedAscending) {
+            NSLog(@"*** Pruning old session log: %@", logFile.lastPathComponent);
+            [fileManager removeItemAtURL:logFile error:nil];
+        }
     }
 }
 
 #pragma mark - BugSplatDelegate
 
-- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat
+/// sessionID identifies the session the crash report being sent was recorded in,
+/// or nil if the report was recorded by an SDK version that predates session tracking.
+- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
-    NSLog(@"*** bugSplatWillSendCrashReport");
+    NSLog(@"*** bugSplatWillSendCrashReport:sessionID: %@", sessionID.UUIDString);
 }
 
-- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error
+/// The upload failed — deliberately keep the session's log file. BugSplat retries
+/// delivery on a future launch and will ask for this session's attachments again.
+- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error sessionID:(NSUUID *)sessionID
 {
-    NSLog(@"*** bugSplat:didFailWithError: %@", error.debugDescription);
+    NSLog(@"*** bugSplat:didFailWithError: %@ sessionID: %@", error.debugDescription, sessionID.UUIDString);
 }
 
-- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat
+/// The crash report was delivered, so the crashed session's log has served its purpose —
+/// delete it. This is invoked once per report, so the right log is removed even when
+/// several queued crash reports are uploaded during a single launch.
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
-    NSLog(@"*** bugSplatDidFinishSendingCrashReport");
+    NSLog(@"*** bugSplatDidFinishSendingCrashReport:sessionID: %@", sessionID.UUIDString);
+
+    if (!sessionID) {
+        return;
+    }
+
+    NSURL *logFileURL = [self logFileURLForSessionID:sessionID];
+    NSError *error = nil;
+    if ([[NSFileManager defaultManager] removeItemAtURL:logFileURL error:&error]) {
+        NSLog(@"*** Deleted delivered session log: %@", logFileURL.lastPathComponent);
+    } else {
+        NSLog(@"*** Could not delete session log %@: %@", logFileURL.lastPathComponent, error.localizedDescription);
+    }
 }
 
 -(void)bugSplatWillShowSubmitCrashReportAlert:(BugSplat *)bugSplat
@@ -223,25 +341,30 @@ void mainObjCRunLoop() {
     NSLog(@"*** bugSplatWillCancelSendingCrashReport");
 }
 
-/// Returns an array of file attachments to include with the crash report
-/// This demonstrates how to attach log files or other data to crash reports
+/// Returns an array of file attachments to include with the crash report.
+/// The sessionID identifies the session that CRASHED — not the current one —
+/// so the matching per-session log file can be located simply by its name.
 /// Note: macOS supports multiple attachments, unlike iOS which only supports one
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat {
-    if (!self.logFileURL) {
-        NSLog(@"Could not read log file for attachment - no URL");
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID {
+    if (!sessionID) {
+        // Crash reports recorded by SDK versions that predate session tracking carry
+        // no session ID. An app could fall back to a heuristic here (e.g. attach the
+        // most recent log file that isn't the current session's).
+        NSLog(@"*** No sessionID for crash report - skipping log attachment");
         return @[];
     }
-    
+
+    NSURL *logFileURL = [self logFileURLForSessionID:sessionID];
     NSError *error = nil;
-    NSData *logData = [NSData dataWithContentsOfURL:self.logFileURL options:0 error:&error];
-    
+    NSData *logData = [NSData dataWithContentsOfURL:logFileURL options:0 error:&error];
+
     if (!logData) {
-        NSLog(@"Could not read log file for attachment: %@", error.localizedDescription);
+        NSLog(@"*** Could not read log file for crashed session %@: %@", sessionID.UUIDString, error.localizedDescription);
         return @[];
     }
-    
-    NSLog(@"Attaching log file to crash report: %@", self.logFileURL.lastPathComponent);
-    BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"sample_log.txt"
+
+    NSLog(@"*** Attaching log file for crashed session %@ to crash report", sessionID.UUIDString);
+    BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
                                                                    attachmentData:logData
                                                                       contentType:@"text/plain"];
     return @[attachment];

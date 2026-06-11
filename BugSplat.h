@@ -55,6 +55,32 @@ NS_ASSUME_NONNULL_BEGIN
 @property (weak, nonatomic, nullable) id<BugSplatDelegate> delegate;
 
 /**
+ * A unique identifier for the current app session (process launch).
+ *
+ * A new value is generated every launch and remains stable for the lifetime
+ * of the process. It is embedded into any crash report captured during this
+ * session, which makes it the key for associating session-scoped data (such
+ * as per-session log files) with the crash that ended the session.
+ *
+ * Recommended usage:
+ * 1. After calling `start`, read `sessionID` and durably record a mapping from
+ *    it to any session-scoped files you may want to attach to a crash report
+ *    (e.g. this session's log file path). Use a per-session file name — a fixed
+ *    path that is overwritten each launch cannot be recovered later.
+ * 2. If the app crashes, the `BugSplatDelegate` callbacks for that crash
+ *    (`attachmentsForBugSplat:sessionID:`, `bugSplatDidFinishSendingCrashReport:sessionID:`,
+ *    etc.) are passed the **crashed** session's ID — not the current one — so you
+ *    can look up the recorded mapping, return the right files, and clean up
+ *    once the report has been sent.
+ *
+ * @note The session ID passed to delegate callbacks may be nil for crash
+ * reports recorded by versions of BugSplat that predate this property.
+ *
+ * @see BugSplatDelegate
+ */
+@property (nonatomic, readonly) NSUUID *sessionID;
+
+/**
  * The database name BugSplat will use to construct the BugSplatDatabase URL where crash reports will be submitted.
  *
  * By default, the BugSplat database name is pulled from the App's Info.plist (BugSplatDatabase key).

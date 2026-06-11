@@ -404,6 +404,91 @@ BugSplat.shared().notes = "Debug build, feature-x enabled"
 
 Bugsplat supports uploading attachments with crash reports. There's a delegate method provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Currently, iOS supports only one attachment with crash reports. See additional iOS attachment limitation when using Attributes.
 
+#### Associating Per-Session Files with Crash Reports
+
+Crash reports are processed and uploaded at the **next launch** after a crash — not at crash time. By the time `BugSplatDelegate` asks your app for attachments, your app is running a new session, so a fixed file path that gets overwritten each launch (e.g. `app.log`) no longer contains the crashed session's data.
+
+To make this association reliable, BugSplat provides a per-launch session ID:
+
+- `BugSplat.shared().sessionID` — a `UUID` generated each launch, stable for the lifetime of the process, and readable any time after `start()` is called.
+- The ID is embedded into any crash report captured during that session, and sessionID-aware delegate callbacks pass the **crashed** session's ID back to you at the next launch:
+  - `attachment(for:sessionID:)` / `attachmentsForBugSplat:sessionID:` (macOS)
+  - `applicationLog(for:sessionID:)`
+  - `bugSplatWillSendCrashReport(_:sessionID:)`
+  - `bugSplatDidFinishSendingCrashReport(_:sessionID:)`
+  - `bugSplat(_:didFailWithError:sessionID:)`
+
+When a sessionID-aware method is implemented, it is called instead of its legacy counterpart. The `sessionID` parameter is `nil` for crash reports recorded by SDK versions that predate session tracking.
+
+The recommended pattern — name session-scoped files after the session ID so the file name itself is the mapping:
+
+**Swift:**
+
+```swift
+// 1. After start(), write this session's log to a file named after the session ID.
+//    A fixed path that is overwritten each launch cannot be recovered later.
+bugSplat.start()
+let logURL = logsDirectory.appendingPathComponent("\(bugSplat.sessionID.uuidString).log")
+
+// 2. At the next launch after a crash, return the crashed session's log.
+func attachment(for bugSplat: BugSplat, sessionID: UUID?) -> BugSplatAttachment? {
+    guard let sessionID,
+          let data = try? Data(contentsOf: logsDirectory.appendingPathComponent("\(sessionID.uuidString).log")) else {
+        return nil // report predates session tracking, or the log is gone
+    }
+    return BugSplatAttachment(filename: "session.log", attachmentData: data, contentType: "text/plain")
+}
+
+// 3. Once the report is delivered, the log is safe to delete. This is called once
+//    per report, so cleanup is correct even when several queued reports upload at once.
+func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat, sessionID: UUID?) {
+    guard let sessionID else { return }
+    try? FileManager.default.removeItem(at: logsDirectory.appendingPathComponent("\(sessionID.uuidString).log"))
+}
+
+// 4. On failure, keep the file - the SDK retries the upload on a future launch.
+func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error, sessionID: UUID?) { }
+```
+
+**Obj-C:**
+
+```objc
+// 1. After start, write this session's log to a file named after the session ID.
+[[BugSplat shared] start];
+NSString *logPath = [logsDirectory stringByAppendingPathComponent:
+    [NSString stringWithFormat:@"%@.log", [BugSplat shared].sessionID.UUIDString]];
+
+// 2. At the next launch after a crash, return the crashed session's log. (macOS)
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    if (!sessionID) return @[]; // report predates session tracking
+    NSString *path = [logsDirectory stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"%@.log", sessionID.UUIDString]];
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    if (!data) return @[];
+    return @[[[BugSplatAttachment alloc] initWithFilename:@"session.log"
+                                           attachmentData:data
+                                              contentType:@"text/plain"]];
+}
+
+// 3. Once the report is delivered, the log is safe to delete.
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    if (!sessionID) return;
+    NSString *path = [logsDirectory stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"%@.log", sessionID.UUIDString]];
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+}
+```
+
+A few practical notes:
+
+- **Use per-session file names.** The session ID can only recover a file that still exists at the next launch. Truncating or overwriting a single fixed path each launch destroys the crashed session's data before BugSplat can ask for it.
+- **Prune old session files yourself.** Sessions that end normally never produce a crash report, so they never get a `didFinishSending` callback. Delete session files older than a few days at startup (never the current session's).
+- **Fatal hang reports carry a session ID too**, so the same lookup works for reports produced by hang detection.
+
+Every app in `Example_Apps` demonstrates this pattern end to end.
+
 #### Bitcode
 
 Bitcode was introduced by Apple to allow apps sent to the App Store to be recompiled by Apple itself and apply the latest optimization. Bitcode has now been officially deprecated by Apple and should be removed or disabled. If Bitcode is enabled, the symbols generated for your app in the store will be different than the ones from your own build system. We recommend that you disable bitcode in order for BugSplat to reliably symbolicate crash reports. Disabling bitcode significantly simplifies symbols management and currently doesn't have any known downsides for iOS apps.
