@@ -410,7 +410,7 @@ Crash reports are processed and uploaded at the **next launch** after a crash �
 
 To make this association reliable, BugSplat provides a per-launch session ID:
 
-- `BugSplat.shared().sessionID` — a `UUID` generated each launch, stable for the lifetime of the process, and readable any time after `start()` is called.
+- `BugSplat.shared().sessionID` — a `UUID` generated when the `BugSplat` instance is first created (e.g. via `BugSplat.shared()`), stable for the lifetime of the process, and readable before or after `start()` is called.
 - The ID is embedded into any crash report captured during that session, and sessionID-aware delegate callbacks pass the **crashed** session's ID back to you at the next launch:
   - `attachment(for:sessionID:)` / `attachmentsForBugSplat:sessionID:` (macOS)
   - `applicationLog(for:sessionID:)`
@@ -485,7 +485,7 @@ A few practical notes:
 
 - **Use per-session file names.** The session ID can only recover a file that still exists at the next launch. Truncating or overwriting a single fixed path each launch destroys the crashed session's data before BugSplat can ask for it.
 - **Prune old session files yourself.** Sessions that end normally never produce a crash report, so they never get a `didFinishSending` callback. Delete session files older than a few days at startup (never the current session's).
-- **Fatal hang reports carry a session ID too**, so the same lookup works for reports produced by hang detection.
+- **Hang reports are a partial case.** A fatal hang persists its session ID alongside the report, so the upload lifecycle callbacks (`bugSplatWillSendCrashReport:sessionID:`, `bugSplatDidFinishSendingCrashReport:sessionID:`, `bugSplat:didFailWithError:sessionID:`) receive the correct ID and your cleanup in step 3 still runs. However, the attachment and application-log callbacks (`attachmentsForBugSplat:sessionID:`, `attachmentForBugSplat:sessionID:`, `applicationLogForBugSplat:sessionID:`) are only invoked for crash reports processed at the next launch — not for hang reports — so the per-session log file shown above is **not** attached to a hang report.
 
 Every app in `Example_Apps` demonstrates this pattern end to end.
 

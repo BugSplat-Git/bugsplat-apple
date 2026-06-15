@@ -63,10 +63,12 @@ NS_ASSUME_NONNULL_BEGIN
  * as per-session log files) with the crash that ended the session.
  *
  * Recommended usage:
- * 1. After calling `start`, read `sessionID` and durably record a mapping from
- *    it to any session-scoped files you may want to attach to a crash report
- *    (e.g. this session's log file path). Use a per-session file name — a fixed
- *    path that is overwritten each launch cannot be recovered later.
+ * 1. `sessionID` is available as soon as the `BugSplat` instance is created
+ *    (e.g. via `+[BugSplat shared]`) and does not change for the lifetime of the
+ *    process — you do not need to wait for `start`. Read it and durably record a
+ *    mapping from it to any session-scoped files you may want to attach to a crash
+ *    report (e.g. this session's log file path). Use a per-session file name — a
+ *    fixed path that is overwritten each launch cannot be recovered later.
  * 2. If the app crashes, the `BugSplatDelegate` callbacks for that crash
  *    (`attachmentsForBugSplat:sessionID:`, `bugSplatDidFinishSendingCrashReport:sessionID:`,
  *    etc.) are passed the **crashed** session's ID — not the current one — so you

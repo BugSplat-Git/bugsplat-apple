@@ -42,10 +42,12 @@ static NSString *const kSessionIDKey = @"sessionID";
 @property (nonatomic, assign) BOOL attachmentCallbackInvoked;    // singular variant
 @property (nonatomic, assign) BOOL applicationLogCallbackInvoked;
 @property (nonatomic, assign) BOOL willSendCallbackInvoked;
+@property (nonatomic, assign) BOOL didFinishCallbackInvoked;
 @property (nonatomic, assign) BOOL didFailCallbackInvoked;
 @property (nonatomic, strong, nullable) NSUUID *receivedAttachmentSessionID;
 @property (nonatomic, strong, nullable) NSUUID *receivedApplicationLogSessionID;
 @property (nonatomic, strong, nullable) NSUUID *receivedWillSendSessionID;
+@property (nonatomic, strong, nullable) NSUUID *receivedDidFinishSessionID;
 @property (nonatomic, strong, nullable) NSUUID *receivedDidFailSessionID;
 @end
 
@@ -78,6 +80,12 @@ static NSString *const kSessionIDKey = @"sessionID";
 {
     self.willSendCallbackInvoked = YES;
     self.receivedWillSendSessionID = sessionID;
+}
+
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    self.didFinishCallbackInvoked = YES;
+    self.receivedDidFinishSessionID = sessionID;
 }
 
 - (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error sessionID:(NSUUID *)sessionID
@@ -426,6 +434,58 @@ static NSString *const kSessionIDKey = @"sessionID";
     XCTAssertTrue(delegate.didFailCallbackInvoked);
     XCTAssertEqualObjects(delegate.receivedDidFailSessionID, crashedSessionID,
                           @"didFail should carry the session ID so the app can keep its mapping for retry");
+}
+
+- (void)testSubmit_DeliversPersistedSessionIDToDidFinishSendingOnSuccess
+{
+    // Plant a crash + meta pair as if persisted at a previous launch. The name sorts
+    // after any timestamp-based leftovers so processPendingCrashReports picks it.
+    NSUUID *crashedSessionID = [NSUUID UUID];
+    NSString *filename = @"99999999998";
+    [self.filenamesToCleanup addObject:filename];
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    XCTAssertTrue([[@"test crash report" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
+    NSDictionary *meta = @{
+        @"database": @"testdb",
+        @"applicationName": @"TestApp",
+        @"applicationVersion": @"1.0.0",
+        @"timestamp": @"2026-06-11T00:00:00Z",
+        @"userSubmitted": @YES,
+        kSessionIDKey: crashedSessionID.UUIDString,
+    };
+    XCTAssertTrue([meta writeToFile:metaPath atomically:YES]);
+
+    // Upload service whose three-step flow (presign -> S3 -> commit) all succeed.
+    MockURLSession *mockSession = [[MockURLSession alloc] init];
+    NSData *presignJSON = [@"{\"url\":\"https://example.com/presigned\"}" dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *commitJSON = [@"{\"crashId\":123,\"infoUrl\":\"https://example.com/crash/123\"}" dataUsingEncoding:NSUTF8StringEncoding];
+    [mockSession queueResponseWithData:presignJSON response:[MockURLSession jsonResponseWithStatusCode:200] error:nil];
+    [mockSession queueResponseWithData:nil response:[MockURLSession responseWithStatusCode:200] error:nil];
+    [mockSession queueResponseWithData:commitJSON response:[MockURLSession jsonResponseWithStatusCode:200] error:nil];
+
+    BugSplatUploadService *uploadService = [[BugSplatUploadService alloc] initWithDatabase:@"testdb"
+                                                                           applicationName:@"TestApp"
+                                                                        applicationVersion:@"1.0.0"
+                                                                                urlSession:mockSession];
+    [uploadService setCompletionDispatcher:^(dispatch_block_t block) { block(); }];
+    [self.bugSplat setUploadServiceForTesting:uploadService];
+
+    SessionIDRecordingDelegate *delegate = [[SessionIDRecordingDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+    self.bugSplat.autoSubmitCrashReport = YES;
+
+    [self.bugSplat processPendingCrashReports];
+
+    XCTAssertTrue(delegate.willSendCallbackInvoked);
+    XCTAssertTrue(delegate.didFinishCallbackInvoked,
+                  @"didFinishSending should fire after a successful upload");
+    XCTAssertEqualObjects(delegate.receivedDidFinishSessionID, crashedSessionID,
+                          @"didFinishSending should carry the session ID recovered from the .meta file "
+                          @"so the app can clean up the crashed session's log");
+    XCTAssertFalse(delegate.didFailCallbackInvoked, @"didFail should not fire on a successful upload");
 }
 
 @end
