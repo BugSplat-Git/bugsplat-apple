@@ -144,6 +144,50 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @end
 
+/// Returns a real attachment + application log so hang enrichment can be verified end
+/// to end, recording the sessionID it was handed and how many times it was asked.
+@interface HangEnrichmentDelegate : NSObject <BugSplatDelegate>
+@property (nonatomic, assign) NSInteger attachmentCallCount;
+@property (nonatomic, assign) NSInteger applicationLogCallCount;
+@property (nonatomic, strong, nullable) NSUUID *receivedAttachmentSessionID;
+@property (nonatomic, strong, nullable) NSUUID *receivedApplicationLogSessionID;
+@end
+
+@implementation HangEnrichmentDelegate
+
+- (BugSplatAttachment *)makeAttachment
+{
+    NSData *data = [@"hang session log contents" dataUsingEncoding:NSUTF8StringEncoding];
+    return [[BugSplatAttachment alloc] initWithFilename:@"session.log"
+                                         attachmentData:data
+                                            contentType:@"text/plain"];
+}
+
+#if TARGET_OS_OSX
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    self.attachmentCallCount++;
+    self.receivedAttachmentSessionID = sessionID;
+    return @[[self makeAttachment]];
+}
+#endif
+
+- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    self.attachmentCallCount++;
+    self.receivedAttachmentSessionID = sessionID;
+    return [self makeAttachment];
+}
+
+- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    self.applicationLogCallCount++;
+    self.receivedApplicationLogSessionID = sessionID;
+    return @"hang app log";
+}
+
+@end
+
 #pragma mark - Tests
 
 @interface BugSplatSessionIDTests : XCTestCase
@@ -486,6 +530,105 @@ static NSString *const kSessionIDKey = @"sessionID";
                           @"didFinishSending should carry the session ID recovered from the .meta file "
                           @"so the app can clean up the crashed session's log");
     XCTAssertFalse(delegate.didFailCallbackInvoked, @"didFail should not fire on a successful upload");
+}
+
+#pragma mark - Hang enrichment tests
+
+/// Plants a hang report (.crash + .meta with the -hang suffix) carrying the given
+/// session ID, as persistHangReportWithDuration:appState: would at hang time.
+- (NSString *)plantHangReportWithSessionID:(NSUUID *)sessionID
+{
+    NSString *filename = @"99999999997-hang";
+    [self.filenamesToCleanup addObject:filename];
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    XCTAssertTrue([[@"App Hang (Fatal)" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
+    NSDictionary *meta = @{
+        @"database": @"testdb",
+        @"applicationName": @"TestApp",
+        @"applicationVersion": @"1.0.0",
+        @"timestamp": @"2026-06-11T00:00:00Z",
+        @"userSubmitted": @YES,
+        kSessionIDKey: sessionID.UUIDString,
+    };
+    XCTAssertTrue([meta writeToFile:metaPath atomically:YES]);
+    return filename;
+}
+
+- (void)testEnrichPendingHangReports_AttachesSessionLogAndApplicationLog
+{
+    NSUUID *hangSessionID = [NSUUID UUID];
+    NSString *filename = [self plantHangReportWithSessionID:hangSessionID];
+
+    HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    [self.bugSplat enrichPendingHangReports];
+
+    // The delegate was asked, with the HUNG session's ID — not the current one.
+    XCTAssertEqual(delegate.attachmentCallCount, 1);
+    XCTAssertEqualObjects(delegate.receivedAttachmentSessionID, hangSessionID,
+                          @"Hang enrichment should pass the session that hung, recovered from .meta");
+    XCTAssertNotEqualObjects(delegate.receivedAttachmentSessionID, self.bugSplat.sessionID);
+    XCTAssertEqual(delegate.applicationLogCallCount, 1);
+    XCTAssertEqualObjects(delegate.receivedApplicationLogSessionID, hangSessionID);
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+
+    // The attachment is persisted next to the report so the existing uploader picks it up.
+    NSString *attachmentPath = [[dir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-0", filename]]
+                                stringByAppendingPathExtension:@"data"];
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:attachmentPath],
+                  @"Hang enrichment should persist the delegate attachment alongside the report");
+
+    // The application log and the enriched marker were written into the .meta.
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+    XCTAssertEqualObjects(meta[@"applicationLog"], @"hang app log");
+    XCTAssertEqualObjects(meta[@"hangEnriched"], @YES);
+    // Pre-existing metadata must be preserved across the rewrite.
+    XCTAssertEqualObjects(meta[kSessionIDKey], hangSessionID.UUIDString);
+}
+
+- (void)testEnrichPendingHangReports_IsIdempotentAcrossLaunches
+{
+    NSUUID *hangSessionID = [NSUUID UUID];
+    [self plantHangReportWithSessionID:hangSessionID];
+
+    HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    [self.bugSplat enrichPendingHangReports];
+    [self.bugSplat enrichPendingHangReports];  // simulates a later offline-retry launch
+
+    XCTAssertEqual(delegate.attachmentCallCount, 1,
+                   @"An already-enriched hang report must not invoke the delegate again");
+    XCTAssertEqual(delegate.applicationLogCallCount, 1);
+}
+
+- (void)testEnrichPendingHangReports_IgnoresNonHangReports
+{
+    // A regular crash report (no -hang suffix) must be left untouched — crashes are
+    // enriched on the PLCrashReporter path, not here.
+    NSString *filename = @"99999999996";
+    [self.filenamesToCleanup addObject:filename];
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    XCTAssertTrue([[@"crash" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
+    XCTAssertTrue(([@{ kSessionIDKey: [NSUUID UUID].UUIDString } writeToFile:metaPath atomically:YES]));
+
+    HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    [self.bugSplat enrichPendingHangReports];
+
+    XCTAssertEqual(delegate.attachmentCallCount, 0,
+                   @"Hang enrichment must only touch -hang reports, not crash reports");
+    NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+    XCTAssertNil(meta[@"hangEnriched"]);
 }
 
 @end

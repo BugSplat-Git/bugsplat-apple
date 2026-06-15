@@ -64,6 +64,9 @@ static NSString *const kBugSplatMetaKeyApplicationVersion = @"applicationVersion
 static NSString *const kBugSplatMetaKeyAppKey = @"appKey";
 static NSString *const kBugSplatMetaKeyNotes = @"notes";
 static NSString *const kBugSplatMetaKeySessionID = @"sessionID";
+// Set once a persisted hang report has had its delegate attachments / application log
+// gathered at next launch, so offline-retry launches don't re-invoke the delegate.
+static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 
 @interface BugSplat () <BugSplatHangTrackerDelegate>
 
@@ -255,7 +258,14 @@ static NSString *const kBugSplatMetaKeySessionID = @"sessionID";
     if ([self.crashReporter hasPendingCrashReport]) {
         [self handleNewCrashFromPLCrashReporter];
     }
-    
+
+    // Enrich any persisted hang reports (recorded during a prior session) with the
+    // delegate's attachments and application log. Hang reports are written while the
+    // main thread is wedged, where calling back into the delegate would risk deadlock,
+    // so enrichment is deferred to here — the next launch, on the main thread — exactly
+    // as crash attachments are gathered in handleNewCrashFromPLCrashReporter.
+    [self enrichPendingHangReports];
+
     // Then, process any pending crash reports from our crashes directory
     // This includes both new crashes and previously failed uploads
     [self processPendingCrashReports];
@@ -792,6 +802,129 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // This ensures we don't process the same crash twice
     [self.crashReporter purgePendingCrashReport];
     NSLog(@"BugSplat: Purged PLCrashReporter pending report (copy saved for retry)");
+}
+
+/**
+ * Gather delegate attachments and application log for any persisted hang reports.
+ *
+ * A hang report is written by persistHangReportWithDuration:appState: while the main
+ * thread is unresponsive, so — unlike a crash — it cannot ask the delegate for
+ * attachments at capture time without risking a deadlock against the wedged main
+ * thread. Instead the report sits on disk and is enriched here, at the next launch,
+ * on the same thread crashes are enriched (the start path). Each report is enriched
+ * at most once; the result is persisted next to the report so the existing upload
+ * pipeline picks it up just like a crash's attachments.
+ */
+- (void)enrichPendingHangReports
+{
+    for (NSString *baseName in [self getPendingCrashFiles]) {
+        if ([baseName hasSuffix:kBugSplatHangFilenameSuffix]) {
+            [self enrichHangReportWithFilename:baseName];
+        }
+    }
+}
+
+/**
+ * Enrich a single persisted hang report. Reads its session ID from the .meta file,
+ * asks the delegate (preferring the sessionID-aware variants) for attachments and an
+ * application log for that session, persists the attachments alongside the report and
+ * the application log into the .meta, then marks the report enriched so offline-retry
+ * launches don't invoke the delegate again.
+ */
+- (void)enrichHangReportWithFilename:(NSString *)hangFilename
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return;
+    }
+
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+    NSMutableDictionary *metadata = [[NSDictionary dictionaryWithContentsOfFile:metaFilePath] mutableCopy];
+    if (!metadata) {
+        // No (or unreadable) metadata: leave the report for processPendingCrashReports,
+        // which handles malformed reports.
+        return;
+    }
+
+    // Enrich at most once. On retry launches the already-persisted attachments and
+    // application log are reused as-is; re-running the delegate could duplicate work
+    // or fail outright (the app may have deleted its per-session log by now).
+    if ([metadata[kBugSplatMetaKeyHangEnriched] boolValue]) {
+        return;
+    }
+
+    // The ID of the session that hung, recovered from metadata. The delegate uses it to
+    // look up session-scoped data (e.g. that session's log file) exactly as for a crash.
+    // Nil for hang reports recorded by SDK versions that predate session tracking.
+    NSUUID *hangSessionID = nil;
+    NSString *hangSessionIDString = metadata[kBugSplatMetaKeySessionID];
+    if ([hangSessionIDString isKindOfClass:[NSString class]]) {
+        hangSessionID = [[NSUUID alloc] initWithUUIDString:hangSessionIDString];
+    }
+
+    // Gather attachments, preferring the sessionID-aware variants, mirroring
+    // handleNewCrashFromPLCrashReporter.
+    NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
+    @try {
+#if TARGET_OS_OSX
+        if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:sessionID:)]) {
+            NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self sessionID:hangSessionID];
+            if (delegateAttachments) {
+                [attachments addObjectsFromArray:delegateAttachments];
+            }
+        } else
+#endif
+        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:sessionID:)]) {
+            BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self sessionID:hangSessionID];
+            if (attachment) {
+                [attachments addObject:attachment];
+            }
+        } else
+#if TARGET_OS_OSX
+        if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
+            NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self];
+            if (delegateAttachments) {
+                [attachments addObjectsFromArray:delegateAttachments];
+            }
+        } else
+#endif
+        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
+            BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self];
+            if (attachment) {
+                [attachments addObject:attachment];
+            }
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in delegate attachment method (hang): %@ - %@", exception.name, exception.reason);
+    }
+
+    if (attachments.count > 0) {
+        [self persistAttachments:attachments forCrashFilename:hangFilename];
+    }
+
+    // Application log, preferring the sessionID-aware variant.
+    @try {
+        if ([self.delegate respondsToSelector:@selector(applicationLogForBugSplat:sessionID:)]) {
+            NSString *appLog = [self.delegate applicationLogForBugSplat:self sessionID:hangSessionID];
+            if (appLog) metadata[kBugSplatMetaKeyApplicationLog] = appLog;
+        } else if ([self.delegate respondsToSelector:@selector(applicationLogForBugSplat:)]) {
+            NSString *appLog = [self.delegate applicationLogForBugSplat:self];
+            if (appLog) metadata[kBugSplatMetaKeyApplicationLog] = appLog;
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in applicationLogForBugSplat delegate (hang): %@ - %@", exception.name, exception.reason);
+    }
+
+    // Mark enriched (even when nothing was gathered) so we don't re-scan the delegate
+    // on every subsequent launch, matching the once-at-ingestion model used for crashes.
+    metadata[kBugSplatMetaKeyHangEnriched] = @YES;
+    if ([metadata writeToFile:metaFilePath atomically:YES]) {
+        NSLog(@"BugSplat: Enriched hang report %@ (%lu attachment(s), session %@)",
+              hangFilename, (unsigned long)attachments.count, hangSessionID.UUIDString ?: @"none");
+    } else {
+        NSLog(@"BugSplat: Failed to rewrite hang metadata after enrichment for %@", hangFilename);
+    }
 }
 
 /**
