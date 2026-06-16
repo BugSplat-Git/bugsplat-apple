@@ -15,8 +15,10 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 
 #pragma mark - Sample log helper
 
-/// Locates the `sample_log.txt` file the app writes at launch (see AppDelegate)
-/// so it can be attached to feedback when the user opts in.
+/// Locates the current session's log file the app writes at launch (see AppDelegate),
+/// named `<BugSplat.sessionID>.log` under <Application Support>/SessionLogs/,
+/// so it can be attached to feedback when the user opts in. Feedback is sent during
+/// the current session, so the current sessionID identifies the right log.
 @interface BSPSampleLog : NSObject
 + (nullable BugSplatAttachment *)attachment;
 @end
@@ -24,12 +26,14 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
 @implementation BSPSampleLog
 
 + (BugSplatAttachment *)attachment {
-    NSURL *docs = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
-                                                          inDomains:NSUserDomainMask] firstObject];
-    NSURL *url = [docs URLByAppendingPathComponent:@"sample_log.txt"];
+    NSURL *appSupport = [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory
+                                                                inDomains:NSUserDomainMask] firstObject];
+    NSString *fileName = [NSString stringWithFormat:@"%@.log", [[BugSplat shared] sessionID].UUIDString];
+    NSURL *url = [[appSupport URLByAppendingPathComponent:@"SessionLogs" isDirectory:YES]
+                  URLByAppendingPathComponent:fileName];
     NSData *data = url ? [NSData dataWithContentsOfURL:url] : nil;
     if (!data) return nil;
-    return [[BugSplatAttachment alloc] initWithFilename:@"sample_log.txt"
+    return [[BugSplatAttachment alloc] initWithFilename:@"session.log"
                                          attachmentData:data
                                             contentType:@"text/plain"];
 }
@@ -383,7 +387,7 @@ static CGFloat const kBSPFeedbackWidth = 480.0;
     title.font = [NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
     title.textColor = [BSPDemoTheme textPrimary];
 
-    NSTextField *subtitle = [NSTextField labelWithString:@"Attach the app's sample_log.txt"];
+    NSTextField *subtitle = [NSTextField labelWithString:@"Attach this session's log file"];
     subtitle.font = [NSFont systemFontOfSize:11];
     subtitle.textColor = [BSPDemoTheme textTertiary];
 

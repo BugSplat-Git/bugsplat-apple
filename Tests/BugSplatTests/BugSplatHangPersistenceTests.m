@@ -141,6 +141,24 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
     XCTAssertNotNil(meta[kTimestampKey]);
 }
 
+- (void)testHangDelegate_MetadataContainsCurrentSessionID
+{
+    [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.0 appState:@"active"];
+    [self drainHangQueue];
+
+    NSString *filename = [self.bugSplat currentHangFilename];
+    XCTAssertNotNil(filename);
+    self.filenameToCleanup = filename;
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+    XCTAssertNotNil(meta);
+
+    // The hang happened in THIS session, so the persisted ID must be the current one.
+    XCTAssertEqualObjects(meta[@"sessionID"], self.bugSplat.sessionID.UUIDString);
+}
+
 - (void)testHangDelegate_MetadataContainsHangAttributes
 {
     [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.5 appState:@"background"];

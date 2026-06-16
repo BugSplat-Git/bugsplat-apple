@@ -26,22 +26,26 @@ enum FeedbackCategory: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-// MARK: - Sample log helper
+// MARK: - Session log helper
 
-/// Locates the `sample_log.txt` file the app writes at launch (see
-/// `BugSplatInitializer`) so it can be attached to feedback when the user opts in.
-enum SampleLog {
+/// Locates the current session's log file the app writes at launch (see
+/// `BugSplatInitializer`, which names it `SessionLogs/<sessionID>.log`) so it
+/// can be attached to feedback when the user opts in. Unlike crash reports,
+/// feedback is sent during the session it was written in, so the *current*
+/// `BugSplat.shared().sessionID` identifies the right log.
+enum SessionLog {
     static var fileURL: URL? {
         FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
-            .appendingPathComponent("sample_log.txt")
+            .appendingPathComponent("SessionLogs", isDirectory: true)
+            .appendingPathComponent("\(BugSplat.shared().sessionID.uuidString).log")
     }
 
-    /// Returns the sample log as a `BugSplatAttachment`, or nil if it cannot be read.
+    /// Returns the session log as a `BugSplatAttachment`, or nil if it cannot be read.
     static func attachment() -> BugSplatAttachment? {
         guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }
-        return BugSplatAttachment(filename: "sample_log.txt",
+        return BugSplatAttachment(filename: "session.log",
                                   attachmentData: data,
                                   contentType: "text/plain")
     }
@@ -257,7 +261,7 @@ struct FeedbackSheet: View {
                 Text("Include logs")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(DemoColor.textPrimary)
-                Text("Attach the app's sample_log.txt")
+                Text("Attach this session's log file")
                     .font(.system(size: 12))
                     .foregroundColor(DemoColor.textTertiary)
             }
@@ -357,7 +361,7 @@ struct FeedbackSheet: View {
 
         var attachments: [BugSplatAttachment] = []
         if let pickedFile { attachments.append(pickedFile.bugSplatAttachment()) }
-        if includeLogs, let logAttachment = SampleLog.attachment() {
+        if includeLogs, let logAttachment = SessionLog.attachment() {
             attachments.append(logAttachment)
         }
 

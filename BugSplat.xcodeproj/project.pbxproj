@@ -35,6 +35,8 @@
 		FEEDBAC000000000000000F8 /* BugSplatFeedbackResult.h in Headers */ = {isa = PBXBuildFile; fileRef = FEEDBAC000000000000000F1 /* BugSplatFeedbackResult.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		63E233862B9715B50066C7FC /* BugSplat.h in Headers */ = {isa = PBXBuildFile; fileRef = 63C6E1FE2B9283B000AED3E3 /* BugSplat.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		73DEAA0D4412D3A9CF562633 /* BugSplatHangPersistenceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */; };
+		5E551D000000000000000001 /* BugSplatSessionIDTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E551D000000000000000003 /* BugSplatSessionIDTests.m */; };
+		5E551D000000000000000002 /* BugSplatSessionIDTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E551D000000000000000003 /* BugSplatSessionIDTests.m */; };
 		7C235FBB8C978B3EC7E2CE49 /* BugSplatHangPersistenceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */; };
 		AA0000032E3FA00000000003 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
@@ -126,6 +128,7 @@
 		FEEDBAC000000000000000F1 /* BugSplatFeedbackResult.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BugSplatFeedbackResult.h; sourceTree = "<group>"; };
 		FEEDBAC000000000000000F2 /* BugSplatFeedbackResult.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BugSplatFeedbackResult.m; sourceTree = "<group>"; };
 		680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatHangPersistenceTests.m; sourceTree = "<group>"; };
+		5E551D000000000000000003 /* BugSplatSessionIDTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatSessionIDTests.m; sourceTree = "<group>"; };
 		6FDD85DA23C98D5070707CC4 /* BugSplatHangTracker.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatHangTracker.m; sourceTree = "<group>"; };
 		AA0000042E3FA00000000004 /* BugSplatUploadService.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BugSplatUploadService.m; sourceTree = "<group>"; };
 		AA0000072E3FA00000000007 /* BugSplatUploadService.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BugSplatUploadService.h; sourceTree = "<group>"; };
@@ -286,6 +289,7 @@
 				TT00001A2E3FE0000000001A /* Info.plist */,
 				03D0C5FD3AB29CB3196AA013 /* BugSplatHangTrackerTests.m */,
 				680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */,
+				5E551D000000000000000003 /* BugSplatSessionIDTests.m */,
 			);
 			path = BugSplatTests;
 			sourceTree = "<group>";
@@ -593,6 +597,7 @@
 				TT00000A2E3FE0000000000A /* MockUserDefaults.m in Sources */,
 				5DF567F3A771ECB5E74796EF /* BugSplatHangTrackerTests.m in Sources */,
 				7C235FBB8C978B3EC7E2CE49 /* BugSplatHangPersistenceTests.m in Sources */,
+				5E551D000000000000000001 /* BugSplatSessionIDTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -612,6 +617,7 @@
 				TT0000792E3FE0000000007A /* MockUserDefaults.m in Sources */,
 				AF1188A1AEE700C402DDFBC8 /* BugSplatHangTrackerTests.m in Sources */,
 				73DEAA0D4412D3A9CF562633 /* BugSplatHangPersistenceTests.m in Sources */,
+				5E551D000000000000000002 /* BugSplatSessionIDTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

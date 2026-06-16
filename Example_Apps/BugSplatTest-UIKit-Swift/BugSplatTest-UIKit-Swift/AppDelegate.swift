@@ -10,15 +10,14 @@ import BugSplat
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-    
-    /// URL for the sample log file that will be attached to crash reports
-    private var logFileURL: URL?
+
+    /// How long a session log is kept before being pruned at startup.
+    /// Sessions that end normally never receive `bugSplatDidFinishSendingCrashReport(_:sessionID:)`,
+    /// so their logs must eventually be cleaned up some other way.
+    private static let sessionLogMaxAge: TimeInterval = 7 * 24 * 60 * 60  // 7 days
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        
-        // Create a sample log file for attachment demonstration
-        createSampleLogFile()
 
         // Initialize BugSplat
         let bugSplat = BugSplat.shared()
@@ -40,52 +39,113 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Don't forget to call start after you've finished configuring BugSplat
         bugSplat.start()
-        
+
+        // Create this session's log file, named after BugSplat's per-launch sessionID.
+        //
+        // WHY per-session file naming matters: crash reports are processed at the NEXT
+        // launch of the app, after a brand new session (with a new sessionID and a new
+        // log file) has already begun. A single fixed log path that gets overwritten
+        // every launch would no longer contain the crashed session's log by the time
+        // the SDK asks for an attachment. By naming each log file after its sessionID,
+        // the file name itself records the session-to-log mapping, and the crashed
+        // session's log can be looked up exactly via the sessionID the SDK passes to
+        // the delegate callbacks below.
+        createSessionLogFile(for: bugSplat.sessionID)
+
+        // Prune session logs from sessions that ended long ago. Sessions that exit
+        // normally never crash, so their logs are never cleaned up by the delegate
+        // callbacks — without pruning they would accumulate forever.
+        pruneStaleSessionLogs(currentSessionID: bugSplat.sessionID)
+
         return true
     }
-    
-    // MARK: - Sample Log File
-    
-    /// Creates a sample log file in the documents directory for attachment demonstration
-    private func createSampleLogFile() {
-        let fileManager = FileManager.default
-        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("Could not access documents directory")
+
+    // MARK: - Per-Session Log Files
+
+    /// Directory holding one log file per app session: <Application Support>/SessionLogs/<sessionID>.log
+    private var sessionLogsDirectoryURL: URL? {
+        guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            print("Could not access Application Support directory")
+            return nil
+        }
+        return appSupportURL.appendingPathComponent("SessionLogs", isDirectory: true)
+    }
+
+    /// Returns the log file URL for a given session ID.
+    /// The file NAME is the session-to-log mapping — no extra bookkeeping required.
+    private func logFileURL(for sessionID: UUID) -> URL? {
+        return sessionLogsDirectoryURL?.appendingPathComponent("\(sessionID.uuidString).log")
+    }
+
+    /// Creates this session's log file and writes a few sample log lines to it.
+    /// In a real app, you would route your logging framework's output to this file
+    /// and append to it throughout the session.
+    private func createSessionLogFile(for sessionID: UUID) {
+        guard let directoryURL = sessionLogsDirectoryURL,
+              let logFileURL = logFileURL(for: sessionID) else {
             return
         }
-        
-        logFileURL = documentsURL.appendingPathComponent("sample_log.txt")
-        
+
         let logContent = """
         =====================================
-        BugSplat Sample Log File
+        BugSplat Per-Session Log File
         =====================================
+        Session ID: \(sessionID.uuidString)
         App Launch: \(Date())
         Device: \(UIDevice.current.model)
         System Version: \(UIDevice.current.systemVersion)
-        
-        This is a sample log file demonstrating how to attach
-        files to BugSplat crash reports.
-        
-        You can use this pattern to attach:
-        - Application logs
-        - Configuration files
-        - User session data
-        - Any other relevant debugging information
-        
+
+        This log file is named after BugSplat's per-launch sessionID.
+        If this session crashes, the crash report is processed at the
+        NEXT launch, and the SDK passes this session's ID back to the
+        BugSplatDelegate so exactly this file can be attached.
+
         Log entries:
         [\(Date())] INFO: Application started
         [\(Date())] DEBUG: BugSplat initialized
-        [\(Date())] INFO: Sample log file created for attachment demo
+        [\(Date())] INFO: Session log file created for session \(sessionID.uuidString)
         =====================================
         """
-        
+
         do {
-            try logContent.write(to: logFileURL!, atomically: true, encoding: .utf8)
-            print("Sample log file created at: \(logFileURL!.path)")
+            // Create the SessionLogs directory if it doesn't already exist
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            try logContent.write(to: logFileURL, atomically: true, encoding: .utf8)
+            print("Session log file created at: \(logFileURL.path)")
         } catch {
-            print("Failed to create sample log file: \(error)")
-            logFileURL = nil
+            print("Failed to create session log file: \(error)")
+        }
+    }
+
+    /// Deletes session logs older than `sessionLogMaxAge`, never touching the current
+    /// session's log. Sessions that end normally never get a
+    /// `bugSplatDidFinishSendingCrashReport(_:sessionID:)` callback (there is no crash
+    /// report to send), so this startup sweep is what keeps the directory bounded.
+    private func pruneStaleSessionLogs(currentSessionID: UUID) {
+        guard let directoryURL = sessionLogsDirectoryURL else { return }
+
+        let fileManager = FileManager.default
+        guard let logURLs = try? fileManager.contentsOfDirectory(at: directoryURL,
+                                                                 includingPropertiesForKeys: [.contentModificationDateKey]) else {
+            return  // Directory doesn't exist yet — nothing to prune
+        }
+
+        let cutoffDate = Date().addingTimeInterval(-Self.sessionLogMaxAge)
+        let currentLogFilename = "\(currentSessionID.uuidString).log"
+
+        for logURL in logURLs {
+            // Never delete the log for the session that is running right now
+            guard logURL.lastPathComponent != currentLogFilename else { continue }
+
+            guard let modificationDate = try? logURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                  modificationDate < cutoffDate else { continue }
+
+            do {
+                try fileManager.removeItem(at: logURL)
+                print("Pruned stale session log: \(logURL.lastPathComponent)")
+            } catch {
+                print("Failed to prune session log \(logURL.lastPathComponent): \(error)")
+            }
         }
     }
 
@@ -111,16 +171,32 @@ extension AppDelegate: BugSplatDelegate {
 
     // MARK: BugSplatDelegate
 
-    func bugSplatWillSendCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
+    /// The sessionID is the ID of the session that CRASHED (a previous launch),
+    /// not the current session — when implemented, this is called instead of
+    /// the legacy `bugSplatWillSendCrashReport(_:)`.
+    func bugSplatWillSendCrashReport(_ bugSplat: BugSplat, sessionID: UUID?) {
+        print("\(#file) - \(#function) sessionID: \(sessionID?.uuidString ?? "nil")")
     }
 
     func bugSplatWillSendCrashReportsAlways(_ bugSplat: BugSplat) {
         print("\(#file) - \(#function)")
     }
 
-    func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
+    /// The crash report for the given session was delivered, so its log file is no
+    /// longer needed — delete it. This is invoked once per report, so when several
+    /// queued reports upload in a single launch, each crashed session's log is
+    /// cleaned up individually and correctly.
+    func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat, sessionID: UUID?) {
+        print("\(#file) - \(#function) sessionID: \(sessionID?.uuidString ?? "nil")")
+
+        guard let sessionID = sessionID, let logFileURL = logFileURL(for: sessionID) else { return }
+
+        do {
+            try FileManager.default.removeItem(at: logFileURL)
+            print("Deleted delivered session log: \(logFileURL.lastPathComponent)")
+        } catch {
+            print("Failed to delete session log \(logFileURL.lastPathComponent): \(error)")
+        }
     }
 
     func bugSplatWillCancelSendingCrashReport(_ bugSplat: BugSplat) {
@@ -131,22 +207,36 @@ extension AppDelegate: BugSplatDelegate {
         print("\(#file) - \(#function)")
     }
 
-    func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error) {
-        print("\(#file) - \(#function)")
+    /// Sending the crash report failed. Deliberately KEEP the session's log file —
+    /// the SDK will retry the upload on a future launch and will ask for the
+    /// attachment again via `attachment(for:sessionID:)`.
+    func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error, sessionID: UUID?) {
+        print("\(#file) - \(#function) sessionID: \(sessionID?.uuidString ?? "nil")")
     }
-    
-    /// Returns a file attachment to include with the crash report
-    /// This demonstrates how to attach log files or other data to crash reports
-    func attachment(for bugSplat: BugSplat) -> BugSplatAttachment? {
-        guard let logFileURL = logFileURL,
-              let logData = try? Data(contentsOf: logFileURL) else {
-            print("Could not read log file for attachment")
+
+    /// Returns the crashed session's log file as an attachment for the crash report.
+    /// The sessionID identifies which previous session crashed, and because each
+    /// session's log is named `<sessionID>.log`, looking up the right file is just
+    /// a path construction — this is the payoff of per-session file naming.
+    func attachment(for bugSplat: BugSplat, sessionID: UUID?) -> BugSplatAttachment? {
+        // sessionID is nil for crash reports recorded by older SDK versions that
+        // predate session tracking. A real app could fall back to a heuristic here
+        // (e.g. attach the most recent log that isn't the current session's).
+        guard let sessionID = sessionID else {
+            print("No sessionID for crash report — no session log attached")
             return nil
         }
-        
-        print("Attaching log file to crash report: \(logFileURL.lastPathComponent)")
+
+        guard let logFileURL = logFileURL(for: sessionID),
+              let logData = try? Data(contentsOf: logFileURL) else {
+            // The crashed session's log is missing (e.g. already pruned)
+            print("Could not read session log for session \(sessionID.uuidString)")
+            return nil
+        }
+
+        print("Attaching session log to crash report: \(logFileURL.lastPathComponent)")
         return BugSplatAttachment(
-            filename: "sample_log.txt",
+            filename: "session.log",
             attachmentData: logData,
             contentType: "text/plain"
         )

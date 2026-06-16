@@ -13,8 +13,10 @@
 
 #pragma mark - Sample log helper
 
-/// Locates the `sample_log.txt` file the app writes at launch (see AppDelegate)
-/// so it can be attached to feedback when the user opts in.
+/// Locates the current session's log file the app writes at launch (see AppDelegate)
+/// so it can be attached to feedback when the user opts in. Each session's log is
+/// named after [BugSplat shared].sessionID; since feedback is sent live during the
+/// current session, the current sessionID identifies the right file.
 @interface BSPSampleLog : NSObject
 + (nullable NSURL *)fileURL;
 + (nullable BugSplatAttachment *)attachment;
@@ -23,16 +25,17 @@
 @implementation BSPSampleLog
 
 + (NSURL *)fileURL {
-    NSURL *docs = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
-                                                          inDomains:NSUserDomainMask] firstObject];
-    return [docs URLByAppendingPathComponent:@"sample_log.txt"];
+    NSURL *appSupport = [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory
+                                                                inDomains:NSUserDomainMask] firstObject];
+    NSString *filename = [[BugSplat shared].sessionID.UUIDString stringByAppendingPathExtension:@"log"];
+    return [[appSupport URLByAppendingPathComponent:@"SessionLogs" isDirectory:YES] URLByAppendingPathComponent:filename];
 }
 
 + (BugSplatAttachment *)attachment {
     NSURL *url = [self fileURL];
     NSData *data = url ? [NSData dataWithContentsOfURL:url] : nil;
     if (!data) return nil;
-    return [[BugSplatAttachment alloc] initWithFilename:@"sample_log.txt"
+    return [[BugSplatAttachment alloc] initWithFilename:@"session.log"
                                          attachmentData:data
                                             contentType:@"text/plain"];
 }
@@ -368,7 +371,7 @@
     title.textColor = [BSPDemoTheme textPrimary];
 
     UILabel *subtitle = [UILabel new];
-    subtitle.text = @"Attach the app's sample_log.txt";
+    subtitle.text = @"Attach this session's log file";
     subtitle.font = [UIFont systemFontOfSize:12];
     subtitle.textColor = [BSPDemoTheme textTertiary];
 
