@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.source       = { http: 'https://github.com/BugSplat-Git/bugsplat-apple/releases/download/v3.0.0/BugSplat.xcframework.zip' }
 
   s.ios.deployment_target = '13.0'
-  s.osx.deployment_target = '11.5'
+  s.osx.deployment_target = '11.0'
   s.tvos.deployment_target = '13.0'
 
   s.static_framework = true

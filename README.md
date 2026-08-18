@@ -19,7 +19,7 @@ The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac 
 ## Requirements 📋
 
 - BugSplat for iOS supports iOS 13 and later.
-- BugSplat for macOS supports macOS 11.5 and later.
+- BugSplat for macOS supports macOS 11.0 and later.
 
 ## Integration 🏗️
 
@@ -37,22 +37,16 @@ https://github.com/BugSplat-Git/bugsplat-apple
 ```
 
 > [!IMPORTANT]
-> Your target's macOS deployment target must be **11.5 or later**. Swift Package Manager
-> refuses to resolve the dependency below that, with an error such as:
->
-> ```
-> error: the library 'App' requires macos 11.0, but depends on the product 'BugSplat'
-> which requires macos 11.5
-> ```
->
-> Because SwiftPM has no `.v11_5` enum case, a `Package.swift` consumer must spell the
-> platform as a string:
+> Your target's macOS deployment target must be **11.0 or later**, and iOS **13.0** or later.
+> Swift Package Manager enforces this at resolve time and will refuse to resolve the
+> dependency below those versions.
 >
 > ```swift
-> platforms: [.macOS("11.5")]
+> platforms: [.macOS(.v11), .iOS(.v13)]
 > ```
 >
-> For an Xcode app target, set `MACOSX_DEPLOYMENT_TARGET` (Minimum Deployments) to 11.5 or later.
+> For an Xcode app target, set the Minimum Deployments field (`MACOSX_DEPLOYMENT_TARGET`)
+> to 11.0 or later.
 
 ### CocoaPods
 
