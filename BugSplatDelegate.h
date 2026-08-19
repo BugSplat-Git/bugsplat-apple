@@ -103,8 +103,9 @@ NS_ASSUME_NONNULL_BEGIN
  */
 -(void)bugSplatWillCancelSendingCrashReport:(BugSplat *)bugSplat;
 
-/** Return a BugSplatAttachment object providing an NSData object the crash report being processed should contain
- NOTE: For iOS, if this method returns a non-nil BugSplatAttachment, any attributes added via setAttribute:value: to BugSplat will NOT be included in the Crash Report.
+/** Return a collection of BugSplatAttachment objects the crash report being processed should contain
+
+ All returned attachments are included with the crash report, on both macOS and iOS.
 
  Example implementation:
 
@@ -113,56 +114,17 @@ NS_ASSUME_NONNULL_BEGIN
  BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"myfile.data"
                                                                 attachmentData:data
                                                                    contentType:@"application/octet-stream"];
- @param bugSplat The `BugSplat` instance invoking this delegate
-*/
-- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(ios(13.0));
-
-/** Return a BugSplatAttachment object providing an NSData object the crash report being processed should contain
-
- When implemented, this method is preferred over `attachmentForBugSplat:`.
-
- The sessionID identifies the session that crashed, so the attachment for that
- specific session can be returned. The recommended pattern is to record a
- mapping from `BugSplat.sessionID` to session-scoped file paths (e.g. this
- session's log file) right after calling `start`, then use the sessionID passed
- here to look up and return the matching file:
-
- NSString *logPath = [self logPathForSessionID:sessionID];  // your own mapping
- NSData *data = [NSData dataWithContentsOfFile:logPath];
-
- BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
-                                                                attachmentData:data
-                                                                   contentType:@"text/plain"];
- NOTE: For iOS, if this method returns a non-nil BugSplatAttachment, any attributes added via setAttribute:value: to BugSplat will NOT be included in the Crash Report.
-
- @param bugSplat The `BugSplat` instance invoking this delegate
- @param sessionID The ID of the session that crashed, or nil if the crash report
-        predates session tracking (in which case you may fall back to a heuristic
-        or return nil)
-*/
-- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID API_AVAILABLE(ios(13.0));
-
-// MARK: - BugSplatDelegate (MacOS)
-#if TARGET_OS_OSX
-
-/** Return a collection of BugsplatAttachment objects providing an NSData object the crash report being processed should contain
-
- Example implementation:
-
- NSData *data = [NSData dataWithContentsOfURL:@"mydatafile"];
-
- BugsplatAttachment *attachment = [[BugsplatAttachment alloc] initWithFilename:@"myfile.data"
-                                                                attachmentData:data
-                                                                   contentType:@"application/octet-stream"];
 
  @param bugSplat The `BugSplat` instance invoking this delegate
 */
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(macosx(10.13));
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(macosx(10.13), ios(13.0));
 
-/** Return a collection of BugsplatAttachment objects providing an NSData object the crash report being processed should contain
+/** Return a collection of BugSplatAttachment objects the crash report being processed should contain
 
  When implemented, this method is preferred over `attachmentsForBugSplat:` and the
  single-attachment variants.
+
+ All returned attachments are included with the crash report, on both macOS and iOS.
 
  The sessionID identifies the session that crashed, so attachments for that
  specific session can be returned. The recommended pattern is to record a
@@ -182,10 +144,52 @@ NS_ASSUME_NONNULL_BEGIN
         predates session tracking (in which case you may fall back to a heuristic
         or return an empty array)
 */
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID API_AVAILABLE(macosx(10.13));
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID API_AVAILABLE(macosx(10.13), ios(13.0));
+
+/** Return a BugSplatAttachment object providing an NSData object the crash report being processed should contain
+
+ Prefer `attachmentsForBugSplat:sessionID:` when the report should carry more than
+ one attachment.
+
+ Example implementation:
+
+ NSData *data = [NSData dataWithContentsOfURL:@"mydatafile"];
+
+ BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"myfile.data"
+                                                                attachmentData:data
+                                                                   contentType:@"application/octet-stream"];
+ @param bugSplat The `BugSplat` instance invoking this delegate
+*/
+- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(ios(13.0));
+
+/** Return a BugSplatAttachment object providing an NSData object the crash report being processed should contain
+
+ When implemented, this method is preferred over `attachmentForBugSplat:`.
+ Prefer `attachmentsForBugSplat:sessionID:` when the report should carry more than
+ one attachment.
+
+ The sessionID identifies the session that crashed, so the attachment for that
+ specific session can be returned. The recommended pattern is to record a
+ mapping from `BugSplat.sessionID` to session-scoped file paths (e.g. this
+ session's log file) right after calling `start`, then use the sessionID passed
+ here to look up and return the matching file:
+
+ NSString *logPath = [self logPathForSessionID:sessionID];  // your own mapping
+ NSData *data = [NSData dataWithContentsOfFile:logPath];
+
+ BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
+                                                                attachmentData:data
+                                                                   contentType:@"text/plain"];
+
+ @param bugSplat The `BugSplat` instance invoking this delegate
+ @param sessionID The ID of the session that crashed, or nil if the crash report
+        predates session tracking (in which case you may fall back to a heuristic
+        or return nil)
+*/
+- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID API_AVAILABLE(ios(13.0));
 
 // MARK: - BugSplatDelegate (iOS)
-#else
+#if !TARGET_OS_OSX
 
 /** Invoked after the user chose "Always Send" in the crash report alert.
  

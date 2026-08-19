@@ -38,7 +38,7 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 /// Implements ONLY the sessionID-aware delegate methods and records what it receives.
 @interface SessionIDRecordingDelegate : NSObject <BugSplatDelegate>
-@property (nonatomic, assign) BOOL attachmentsCallbackInvoked;   // plural variant (macOS)
+@property (nonatomic, assign) BOOL attachmentsCallbackInvoked;   // plural variant
 @property (nonatomic, assign) BOOL attachmentCallbackInvoked;    // singular variant
 @property (nonatomic, assign) BOOL applicationLogCallbackInvoked;
 @property (nonatomic, assign) BOOL willSendCallbackInvoked;
@@ -53,14 +53,12 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation SessionIDRecordingDelegate
 
-#if TARGET_OS_OSX
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
     self.attachmentsCallbackInvoked = YES;
     self.receivedAttachmentSessionID = sessionID;
     return @[];
 }
-#endif
 
 - (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
@@ -104,13 +102,11 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation LegacyRecordingDelegate
 
-#if TARGET_OS_OSX
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat
 {
     self.legacyAttachmentsCallbackInvoked = YES;
     return @[];
 }
-#endif
 
 - (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat
 {
@@ -128,13 +124,11 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation BothGenerationsDelegate
 
-#if TARGET_OS_OSX
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat
 {
     self.legacyAttachmentsCallbackInvoked = YES;
     return @[];
 }
-#endif
 
 - (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat
 {
@@ -163,14 +157,12 @@ static NSString *const kSessionIDKey = @"sessionID";
                                             contentType:@"text/plain"];
 }
 
-#if TARGET_OS_OSX
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
     self.attachmentCallCount++;
     self.receivedAttachmentSessionID = sessionID;
     return @[[self makeAttachment]];
 }
-#endif
 
 - (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
 {
@@ -184,6 +176,28 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.applicationLogCallCount++;
     self.receivedApplicationLogSessionID = sessionID;
     return @"hang app log";
+}
+
+@end
+
+/// Returns TWO attachments from the plural delegate so multi-attachment support can be
+/// verified on every platform (issue #69).
+@interface MultiAttachmentDelegate : NSObject <BugSplatDelegate>
+@end
+
+@implementation MultiAttachmentDelegate
+
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+{
+    BugSplatAttachment *playerLog =
+        [[BugSplatAttachment alloc] initWithFilename:@"Player.log"
+                                      attachmentData:[@"player log" dataUsingEncoding:NSUTF8StringEncoding]
+                                         contentType:@"text/plain"];
+    BugSplatAttachment *sessionLog =
+        [[BugSplatAttachment alloc] initWithFilename:@"session.log"
+                                      attachmentData:[@"session log" dataUsingEncoding:NSUTF8StringEncoding]
+                                         contentType:@"text/plain"];
+    return @[playerLog, sessionLog];
 }
 
 @end
@@ -336,12 +350,8 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self.bugSplat handleNewCrashFromPLCrashReporter];
     [self recordCurrentCrashFilenameForCleanup];
 
-#if TARGET_OS_OSX
-    XCTAssertTrue(delegate.attachmentsCallbackInvoked, @"plural sessionID-aware variant should be preferred on macOS");
+    XCTAssertTrue(delegate.attachmentsCallbackInvoked, @"plural sessionID-aware variant should be preferred on every platform");
     XCTAssertFalse(delegate.attachmentCallbackInvoked);
-#else
-    XCTAssertTrue(delegate.attachmentCallbackInvoked);
-#endif
     XCTAssertEqualObjects(delegate.receivedAttachmentSessionID, crashedSessionID,
                           @"Delegate should receive the CRASHED session's ID");
     XCTAssertNotEqualObjects(delegate.receivedAttachmentSessionID, self.bugSplat.sessionID,
@@ -383,12 +393,8 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self.bugSplat handleNewCrashFromPLCrashReporter];
     [self recordCurrentCrashFilenameForCleanup];
 
-#if TARGET_OS_OSX
     XCTAssertTrue(delegate.attachmentsCallbackInvoked);
     XCTAssertFalse(delegate.legacyAttachmentsCallbackInvoked, @"Legacy variant should not be called when the sessionID-aware variant is implemented");
-#else
-    XCTAssertTrue(delegate.attachmentCallbackInvoked);
-#endif
     XCTAssertFalse(delegate.legacyAttachmentCallbackInvoked, @"Legacy variant should not be called when the sessionID-aware variant is implemented");
 }
 
@@ -403,11 +409,43 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self.bugSplat handleNewCrashFromPLCrashReporter];
     [self recordCurrentCrashFilenameForCleanup];
 
-#if TARGET_OS_OSX
     XCTAssertTrue(delegate.legacyAttachmentsCallbackInvoked, @"Legacy delegates must keep working");
-#else
-    XCTAssertTrue(delegate.legacyAttachmentCallbackInvoked, @"Legacy delegates must keep working");
-#endif
+}
+
+- (void)testHandleNewCrash_PersistsEveryAttachmentFromPluralDelegate
+{
+    // Attributes are sent as form fields on the upload request, so an app is free to
+    // spend all of its attachments on its own files - on iOS as well as macOS.
+    self.mockCrashReporter.hasPendingReport = YES;
+    self.mockCrashReporter.pendingCrashReportData = [self crashReportDataWithEmbeddedSessionID:[NSUUID UUID]];
+
+    MultiAttachmentDelegate *delegate = [[MultiAttachmentDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    XCTAssertTrue([self.bugSplat setValue:@"boss-fight" forAttribute:@"level"]);
+
+    [self.bugSplat handleNewCrashFromPLCrashReporter];
+    [self recordCurrentCrashFilenameForCleanup];
+
+    NSString *filename = [self.bugSplat currentCrashFilename];
+    XCTAssertNotNil(filename);
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSArray<NSString *> *expectedFilenames = @[@"Player.log", @"session.log"];
+    for (NSUInteger index = 0; index < expectedFilenames.count; index++) {
+        NSString *path = [[dir stringByAppendingPathComponent:
+                           [NSString stringWithFormat:@"%@-%lu", filename, (unsigned long)index]]
+                          stringByAppendingPathExtension:@"data"];
+        NSData *archived = [NSData dataWithContentsOfFile:path];
+        XCTAssertNotNil(archived, @"Attachment %lu should have been persisted", (unsigned long)index);
+
+        NSError *error = nil;
+        BugSplatAttachment *decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[BugSplatAttachment class]
+                                                                       fromData:archived
+                                                                          error:&error];
+        XCTAssertNil(error);
+        XCTAssertEqualObjects(decoded.filename, expectedFilenames[index]);
+    }
 }
 
 - (void)testHandleNewCrash_NilSessionIDWhenReportPredatesSessionTracking
@@ -423,11 +461,7 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self.bugSplat handleNewCrashFromPLCrashReporter];
     [self recordCurrentCrashFilenameForCleanup];
 
-#if TARGET_OS_OSX
     XCTAssertTrue(delegate.attachmentsCallbackInvoked);
-#else
-    XCTAssertTrue(delegate.attachmentCallbackInvoked);
-#endif
     XCTAssertNil(delegate.receivedAttachmentSessionID,
                  @"sessionID should be nil for reports without embedded session data");
 }
