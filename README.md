@@ -36,6 +36,13 @@ Add the following URL to your project's `Additional Package Dependencies`:
 https://github.com/BugSplat-Git/bugsplat-apple
 ```
 
+> [!TIP]
+> Xcode's package dialog may default the Dependency Rule to Branch `main`, and show a
+> placeholder of `1.0.0` when you switch to a version rule. Choose **Up to Next Major
+> Version** and enter the current release (e.g. `3.4.0`). Prefer a version rule over the
+> `main` branch: tagged releases are what ship the prebuilt framework the manifest
+> references.
+
 > [!IMPORTANT]
 > Your target's macOS deployment target must be **11.0 or later**, and iOS **13.0** or later.
 > Swift Package Manager enforces this at resolve time and will refuse to resolve the
