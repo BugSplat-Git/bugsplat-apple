@@ -16,6 +16,7 @@ jobs:
     outputs:
       current: ${{ steps.semver.outputs.current }}
       next: ${{ steps.semver.outputs.next }}
+      next_strict: ${{ steps.semver.outputs.nextStrict }}
       should_build: ${{ steps.check.outputs.should_build }}
     
     steps:
@@ -94,7 +95,7 @@ jobs:
     - name: Update Package.swift
       run: |
         CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
-        URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next }}/BugSplat.xcframework.zip"
+        URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next_strict }}/BugSplat.xcframework.zip"
         
         # Update the URL and checksum in Package.swift
         sed -i '' 's|url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/[^"]*"|url: "'"$URL"'"|' Package.swift
@@ -103,24 +104,24 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add Package.swift
-        git commit -m "chore: release ${{ needs.check-version.outputs.next }}"
+        git commit -m "chore: release ${{ needs.check-version.outputs.next_strict }}"
         git push origin HEAD:main
 
     - name: Create and Push Tag
       run: |
-        git tag ${{ needs.check-version.outputs.next }}
-        git push origin ${{ needs.check-version.outputs.next }}
+        git tag ${{ needs.check-version.outputs.next_strict }}
+        git push origin ${{ needs.check-version.outputs.next_strict }}
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ needs.check-version.outputs.next }}
+        tag_name: ${{ needs.check-version.outputs.next_strict }}
         files: |
           xcframeworks/BugSplat.xcframework.zip
           xcframeworks/BugSplat-macOS.dylib
-        name: Release ${{ needs.check-version.outputs.next }}
+        name: Release ${{ needs.check-version.outputs.next_strict }}
         body: |
-          Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next }}
+          Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next_strict }}
           
           This release includes:
           - BugSplat.xcframework (iOS, macOS, tvOS)
@@ -130,7 +131,7 @@ jobs:
           
           ```swift
           dependencies: [
-              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ needs.check-version.outputs.next }}")
+              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ needs.check-version.outputs.next_strict }}")
           ]
           ```
           
