@@ -36,24 +36,6 @@ Add the following URL to your project's `Additional Package Dependencies`:
 https://github.com/BugSplat-Git/bugsplat-apple
 ```
 
-> [!IMPORTANT]
-> Your target's macOS deployment target must be **11.5 or later**. Swift Package Manager
-> refuses to resolve the dependency below that, with an error such as:
->
-> ```
-> error: the library 'App' requires macos 11.0, but depends on the product 'BugSplat'
-> which requires macos 11.5
-> ```
->
-> Because SwiftPM has no `.v11_5` enum case, a `Package.swift` consumer must spell the
-> platform as a string:
->
-> ```swift
-> platforms: [.macOS("11.5")]
-> ```
->
-> For an Xcode app target, set `MACOSX_DEPLOYMENT_TARGET` (Minimum Deployments) to 11.5 or later.
-
 ### CocoaPods
 
 Add the following to your `Podfile`:
