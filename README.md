@@ -19,7 +19,7 @@ The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac 
 ## Requirements 📋
 
 - BugSplat for iOS supports iOS 13 and later.
-- BugSplat for macOS supports macOS 10.13 and later.
+- BugSplat for macOS supports macOS 11.5 and later.
 
 ## Integration 🏗️
 
@@ -53,6 +53,32 @@ To manually integrate BugSplat into your Xcode project, BugSplat.xcframework nee
 1. Download the latest released xcframework (BugSplat.xcframework.zip) from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The zip will contain BugSplat.xcframework.
 2. Unzip the archive.
 3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to where you unzipped the archive in step 2. Select BugSplat.xcframework, then tap the "Add" button. Once added, select Embed & Sign for the xcframework.
+
+### Troubleshooting: "Library not loaded" / "different Team IDs" on macOS
+
+If your app integrates BugSplat with Swift Package Manager and crashes at launch with:
+
+```
+dyld: Library not loaded: @rpath/BugSplat.framework/Versions/A/BugSplat
+Reason: ... code signature ... not valid for use in process:
+mapping process and mapped file (non-platform) have different Team IDs
+```
+
+the package resolved and built correctly — this is a code-signing issue at load time.
+`BugSplat.framework` ships with an ad-hoc (linker) signature and no Team ID. When your
+app is signed with your team's identity and has the Hardened Runtime's Library
+Validation enabled, `dyld` refuses to load any non-platform library that is not signed
+with the same Team ID.
+
+This typically happens when only an **intermediate framework target** depends on the
+BugSplat package. Xcode links against the unsigned copy of `BugSplat.framework` in the
+build products directory, but never embeds and re-signs it into the app bundle —
+embedding only happens for package products attached to an **application** target.
+
+**Fix:** also add the BugSplat package product to your app target —
+select the app target, General → *Frameworks, Libraries, and Embedded Content* → `+` →
+BugSplat. Xcode then embeds the framework in the app bundle and re-signs it with your
+signing identity, which satisfies Library Validation.
 
 ## Usage 🧑‍💻
 
