@@ -36,13 +36,6 @@ Add the following URL to your project's `Additional Package Dependencies`:
 https://github.com/BugSplat-Git/bugsplat-apple
 ```
 
-> [!TIP]
-> Xcode's package dialog may default the Dependency Rule to Branch `main`, and show a
-> placeholder of `1.0.0` when you switch to a version rule. Choose **Up to Next Major
-> Version** and enter the current release (e.g. `3.4.0`). Prefer a version rule over the
-> `main` branch: tagged releases are what ship the prebuilt framework the manifest
-> references.
-
 > [!IMPORTANT]
 > Your target's macOS deployment target must be **11.5 or later**. Swift Package Manager
 > refuses to resolve the dependency below that, with an error such as:
@@ -100,22 +93,10 @@ BugSplat package. Xcode links against the unsigned copy of `BugSplat.framework` 
 build products directory, but never embeds and re-signs it into the app bundle —
 embedding only happens for package products attached to an **application** target.
 
-**Fix (recommended):** also add the BugSplat package product to your app target —
+**Fix:** also add the BugSplat package product to your app target —
 select the app target, General → *Frameworks, Libraries, and Embedded Content* → `+` →
 BugSplat. Xcode then embeds the framework in the app bundle and re-signs it with your
 signing identity, which satisfies Library Validation.
-
-**Alternative:** re-sign the framework yourself in a Run Script build phase, e.g.
-
-```sh
-codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
-  --preserve-metadata=identifier,entitlements \
-  "${BUILT_PRODUCTS_DIR}/BugSplat.framework/Versions/A"
-```
-
-**Debug-only escape hatch:** disable Hardened Runtime (or add the
-`com.apple.security.cs.disable-library-validation` entitlement) for your Debug
-configuration. Prefer the embedding fix for Release builds.
 
 ## Usage 🧑‍💻
 
