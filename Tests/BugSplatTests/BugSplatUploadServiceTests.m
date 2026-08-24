@@ -511,6 +511,139 @@
     XCTAssertEqual(bytes[1], 'K');
 }
 
+- (void)testUploadCrashReport_IncludesMultipleAttachmentsInZip
+{
+    // iOS and macOS alike carry every attachment in the uploaded ZIP - there is no
+    // single-attachment limit (issue #69).
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/bucket/key"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Upload completes"];
+
+    BugSplatAttachment *playerLog = [[BugSplatAttachment alloc] initWithFilename:@"Player.log"
+                                                                 attachmentData:[@"player log" dataUsingEncoding:NSUTF8StringEncoding]
+                                                                    contentType:@"text/plain"];
+    BugSplatAttachment *sessionLog = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
+                                                                  attachmentData:[@"session log" dataUsingEncoding:NSUTF8StringEncoding]
+                                                                     contentType:@"text/plain"];
+
+    NSData *crashData = [@"crash content" dataUsingEncoding:NSUTF8StringEncoding];
+    [self.uploadService uploadCrashReport:crashData
+                            crashFilename:@"crash.crashlog"
+                              attachments:@[playerLog, sessionLog]
+                                 metadata:nil
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        XCTAssertTrue(success);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    NSData *zipData = self.mockSession.recordedRequests[1].bodyData;
+    XCTAssertNotNil(zipData);
+    for (NSString *filename in @[@"crash.crashlog", @"Player.log", @"session.log"]) {
+        NSRange range = [zipData rangeOfData:[filename dataUsingEncoding:NSUTF8StringEncoding]
+                                     options:0
+                                       range:NSMakeRange(0, zipData.length)];
+        XCTAssertNotEqual(range.location, (NSUInteger)NSNotFound, @"ZIP should contain %@", filename);
+    }
+}
+
+- (void)testUploadCrashReport_SendsAttributesInCommitRequest
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/bucket/key"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.attributes = @{@"level": @"boss-fight"};
+
+    BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"Player.log"
+                                                                  attachmentData:[@"player log" dataUsingEncoding:NSUTF8StringEncoding]
+                                                                     contentType:@"text/plain"];
+
+    NSData *crashData = [@"crash content" dataUsingEncoding:NSUTF8StringEncoding];
+    [self.uploadService uploadCrashReport:crashData
+                            crashFilename:@"crash.crashlog"
+                              attachments:@[attachment]
+                                 metadata:metadata
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        XCTAssertTrue(success);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // Attributes travel as a form field on the commit request (3rd request), so an
+    // attachment supplied by the app never displaces them (issue #69).
+    MockURLSessionRequest *commitRequest = self.mockSession.recordedRequests[2];
+    NSString *bodyString = [[NSString alloc] initWithData:commitRequest.request.HTTPBody encoding:NSUTF8StringEncoding];
+    XCTAssertTrue([bodyString containsString:@"name=\"attributes\""]);
+    XCTAssertTrue([bodyString containsString:@"level"]);
+    XCTAssertTrue([bodyString containsString:@"boss-fight"]);
+}
+
+- (void)testUploadCrashReport_DoesNotSendAttributesAsAttachment
+{
+    NSDictionary *presignedResponse = @{@"url": @"https://s3.example.com/bucket/key"};
+    NSData *presignedData = [NSJSONSerialization dataWithJSONObject:presignedResponse options:0 error:nil];
+    [self.mockSession queueResponseWithData:presignedData
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:nil
+                                   response:[MockURLSession responseWithStatusCode:200]
+                                      error:nil];
+    [self.mockSession queueResponseWithData:[@"{}" dataUsingEncoding:NSUTF8StringEncoding]
+                                   response:[MockURLSession jsonResponseWithStatusCode:200]
+                                      error:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Upload completes"];
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.attributes = @{@"level": @"boss-fight"};
+
+    NSData *crashData = [@"crash content" dataUsingEncoding:NSUTF8StringEncoding];
+    [self.uploadService uploadCrashReport:crashData
+                            crashFilename:@"crash.crashlog"
+                              attachments:nil
+                                 metadata:metadata
+                               completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        XCTAssertTrue(success);
+        [expectation fulfill];
+    }];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // The uploaded ZIP carries only the crash report - attributes are not packaged
+    // as a CrashContext.xml attachment.
+    NSData *zipData = self.mockSession.recordedRequests[1].bodyData;
+    XCTAssertNotNil(zipData);
+    NSRange contextRange = [zipData rangeOfData:[@"CrashContext" dataUsingEncoding:NSUTF8StringEncoding]
+                                        options:0
+                                          range:NSMakeRange(0, zipData.length)];
+    XCTAssertEqual(contextRange.location, (NSUInteger)NSNotFound,
+                   @"Attributes must not be uploaded as a CrashContext.xml attachment");
+}
+
 #pragma mark - Cancel Tests
 
 - (void)testCancelUpload_CancelsCurrentTask

@@ -678,29 +678,22 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
 
     @try {
-#if TARGET_OS_OSX
         if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:sessionID:)]) {
             NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self sessionID:crashedSessionID];
             if (delegateAttachments) {
                 [attachments addObjectsFromArray:delegateAttachments];
             }
-        } else
-#endif
-        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:sessionID:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:sessionID:)]) {
             BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self sessionID:crashedSessionID];
             if (attachment) {
                 [attachments addObject:attachment];
             }
-        } else
-#if TARGET_OS_OSX
-        if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
             NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self];
             if (delegateAttachments) {
                 [attachments addObjectsFromArray:delegateAttachments];
             }
-        } else
-#endif
-        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
             BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self];
             if (attachment) {
                 [attachments addObject:attachment];
@@ -867,29 +860,22 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // handleNewCrashFromPLCrashReporter.
     NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
     @try {
-#if TARGET_OS_OSX
         if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:sessionID:)]) {
             NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self sessionID:hangSessionID];
             if (delegateAttachments) {
                 [attachments addObjectsFromArray:delegateAttachments];
             }
-        } else
-#endif
-        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:sessionID:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:sessionID:)]) {
             BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self sessionID:hangSessionID];
             if (attachment) {
                 [attachments addObject:attachment];
             }
-        } else
-#if TARGET_OS_OSX
-        if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentsForBugSplat:)]) {
             NSArray *delegateAttachments = [self.delegate attachmentsForBugSplat:self];
             if (delegateAttachments) {
                 [attachments addObjectsFromArray:delegateAttachments];
             }
-        } else
-#endif
-        if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
+        } else if ([self.delegate respondsToSelector:@selector(attachmentForBugSplat:)]) {
             BugSplatAttachment *attachment = [self.delegate attachmentForBugSplat:self];
             if (attachment) {
                 [attachments addObject:attachment];

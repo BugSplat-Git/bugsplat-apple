@@ -95,8 +95,25 @@ jobs:
     - name: Run iOS Tests
       run: |
         set -o pipefail
+        # Pick an iPhone simulator from the newest installed iOS runtime by UDID.
+        # A hardcoded device name breaks whenever the runner image's device set
+        # changes, and omitting OS resolves to the newest runtime, which older
+        # device models are not paired with.
+        UDID=$(xcrun simctl list devices available --json | python3 -c '
+        import json, sys
+        data = json.load(sys.stdin)["devices"]
+        def ver(k):
+            return tuple(int(p) for p in k.split("iOS-")[-1].split("-") if p.isdigit())
+        ios = {k: v for k, v in data.items() if ".iOS-" in k}
+        for k in sorted(ios, key=ver, reverse=True):
+            for d in ios[k]:
+                if d.get("isAvailable") and d["name"].startswith("iPhone"):
+                    print(d["udid"]); sys.exit()
+        sys.exit("no available iPhone simulator found")
+        ')
+        xcrun simctl list devices | grep "$UDID"
         xcodebuild test \
           -workspace BugSplat.xcworkspace \
           -scheme BugSplatIOSTests \
-          -destination 'platform=iOS Simulator,OS=latest,name=iPhone 16' \
+          -destination "platform=iOS Simulator,id=$UDID" \
           CODE_SIGNING_ALLOWED=NO
