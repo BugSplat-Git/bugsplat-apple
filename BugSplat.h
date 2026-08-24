@@ -251,7 +251,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * This method may be called multiple times, once per attribute+value pair.
  * This method may be called at any time during the app session prior to a crash.
- * Attributes are stored in a NSDictionary<NSString *, NSString *>, so attribute names must be unique.
+ * Attributes are stored in an NSDictionary<NSString *, NSString *>, so attribute names must be unique.
  * If the attribute does not exist, it will be added to attributes dictionary.
  * If attribute already exists, the value will be replaced in the dictionary.
  * If attribute already exists, and the value is nil, the attribute will be removed from the dictionary.

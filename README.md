@@ -263,7 +263,7 @@ BugSplat.shared().setValue("Value of Attribute", forAttribute: "AttributeName")
 
 It is important to understand how attributes are set, as well as if and when attributes will be included in a crash report.
 
-Attributes and their associated values are programmatically set at any time while an app is running. Attributes are unique `NSString` keys so there can only be one attribute of a given name in any given set of attributes. Every time BugSplat's `setValue:forAttribute:` API is called, this attribute/value pair will be added to a `NSDictionary<NSString *, NSString *>`. If the app session terminates due to a crash, the attributes are handled as follows:
+Attributes and their associated values are programmatically set at any time while an app is running. Attributes are unique `NSString` keys so there can only be one attribute of a given name in any given set of attributes. Every time BugSplat's `setValue:forAttribute:` API is called, this attribute/value pair will be added to an `NSDictionary<NSString *, NSString *>`. If the app session terminates due to a crash, the attributes are handled as follows:
 
     1. The attributes set during the session are recorded with the crash report at the moment the crash occurs.
     2. Upon the next launch, the recorded attributes are read back from the crash report and sent as form fields on the crash upload request.
@@ -401,7 +401,7 @@ BugSplat.shared().notes = "Debug build, feature-x enabled"
 
 #### Attachments
 
-Bugsplat supports uploading attachments with crash reports. There are delegate methods provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Implement `attachmentsForBugSplat:sessionID:` (Swift: `attachments(for:sessionID:)`) to return any number of attachments; it is supported on both macOS and iOS. The single-attachment `attachmentForBugSplat:` variants remain available for existing integrations. Attachments are independent of [Attributes](#attributes) — attributes are sent as form fields on the upload request, not as an attachment.
+BugSplat supports uploading attachments with crash reports. There are delegate methods provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Implement `attachmentsForBugSplat:sessionID:` (Swift: `attachments(for:sessionID:)`) to return any number of attachments; it is supported on both macOS and iOS. The single-attachment `attachmentForBugSplat:` variants remain available for existing integrations. Attachments are independent of [Attributes](#attributes) — attributes are sent as form fields on the upload request, not as an attachment.
 
 #### Associating Per-Session Files with Crash Reports
 
@@ -411,11 +411,11 @@ To make this association reliable, BugSplat provides a per-launch session ID:
 
 - `BugSplat.shared().sessionID` — a `UUID` generated when the `BugSplat` instance is first created (e.g. via `BugSplat.shared()`), stable for the lifetime of the process, and readable before or after `start()` is called.
 - The ID is embedded into any crash report captured during that session, and sessionID-aware delegate callbacks pass the **crashed** session's ID back to you at the next launch:
-  - `attachments(for:sessionID:)` / `attachment(for:sessionID:)`
-  - `applicationLog(for:sessionID:)`
-  - `bugSplatWillSendCrashReport(_:sessionID:)`
-  - `bugSplatDidFinishSendingCrashReport(_:sessionID:)`
-  - `bugSplat(_:didFailWithError:sessionID:)`
+  - `attachments(for:sessionID:)` / `attachment(for:sessionID:)` (Obj-C: `attachmentsForBugSplat:sessionID:` / `attachmentForBugSplat:sessionID:`)
+  - `applicationLog(for:sessionID:)` (Obj-C: `applicationLogForBugSplat:sessionID:`)
+  - `bugSplatWillSendCrashReport(_:sessionID:)` (Obj-C: `bugSplatWillSendCrashReport:sessionID:`)
+  - `bugSplatDidFinishSendingCrashReport(_:sessionID:)` (Obj-C: `bugSplatDidFinishSendingCrashReport:sessionID:`)
+  - `bugSplat(_:didFailWithError:sessionID:)` (Obj-C: `bugSplat:didFailWithError:sessionID:`)
 
 When a sessionID-aware method is implemented, it is called instead of its legacy counterpart. The `sessionID` parameter is `nil` for crash reports recorded by SDK versions that predate session tracking.
 
@@ -458,7 +458,7 @@ NSString *logPath = [logsDirectory stringByAppendingPathComponent:
     [NSString stringWithFormat:@"%@.log", [BugSplat shared].sessionID.UUIDString]];
 
 // 2. At the next launch after a crash, return the crashed session's log.
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     if (!sessionID) return @[]; // report predates session tracking
     NSString *path = [logsDirectory stringByAppendingPathComponent:
@@ -471,7 +471,7 @@ NSString *logPath = [logsDirectory stringByAppendingPathComponent:
 }
 
 // 3. Once the report is delivered, the log is safe to delete.
-- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     if (!sessionID) return;
     NSString *path = [logsDirectory stringByAppendingPathComponent:

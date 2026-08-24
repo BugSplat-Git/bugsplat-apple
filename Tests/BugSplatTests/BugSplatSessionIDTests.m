@@ -53,40 +53,40 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation SessionIDRecordingDelegate
 
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.attachmentsCallbackInvoked = YES;
     self.receivedAttachmentSessionID = sessionID;
     return @[];
 }
 
-- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.attachmentCallbackInvoked = YES;
     self.receivedAttachmentSessionID = sessionID;
     return nil;
 }
 
-- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.applicationLogCallbackInvoked = YES;
     self.receivedApplicationLogSessionID = sessionID;
     return @"session log";
 }
 
-- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.willSendCallbackInvoked = YES;
     self.receivedWillSendSessionID = sessionID;
 }
 
-- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.didFinishCallbackInvoked = YES;
     self.receivedDidFinishSessionID = sessionID;
 }
 
-- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error sessionID:(NSUUID *)sessionID
+- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error sessionID:(nullable NSUUID *)sessionID
 {
     self.didFailCallbackInvoked = YES;
     self.receivedDidFailSessionID = sessionID;
@@ -157,21 +157,21 @@ static NSString *const kSessionIDKey = @"sessionID";
                                             contentType:@"text/plain"];
 }
 
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.attachmentCallCount++;
     self.receivedAttachmentSessionID = sessionID;
     return @[[self makeAttachment]];
 }
 
-- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.attachmentCallCount++;
     self.receivedAttachmentSessionID = sessionID;
     return [self makeAttachment];
 }
 
-- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     self.applicationLogCallCount++;
     self.receivedApplicationLogSessionID = sessionID;
@@ -187,7 +187,7 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation MultiAttachmentDelegate
 
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(NSUUID *)sessionID
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
     BugSplatAttachment *playerLog =
         [[BugSplatAttachment alloc] initWithFilename:@"Player.log"

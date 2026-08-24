@@ -103,23 +103,24 @@ NS_ASSUME_NONNULL_BEGIN
  */
 -(void)bugSplatWillCancelSendingCrashReport:(BugSplat *)bugSplat;
 
-/** Return a collection of BugSplatAttachment objects the crash report being processed should contain
+/** Return a collection of BugSplatAttachment objects that the crash report being processed should contain
 
  All returned attachments are included with the crash report, on both macOS and iOS.
 
  Example implementation:
 
- NSData *data = [NSData dataWithContentsOfURL:@"mydatafile"];
+ NSData *data = [NSData dataWithContentsOfFile:@"mydatafile"];
 
  BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"myfile.data"
                                                                 attachmentData:data
                                                                    contentType:@"application/octet-stream"];
+ return @[attachment];
 
  @param bugSplat The `BugSplat` instance invoking this delegate
 */
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(macosx(10.13), ios(13.0));
 
-/** Return a collection of BugSplatAttachment objects the crash report being processed should contain
+/** Return a collection of BugSplatAttachment objects that the crash report being processed should contain
 
  When implemented, this method is preferred over `attachmentsForBugSplat:` and the
  single-attachment variants.
@@ -138,6 +139,7 @@ NS_ASSUME_NONNULL_BEGIN
  BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
                                                                 attachmentData:data
                                                                    contentType:@"text/plain"];
+ return @[attachment];
 
  @param bugSplat The `BugSplat` instance invoking this delegate
  @param sessionID The ID of the session that crashed, or nil if the crash report
@@ -153,11 +155,13 @@ NS_ASSUME_NONNULL_BEGIN
 
  Example implementation:
 
- NSData *data = [NSData dataWithContentsOfURL:@"mydatafile"];
+ NSData *data = [NSData dataWithContentsOfFile:@"mydatafile"];
 
  BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"myfile.data"
                                                                 attachmentData:data
                                                                    contentType:@"application/octet-stream"];
+ return attachment;
+
  @param bugSplat The `BugSplat` instance invoking this delegate
 */
 - (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat API_AVAILABLE(ios(13.0));
@@ -180,6 +184,7 @@ NS_ASSUME_NONNULL_BEGIN
  BugSplatAttachment *attachment = [[BugSplatAttachment alloc] initWithFilename:@"session.log"
                                                                 attachmentData:data
                                                                    contentType:@"text/plain"];
+ return attachment;
 
  @param bugSplat The `BugSplat` instance invoking this delegate
  @param sessionID The ID of the session that crashed, or nil if the crash report
