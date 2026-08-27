@@ -57,6 +57,24 @@ static NSString *const kBugSplatMetaKeyAttributes = @"attributes";
 static NSString *const kBugSplatMetaKeyApplicationLog = @"applicationLog";
 static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
 static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
+
+/**
+ * Decodes a persisted `timestamp` value.
+ *
+ * It is written as an ISO-8601 string (see the two writers below), so reading it as a number
+ * yields garbage rather than a date. Returns nil for anything that is not a parseable string,
+ * which callers must treat as "unknown" rather than "very old".
+ */
+static NSDate *BugSplatDateFromPersistedTimestamp(id value)
+{
+    if (![value isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    return [formatter dateFromString:(NSString *)value];
+}
 // Crash-time context (may differ from current app if updated before upload)
 static NSString *const kBugSplatMetaKeyDatabase = @"database";
 static NSString *const kBugSplatMetaKeyApplicationName = @"applicationName";
@@ -1007,18 +1025,27 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
 #if TARGET_OS_OSX
-    // Crash report has expired
-    @try {
-        NSNumber *timestamp = metadata[kBugSplatMetaKeyTimestamp];
-        if (self.expirationTimeInterval > 0 && timestamp) {
-            NSTimeInterval timeSinceCrash = [[NSDate date] timeIntervalSince1970] - timestamp.doubleValue;
+    // Crash report has expired.
+    //
+    // The timestamp is persisted as an ISO-8601 string. This used to read it as an NSNumber and
+    // call -doubleValue on it, which NSString answers by parsing a leading number - "2026-08-27T..."
+    // came back as 2026, making every report look decades old, so any app that set
+    // expirationTimeInterval submitted all of its reports silently and never saw the dialog.
+    //
+    // An unparseable timestamp is treated as unknown, not as expired: skipping the check leaves
+    // the decision to autoSubmitCrashReport, which errs towards asking the user rather than
+    // quietly sending a report they were never shown.
+    if (self.expirationTimeInterval > 0) {
+        NSDate *reportDate = BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp]);
+        if (reportDate) {
+            NSTimeInterval timeSinceCrash = -[reportDate timeIntervalSinceNow];
             if (timeSinceCrash > self.expirationTimeInterval) {
                 NSLog(@"BugSplat: Crash report expired (%.0f seconds old)", timeSinceCrash);
                 return YES;
             }
+        } else if (metadata[kBugSplatMetaKeyTimestamp]) {
+            NSLog(@"BugSplat: Could not read crash report timestamp; skipping the expiration check");
         }
-    } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception checking crash report expiration: %@ - %@", exception.name, exception.reason);
     }
 #else
     // iOS: User chose "Always Send"

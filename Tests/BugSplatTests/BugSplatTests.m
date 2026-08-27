@@ -317,6 +317,70 @@
     XCTAssertFalse(result);
 }
 
+#if TARGET_OS_OSX
+
+#pragma mark - Expiration Tests
+
+/// Writes the timestamp exactly as the persist paths do, so these tests break if the two formats
+/// ever drift apart again.
+- (NSString *)persistedTimestampForDate:(NSDate *)date
+{
+    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    return [formatter stringFromDate:date];
+}
+
+- (void)testShouldSendCrashSilently_RecentReportIsNotExpired
+{
+    // The regression: the ISO string was read with -doubleValue, which returned the leading year
+    // and made a report written seconds ago look decades old, so it was silently submitted.
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDictionary *metadata = @{ @"timestamp": [self persistedTimestampForDate:[NSDate date]] };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"A report written just now must not count as expired");
+}
+
+- (void)testShouldSendCrashSilently_OldReportIsExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDate *twoHoursAgo = [NSDate dateWithTimeIntervalSinceNow:-(2 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": [self persistedTimestampForDate:twoHoursAgo] };
+
+    XCTAssertTrue([self.bugSplat shouldSendCrashSilently:metadata],
+                  @"A report older than expirationTimeInterval must still expire");
+}
+
+- (void)testShouldSendCrashSilently_ExpirationIgnoredWhenNotConfigured
+{
+    // The default is -1, so the check must not run at all.
+    self.bugSplat.autoSubmitCrashReport = NO;
+    NSDate *longAgo = [NSDate dateWithTimeIntervalSinceNow:-(365 * 24 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": [self persistedTimestampForDate:longAgo] };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"Without expirationTimeInterval set, age must not matter");
+}
+
+- (void)testShouldSendCrashSilently_UnreadableTimestampIsNotTreatedAsExpired
+{
+    // Unknown age must fall through to autoSubmitCrashReport rather than silently sending a
+    // report the user was never shown.
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    for (id value in @[ @"not a date", @0, [NSNull null], @[] ]) {
+        XCTAssertFalse([self.bugSplat shouldSendCrashSilently:@{ @"timestamp": value }],
+                       @"timestamp %@ should skip the expiration check, not expire the report", value);
+    }
+}
+
+#endif
+
 #if !TARGET_OS_OSX
 - (void)testShouldSendCrashSilently_iOS_TrueWhenAlwaysSendEnabled
 {
