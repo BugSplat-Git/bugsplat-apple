@@ -18,6 +18,92 @@ static const CGFloat kButtonWidth = 100.0;
 static const CGFloat kButtonHeight = 32.0;
 static const CGFloat kDetailsHeight = 200.0;
 
+#pragma mark - BugSplatCrashReportDialogWindow
+
+/**
+ * The dialog's window.
+ *
+ * macOS does not build the standard editing shortcuts into NSTextField or
+ * NSTextView. They work in a normal Cocoa app only because the application's
+ * main menu has an Edit menu carrying those key equivalents, which
+ * NSApplication dispatches to the first responder. BugSplat's dialog is shown
+ * from inside host applications - Unity game players, for example - whose menu
+ * bar has no Edit menu, so nothing translates Cmd+A into selectAll: and the
+ * shortcut is silently dead in the Name, Email and Comments fields.
+ *
+ * Overriding performKeyEquivalent: sends the same action selectors an Edit menu
+ * item would send, to whatever currently has focus, so the shortcuts work
+ * regardless of the host's menu bar.
+ */
+@interface BugSplatCrashReportDialogWindow : NSWindow
+@end
+
+@implementation BugSplatCrashReportDialogWindow
+
+- (BOOL)performKeyEquivalent:(NSEvent *)event
+{
+    // The view hierarchy gets first refusal so the Cancel (Escape) and Send
+    // (Return) buttons keep their own key equivalents.
+    if ([super performKeyEquivalent:event]) {
+        return YES;
+    }
+
+    SEL action = [self editingActionForEvent:event];
+    if (action == NULL) {
+        return NO;
+    }
+
+    // A nil target routes through the responder chain starting at the first
+    // responder - the field editor, when a text field or the comments text view
+    // has focus - exactly as an Edit menu item with a nil target does. If
+    // nothing in the chain can perform the action we return NO, so a host that
+    // does have an Edit menu still gets its normal shot at the event.
+    return [NSApp sendAction:action to:nil from:self];
+}
+
+/**
+ * Maps a key equivalent event onto the Edit menu action it stands for,
+ * or NULL if this window should not claim the event.
+ */
+- (SEL)editingActionForEvent:(NSEvent *)event
+{
+    if (event.type != NSEventTypeKeyDown) {
+        return NULL;
+    }
+
+    // Command must be held. Control and Option must not be: they form shortcuts
+    // of their own, and claiming those would shadow the host application.
+    NSEventModifierFlags modifiers = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+    if (!(modifiers & NSEventModifierFlagCommand)) {
+        return NULL;
+    }
+    if (modifiers & (NSEventModifierFlagControl | NSEventModifierFlagOption)) {
+        return NULL;
+    }
+
+    NSString *key = event.charactersIgnoringModifiers.lowercaseString;
+
+    if (modifiers & NSEventModifierFlagShift) {
+        // Cmd+Shift+Z (Redo) is the only shifted shortcut we claim.
+        // AppKit does not declare -undo:/-redo: in a public header, so
+        // @selector() would trip -Wundeclared-selector. These are the selectors
+        // the standard Edit menu uses.
+        return [key isEqualToString:@"z"] ? NSSelectorFromString(@"redo:") : NULL;
+    }
+
+    if ([key isEqualToString:@"a"]) { return @selector(selectAll:); }
+    if ([key isEqualToString:@"c"]) { return @selector(copy:); }
+    if ([key isEqualToString:@"v"]) { return @selector(paste:); }
+    if ([key isEqualToString:@"x"]) { return @selector(cut:); }
+    if ([key isEqualToString:@"z"]) { return NSSelectorFromString(@"undo:"); }
+
+    return NULL;
+}
+
+@end
+
+#pragma mark - BugSplatCrashReportWindow
+
 @interface BugSplatCrashReportWindow () <NSTextStorageDelegate, NSWindowDelegate>
 
 @property (nonatomic, strong) NSStackView *mainStackView;
@@ -53,10 +139,12 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (instancetype)init
 {
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, kWindowWidth, 400)
-                                                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
-                                                     backing:NSBackingStoreBuffered
-                                                       defer:NO];
+    // BugSplatCrashReportDialogWindow, rather than a plain NSWindow, so the
+    // standard editing shortcuts work in hosts with no Edit menu.
+    NSWindow *window = [[BugSplatCrashReportDialogWindow alloc] initWithContentRect:NSMakeRect(0, 0, kWindowWidth, 400)
+                                                                          styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                                                                            backing:NSBackingStoreBuffered
+                                                                              defer:NO];
     
     self = [super initWithWindow:window];
     if (self) {
@@ -245,6 +333,9 @@ static const CGFloat kDetailsHeight = 200.0;
     self.commentsTextView.textContainerInset = NSMakeSize(0, 4);
     self.commentsTextView.font = [NSFont systemFontOfSize:13];
     self.commentsTextView.textColor = [NSColor textColor];
+    // NSTextView does not allow undo by default, which would leave Cmd+Z a no-op
+    // in the Comments field. (NSTextField's field editor already allows undo.)
+    self.commentsTextView.allowsUndo = YES;
     self.commentsTextView.textStorage.delegate = self;
     self.commentsScrollView.documentView = self.commentsTextView;
     
