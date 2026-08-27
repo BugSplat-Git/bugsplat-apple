@@ -167,9 +167,10 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
     XCTAssertNotNil(meta);
 
     XCTAssertNil(meta[kUserSubmittedKey],
-                 @"userSubmitted must be absent so the scanner surfaces the dialog");
+                 @"userSubmitted must be absent so the scanner takes the normal submission path; "
+                 @"whether that shows a dialog is then autoSubmitCrashReport's call");
 
-    // Everything else the report needs must still be there - opting into the dialog must not
+    // Everything else the report needs must still be there - opting out of auto-submit must not
     // cost the hang its context.
     XCTAssertEqualObjects(meta[kDatabaseKey], @"hangtestdb");
     XCTAssertNotNil(meta[kTimestampKey]);
