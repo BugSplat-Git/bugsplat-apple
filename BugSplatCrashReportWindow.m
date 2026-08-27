@@ -18,6 +18,85 @@ static const CGFloat kButtonWidth = 100.0;
 static const CGFloat kButtonHeight = 32.0;
 static const CGFloat kDetailsHeight = 200.0;
 
+#pragma mark - BugSplatCrashReportDialogWindow
+
+/**
+ * The dialog's window.
+ *
+ * The standard editing key equivalents are carried by the host application's Edit menu, which
+ * a host such as a Unity player does not have. This window maps them itself so they work in
+ * the dialog's text fields regardless of the host's menu bar.
+ */
+@interface BugSplatCrashReportDialogWindow : NSWindow
+@end
+
+@implementation BugSplatCrashReportDialogWindow
+
+- (BOOL)performKeyEquivalent:(NSEvent *)event
+{
+    // The view hierarchy gets first refusal so the Cancel (Escape) and Send
+    // (Return) buttons keep their own key equivalents.
+    if ([super performKeyEquivalent:event]) {
+        return YES;
+    }
+
+    SEL action = [self editingActionForEvent:event];
+    if (action == NULL) {
+        return NO;
+    }
+
+    // nil target resolves through the responder chain to the field editor, as an Edit menu item
+    // does. NO when nothing can perform it, so a host with its own Edit menu still gets the event.
+    return [NSApp sendAction:action to:nil from:self];
+}
+
+/**
+ * Maps a key equivalent event onto the Edit menu action it stands for,
+ * or NULL if this window should not claim the event.
+ */
+- (SEL)editingActionForEvent:(NSEvent *)event
+{
+    if (event.type != NSEventTypeKeyDown) {
+        return NULL;
+    }
+
+    // Command must be held, and nothing beyond Shift may join it. An allowed-set test rather
+    // than a Control/Option denylist, so Fn, Help and NumericPad cannot slip through and let us
+    // claim a chord the host meant to own. Caps Lock is stateful rather than part of a chord, so
+    // it is masked off first - someone typing with it on still gets Cmd+A.
+    NSEventModifierFlags modifiers = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+    modifiers &= ~NSEventModifierFlagCapsLock;
+
+    if (!(modifiers & NSEventModifierFlagCommand)) {
+        return NULL;
+    }
+    if (modifiers & ~(NSEventModifierFlagCommand | NSEventModifierFlagShift)) {
+        return NULL;
+    }
+
+    NSString *key = event.charactersIgnoringModifiers.lowercaseString;
+
+    if (modifiers & NSEventModifierFlagShift) {
+        // Cmd+Shift+Z (Redo) is the only shifted shortcut we claim.
+        // AppKit does not declare -undo:/-redo: in a public header, so
+        // @selector() would trip -Wundeclared-selector. These are the selectors
+        // the standard Edit menu uses.
+        return [key isEqualToString:@"z"] ? NSSelectorFromString(@"redo:") : NULL;
+    }
+
+    if ([key isEqualToString:@"a"]) { return @selector(selectAll:); }
+    if ([key isEqualToString:@"c"]) { return @selector(copy:); }
+    if ([key isEqualToString:@"v"]) { return @selector(paste:); }
+    if ([key isEqualToString:@"x"]) { return @selector(cut:); }
+    if ([key isEqualToString:@"z"]) { return NSSelectorFromString(@"undo:"); }
+
+    return NULL;
+}
+
+@end
+
+#pragma mark - BugSplatCrashReportWindow
+
 @interface BugSplatCrashReportWindow () <NSTextStorageDelegate, NSWindowDelegate>
 
 @property (nonatomic, strong) NSStackView *mainStackView;
@@ -53,10 +132,10 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (instancetype)init
 {
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, kWindowWidth, 400)
-                                                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
-                                                     backing:NSBackingStoreBuffered
-                                                       defer:NO];
+    NSWindow *window = [[BugSplatCrashReportDialogWindow alloc] initWithContentRect:NSMakeRect(0, 0, kWindowWidth, 400)
+                                                                          styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                                                                            backing:NSBackingStoreBuffered
+                                                                              defer:NO];
     
     self = [super initWithWindow:window];
     if (self) {
@@ -245,6 +324,9 @@ static const CGFloat kDetailsHeight = 200.0;
     self.commentsTextView.textContainerInset = NSMakeSize(0, 4);
     self.commentsTextView.font = [NSFont systemFontOfSize:13];
     self.commentsTextView.textColor = [NSColor textColor];
+    // NSTextView does not allow undo by default, which would leave Cmd+Z a no-op
+    // in the Comments field. (NSTextField's field editor already allows undo.)
+    self.commentsTextView.allowsUndo = YES;
     self.commentsTextView.textStorage.delegate = self;
     self.commentsScrollView.documentView = self.commentsTextView;
     
