@@ -147,7 +147,13 @@
         @{ @"characters": @"a", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagOption) },         // Cmd+Opt+A
         @{ @"characters": @"a", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagShift) },          // Cmd+Shift+A
         @{ @"characters": @"q", @"modifiers": @(NSEventModifierFlagCommand) },                                     // Cmd+Q
-        @{ @"characters": @"w", @"modifiers": @(NSEventModifierFlagCommand) }                                      // Cmd+W
+        @{ @"characters": @"w", @"modifiers": @(NSEventModifierFlagCommand) },                                     // Cmd+W
+        // Modifiers a Control/Option denylist would have let through.
+        @{ @"characters": @"a", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagFunction) },       // Cmd+Fn+A
+        @{ @"characters": @"a", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagHelp) },           // Cmd+Help+A
+        @{ @"characters": @"a", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagNumericPad) },     // Cmd+NumPad+A
+        @{ @"characters": @"z", @"modifiers": @(NSEventModifierFlagCommand | NSEventModifierFlagShift
+                                                | NSEventModifierFlagFunction) }                                   // Cmd+Shift+Fn+Z
     ];
 
     for (NSDictionary *event in unhandled) {
@@ -160,6 +166,22 @@
     }
 
     XCTAssertEqual(self.recorder.performedActions.count, 0);
+}
+
+- (void)testCapsLockDoesNotSuppressTheShortcuts
+{
+    // Caps Lock is a stateful toggle rather than part of a chord, so someone typing with it on
+    // must still get the editing shortcuts.
+    XCTAssertTrue([self performKeyEquivalentForCharacters:@"a"
+                                                modifiers:NSEventModifierFlagCommand | NSEventModifierFlagCapsLock]);
+    XCTAssertEqualObjects(self.recorder.performedActions, @[@"selectAll:"]);
+
+    [self.recorder.performedActions removeAllObjects];
+
+    XCTAssertTrue([self performKeyEquivalentForCharacters:@"z"
+                                                modifiers:NSEventModifierFlagCommand | NSEventModifierFlagShift
+                                                          | NSEventModifierFlagCapsLock]);
+    XCTAssertEqualObjects(self.recorder.performedActions, @[@"redo:"]);
 }
 
 - (void)testReturnStillTriggersSend

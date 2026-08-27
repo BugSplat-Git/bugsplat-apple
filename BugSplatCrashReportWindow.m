@@ -60,13 +60,17 @@ static const CGFloat kDetailsHeight = 200.0;
         return NULL;
     }
 
-    // Command must be held. Control and Option must not be: they form shortcuts
-    // of their own, and claiming those would shadow the host application.
+    // Command must be held, and nothing beyond Shift may join it. An allowed-set test rather
+    // than a Control/Option denylist, so Fn, Help and NumericPad cannot slip through and let us
+    // claim a chord the host meant to own. Caps Lock is stateful rather than part of a chord, so
+    // it is masked off first - someone typing with it on still gets Cmd+A.
     NSEventModifierFlags modifiers = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+    modifiers &= ~NSEventModifierFlagCapsLock;
+
     if (!(modifiers & NSEventModifierFlagCommand)) {
         return NULL;
     }
-    if (modifiers & (NSEventModifierFlagControl | NSEventModifierFlagOption)) {
+    if (modifiers & ~(NSEventModifierFlagCommand | NSEventModifierFlagShift)) {
         return NULL;
     }
 
