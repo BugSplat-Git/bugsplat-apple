@@ -203,8 +203,9 @@ NS_ASSUME_NONNULL_BEGIN
  * (launch/resume watchdog kills, user force-quit), a hang report is uploaded on the next
  * launch using the same pipeline as crash reports.
  *
- * If the main thread resumes after a hang is detected, the persisted report is discarded -
- * non-fatal hangs are not reported in this version.
+ * If the main thread resumes after a hang is detected, the persisted report is discarded.
+ * Set `enableNonFatalHangReporting` to report those recovered hangs instead of discarding
+ * them.
  *
  * Hang reports carry the exception name `App Hang (Fatal)` and include attributes prefixed
  * with `bugsplat-hang-` (duration, detection time, app state, launch id) that can be used
@@ -236,6 +237,38 @@ NS_ASSUME_NONNULL_BEGIN
  * Default: 2.0
  */
 @property (nonatomic, assign) NSTimeInterval hangDetectionThreshold;
+
+/**
+ * Enable reporting of non-fatal main-thread hangs - hangs the app recovers from.
+ *
+ * `enableHangDetection` reports only hangs the app never recovered from: when the main
+ * thread resumes, the report captured at detection time is discarded. Set this property
+ * to YES to upload that report instead of discarding it. The upload happens in the
+ * background and the app keeps running - nothing is terminated and the main thread is
+ * never blocked by the upload.
+ *
+ * Non-fatal hang reports carry the exception name `App Hang (Non-Fatal)` so they group
+ * separately from the `App Hang (Fatal)` reports produced by `enableHangDetection`. They
+ * carry the same attributes as fatal hang reports (`bugsplat-hang-duration-ms`,
+ * `bugsplat-hang-detected-at`, `bugsplat-hang-app-state`, `bugsplat-hang-launch-id`) plus
+ * `bugsplat-hang-fatal` (`false`) and `bugsplat-hang-recovered-after-ms`.
+ *
+ * Upload volume is bounded: at most 3 non-fatal hang reports are uploaded per launch, and
+ * at least 60 seconds must elapse between them. Recovered hangs beyond those limits are
+ * discarded exactly as they are when this property is NO.
+ *
+ * This property can be set independently of `enableHangDetection` - setting either one to
+ * YES starts main-thread monitoring, and `hangDetectionThreshold` applies to both. When
+ * only this property is YES, a hang the app never recovers from is discarded at the next
+ * launch rather than uploaded, because fatal hang reporting was not opted in to.
+ *
+ * Must be set before `-start` is invoked. The debugger, app-active, app-extension and
+ * wall-clock-suspension guards documented on `enableHangDetection` apply here too, as does
+ * the requirement that `-start` be invoked on the main thread.
+ *
+ * Default: NO
+ */
+@property (nonatomic, assign) BOOL enableNonFatalHangReporting;
 
 /**
  * Add an attribute and value to a dictionary of attributes that will potentially be included in a crash report.
