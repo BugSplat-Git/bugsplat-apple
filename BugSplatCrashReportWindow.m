@@ -23,17 +23,9 @@ static const CGFloat kDetailsHeight = 200.0;
 /**
  * The dialog's window.
  *
- * macOS does not build the standard editing shortcuts into NSTextField or
- * NSTextView. They work in a normal Cocoa app only because the application's
- * main menu has an Edit menu carrying those key equivalents, which
- * NSApplication dispatches to the first responder. BugSplat's dialog is shown
- * from inside host applications - Unity game players, for example - whose menu
- * bar has no Edit menu, so nothing translates Cmd+A into selectAll: and the
- * shortcut is silently dead in the Name, Email and Comments fields.
- *
- * Overriding performKeyEquivalent: sends the same action selectors an Edit menu
- * item would send, to whatever currently has focus, so the shortcuts work
- * regardless of the host's menu bar.
+ * The standard editing key equivalents are carried by the host application's Edit menu, which
+ * a host such as a Unity player does not have. This window maps them itself so they work in
+ * the dialog's text fields regardless of the host's menu bar.
  */
 @interface BugSplatCrashReportDialogWindow : NSWindow
 @end
@@ -53,11 +45,8 @@ static const CGFloat kDetailsHeight = 200.0;
         return NO;
     }
 
-    // A nil target routes through the responder chain starting at the first
-    // responder - the field editor, when a text field or the comments text view
-    // has focus - exactly as an Edit menu item with a nil target does. If
-    // nothing in the chain can perform the action we return NO, so a host that
-    // does have an Edit menu still gets its normal shot at the event.
+    // nil target resolves through the responder chain to the field editor, as an Edit menu item
+    // does. NO when nothing can perform it, so a host with its own Edit menu still gets the event.
     return [NSApp sendAction:action to:nil from:self];
 }
 
@@ -139,8 +128,6 @@ static const CGFloat kDetailsHeight = 200.0;
 
 - (instancetype)init
 {
-    // BugSplatCrashReportDialogWindow, rather than a plain NSWindow, so the
-    // standard editing shortcuts work in hosts with no Edit menu.
     NSWindow *window = [[BugSplatCrashReportDialogWindow alloc] initWithContentRect:NSMakeRect(0, 0, kWindowWidth, 400)
                                                                           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
                                                                             backing:NSBackingStoreBuffered

@@ -15,13 +15,8 @@
 #pragma mark - Recorder
 
 /**
- * Stands in for the host application at the end of the responder chain.
- *
- * The dialog's window sends the editing actions with a nil target, so
- * NSApplication resolves them through the responder chain. A unit test process
- * has no key or main window, so that search ends at the application's delegate,
- * which lets this recorder observe exactly which action each key equivalent
- * produced.
+ * Sits on NSApp.delegate because a unit test process has no key window, so the window's
+ * nil-target sendAction: ends up here and this can record what each key equivalent produced.
  */
 @interface BugSplatEditingActionRecorder : NSObject <NSApplicationDelegate>
 
