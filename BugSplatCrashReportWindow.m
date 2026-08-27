@@ -170,7 +170,7 @@ static const CGFloat kDetailsHeight = 200.0;
     // Name field
     self.nameField = [[NSTextField alloc] init];
     self.nameField.translatesAutoresizingMaskIntoConstraints = NO;
-    self.nameField.placeholderString = @"";
+    self.nameField.placeholderString = @"Your name (optional)";
     self.nameField.bezelStyle = NSTextFieldRoundedBezel;
     self.nameField.font = [NSFont systemFontOfSize:13];
     [self.userFieldsContainer addSubview:self.nameField];
@@ -184,7 +184,7 @@ static const CGFloat kDetailsHeight = 200.0;
     // Email field
     self.emailField = [[NSTextField alloc] init];
     self.emailField.translatesAutoresizingMaskIntoConstraints = NO;
-    self.emailField.placeholderString = @"";
+    self.emailField.placeholderString = @"you@example.com (optional)";
     self.emailField.bezelStyle = NSTextFieldRoundedBezel;
     self.emailField.font = [NSFont systemFontOfSize:13];
     [self.userFieldsContainer addSubview:self.emailField];
