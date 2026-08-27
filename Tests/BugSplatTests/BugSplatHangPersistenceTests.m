@@ -141,6 +141,43 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
     XCTAssertNotNil(meta[kTimestampKey]);
 }
 
+- (void)testHangDelegate_AutoSubmitFatalHangReport_DefaultsToYes
+{
+    XCTAssertTrue(self.bugSplat.autoSubmitFatalHangReport,
+                  @"Hang reports must keep auto-submitting unless the app opts out");
+}
+
+- (void)testHangDelegate_AutoSubmitFatalHangReportOff_OmitsUserSubmittedFlag
+{
+    // With auto-submit off, the report must NOT be pre-marked as user-submitted: that flag is
+    // what makes the next-launch scanner skip the dialog, so leaving it off is precisely how
+    // the hang gets routed through the same path a crash report takes.
+    self.bugSplat.autoSubmitFatalHangReport = NO;
+
+    [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.0 appState:@"active"];
+    [self drainHangQueue];
+
+    NSString *filename = [self.bugSplat currentHangFilename];
+    XCTAssertNotNil(filename);
+    self.filenameToCleanup = filename;
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+    XCTAssertNotNil(meta);
+
+    XCTAssertNil(meta[kUserSubmittedKey],
+                 @"userSubmitted must be absent so the scanner surfaces the dialog");
+
+    // Everything else the report needs must still be there - opting into the dialog must not
+    // cost the hang its context.
+    XCTAssertEqualObjects(meta[kDatabaseKey], @"hangtestdb");
+    XCTAssertNotNil(meta[kTimestampKey]);
+    NSDictionary *attributes = meta[kAttributesKey];
+    XCTAssertNotNil(attributes[kHangAttrDurationMs]);
+    XCTAssertNotNil(attributes[kHangAttrAppState]);
+}
+
 - (void)testHangDelegate_MetadataContainsCurrentSessionID
 {
     [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.0 appState:@"active"];
