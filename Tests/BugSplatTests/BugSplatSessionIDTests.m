@@ -141,6 +141,11 @@ static NSString *const kSessionIDKey = @"sessionID";
 /// Returns a real attachment + application log so hang enrichment can be verified end
 /// to end, recording the sessionID it was handed and how many times it was asked.
 @interface HangEnrichmentDelegate : NSObject <BugSplatDelegate>
+/// Only calls carrying this session are counted. `enrichPendingHangReports` walks every
+/// -hang report in the crashes directory, which is shared with the rest of the suite and
+/// with the test processes xcodebuild runs in parallel, so an unfiltered count also sees
+/// reports another test happens to have on disk. Nil counts everything.
+@property (nonatomic, strong, nullable) NSUUID *sessionIDUnderTest;
 @property (nonatomic, assign) NSInteger attachmentCallCount;
 @property (nonatomic, assign) NSInteger applicationLogCallCount;
 @property (nonatomic, strong, nullable) NSUUID *receivedAttachmentSessionID;
@@ -148,6 +153,11 @@ static NSString *const kSessionIDKey = @"sessionID";
 @end
 
 @implementation HangEnrichmentDelegate
+
+- (BOOL)countsSessionID:(nullable NSUUID *)sessionID
+{
+    return self.sessionIDUnderTest == nil || [sessionID isEqual:self.sessionIDUnderTest];
+}
 
 - (BugSplatAttachment *)makeAttachment
 {
@@ -159,22 +169,28 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    self.attachmentCallCount++;
-    self.receivedAttachmentSessionID = sessionID;
+    if ([self countsSessionID:sessionID]) {
+        self.attachmentCallCount++;
+        self.receivedAttachmentSessionID = sessionID;
+    }
     return @[[self makeAttachment]];
 }
 
 - (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    self.attachmentCallCount++;
-    self.receivedAttachmentSessionID = sessionID;
+    if ([self countsSessionID:sessionID]) {
+        self.attachmentCallCount++;
+        self.receivedAttachmentSessionID = sessionID;
+    }
     return [self makeAttachment];
 }
 
 - (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    self.applicationLogCallCount++;
-    self.receivedApplicationLogSessionID = sessionID;
+    if ([self countsSessionID:sessionID]) {
+        self.applicationLogCallCount++;
+        self.receivedApplicationLogSessionID = sessionID;
+    }
     return @"hang app log";
 }
 
@@ -597,6 +613,7 @@ static NSString *const kSessionIDKey = @"sessionID";
     NSString *filename = [self plantHangReportWithSessionID:hangSessionID];
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = hangSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];
@@ -632,6 +649,7 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self plantHangReportWithSessionID:hangSessionID];
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = hangSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];
@@ -652,9 +670,11 @@ static NSString *const kSessionIDKey = @"sessionID";
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
     XCTAssertTrue([[@"crash" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
-    XCTAssertTrue(([@{ kSessionIDKey: [NSUUID UUID].UUIDString } writeToFile:metaPath atomically:YES]));
+    NSUUID *crashSessionID = [NSUUID UUID];
+    XCTAssertTrue(([@{ kSessionIDKey: crashSessionID.UUIDString } writeToFile:metaPath atomically:YES]));
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = crashSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];
