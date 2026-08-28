@@ -141,10 +141,12 @@ static NSString *const kSessionIDKey = @"sessionID";
 /// Returns a real attachment + application log so hang enrichment can be verified end
 /// to end, recording the sessionID it was handed and how many times it was asked.
 @interface HangEnrichmentDelegate : NSObject <BugSplatDelegate>
-/// Only calls carrying this session are counted. `enrichPendingHangReports` walks every
-/// -hang report in the crashes directory, which is shared with the rest of the suite and
-/// with the test processes xcodebuild runs in parallel, so an unfiltered count also sees
-/// reports another test happens to have on disk. Nil counts everything.
+/// The session this delegate answers for. `enrichPendingHangReports` walks every -hang
+/// report in the crashes directory, which is shared with the rest of the suite and with
+/// the test processes xcodebuild runs in parallel, so the delegate is inert for any other
+/// session: it neither counts the call nor returns anything, because returning an
+/// attachment or a log would persist it into another test's report and mark that report
+/// enriched. Nil answers for everything.
 @property (nonatomic, strong, nullable) NSUUID *sessionIDUnderTest;
 @property (nonatomic, assign) NSInteger attachmentCallCount;
 @property (nonatomic, assign) NSInteger applicationLogCallCount;
@@ -154,7 +156,7 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 @implementation HangEnrichmentDelegate
 
-- (BOOL)countsSessionID:(nullable NSUUID *)sessionID
+- (BOOL)answersForSessionID:(nullable NSUUID *)sessionID
 {
     return self.sessionIDUnderTest == nil || [sessionID isEqual:self.sessionIDUnderTest];
 }
@@ -169,28 +171,31 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    if ([self countsSessionID:sessionID]) {
-        self.attachmentCallCount++;
-        self.receivedAttachmentSessionID = sessionID;
+    if (![self answersForSessionID:sessionID]) {
+        return @[];
     }
+    self.attachmentCallCount++;
+    self.receivedAttachmentSessionID = sessionID;
     return @[[self makeAttachment]];
 }
 
-- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    if ([self countsSessionID:sessionID]) {
-        self.attachmentCallCount++;
-        self.receivedAttachmentSessionID = sessionID;
+    if (![self answersForSessionID:sessionID]) {
+        return nil;
     }
+    self.attachmentCallCount++;
+    self.receivedAttachmentSessionID = sessionID;
     return [self makeAttachment];
 }
 
-- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+- (nullable NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
-    if ([self countsSessionID:sessionID]) {
-        self.applicationLogCallCount++;
-        self.receivedApplicationLogSessionID = sessionID;
+    if (![self answersForSessionID:sessionID]) {
+        return nil;
     }
+    self.applicationLogCallCount++;
+    self.receivedApplicationLogSessionID = sessionID;
     return @"hang app log";
 }
 
