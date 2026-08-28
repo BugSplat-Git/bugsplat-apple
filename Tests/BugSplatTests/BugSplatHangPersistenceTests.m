@@ -374,6 +374,7 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     NSString *filename = [self persistHangReport];
 
     NSString *text = [self reportTextForFilename:filename];
+    XCTAssertNotNil(text, @"Report text should be readable; containsString: on nil would assert misleadingly");
     XCTAssertTrue([text containsString:kFatalExceptionName]);
     XCTAssertFalse([text containsString:kNonFatalExceptionName]);
 
@@ -729,7 +730,7 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     [self waitForCondition:^BOOL { return self.mockSession.requestCount > 0; } timeout:1.0];
 
     XCTAssertEqual(self.mockSession.requestCount, (NSUInteger)0,
-                   @"A report that still reads App Hang (Fatal) must not be uploaded as non-fatal");
+                   @"A report whose exception name could not be rewritten must not be uploaded");
     NSFileManager *fm = [NSFileManager defaultManager];
     XCTAssertFalse([fm fileExistsAtPath:[self crashPathForFilename:filename]]);
     XCTAssertFalse([fm fileExistsAtPath:[self metaPathForFilename:filename]]);

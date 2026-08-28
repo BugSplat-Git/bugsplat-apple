@@ -788,6 +788,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                                       error:(nullable NSError *)error
                                   sessionID:(nullable NSUUID *)reportSessionID
 {
+    // bugSplat:didFailWithError: takes a nonnull NSError, which Swift delegates see as
+    // non-optional, but the upload completion's error is nullable. No current failure path
+    // leaves it nil; substitute one rather than rely on that staying true.
+    NSError *reportedError = success
+        ? nil
+        : (error ?: [self nonFatalHangUploadErrorWithDescription:@"Non-fatal hang upload failed"]);
+
     dispatch_block_t notify = ^{
         @try {
             if (success) {
@@ -798,9 +805,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                 }
             } else {
                 if ([self.delegate respondsToSelector:@selector(bugSplat:didFailWithError:sessionID:)]) {
-                    [self.delegate bugSplat:self didFailWithError:error sessionID:reportSessionID];
+                    [self.delegate bugSplat:self didFailWithError:reportedError sessionID:reportSessionID];
                 } else if ([self.delegate respondsToSelector:@selector(bugSplat:didFailWithError:)]) {
-                    [self.delegate bugSplat:self didFailWithError:error];
+                    [self.delegate bugSplat:self didFailWithError:reportedError];
                 }
             }
         } @catch (NSException *exception) {
