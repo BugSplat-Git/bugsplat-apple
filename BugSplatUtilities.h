@@ -74,3 +74,22 @@
  */
 - (BOOL)isValidXMLEntity;
 @end
+
+#pragma mark - Persisted crash timestamps
+
+/**
+ * Writes the `timestamp` value stored in persisted crash and hang metadata.
+ *
+ * The value is an ISO-8601 string. The writers and the macOS expiration reader have to agree on
+ * the format options, so everything that touches a persisted timestamp goes through these two
+ * functions rather than configuring a formatter of its own.
+ */
+NSString *BugSplatPersistedTimestampFromDate(NSDate *date);
+
+/**
+ * Reads a `timestamp` value written by BugSplatPersistedTimestampFromDate.
+ *
+ * Returns nil for anything that is not a parseable ISO-8601 string. Callers must treat nil as
+ * "unknown age" rather than "very old".
+ */
+NSDate *BugSplatDateFromPersistedTimestamp(id value);

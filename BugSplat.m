@@ -57,24 +57,6 @@ static NSString *const kBugSplatMetaKeyAttributes = @"attributes";
 static NSString *const kBugSplatMetaKeyApplicationLog = @"applicationLog";
 static NSString *const kBugSplatMetaKeyTimestamp = @"timestamp";
 static NSString *const kBugSplatMetaKeyUserSubmitted = @"userSubmitted";
-
-/**
- * Decodes a persisted `timestamp` value.
- *
- * It is written as an ISO-8601 string (see the two writers below), so reading it as a number
- * yields garbage rather than a date. Returns nil for anything that is not a parseable string,
- * which callers must treat as "unknown" rather than "very old".
- */
-static NSDate *BugSplatDateFromPersistedTimestamp(id value)
-{
-    if (![value isKindOfClass:[NSString class]]) {
-        return nil;
-    }
-
-    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
-    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-    return [formatter dateFromString:(NSString *)value];
-}
 // Crash-time context (may differ from current app if updated before upload)
 static NSString *const kBugSplatMetaKeyDatabase = @"database";
 static NSString *const kBugSplatMetaKeyApplicationName = @"applicationName";
@@ -543,10 +525,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // so we snapshot current values directly - this is safe because the main thread is hung
     // and nothing else is mutating these properties while this runs.
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
     NSDate *now = [NSDate date];
-    NSString *nowISO = [isoFormatter stringFromDate:now];
+    NSString *nowISO = BugSplatPersistedTimestampFromDate(now);
 
     metadata[kBugSplatMetaKeyTimestamp] = nowISO;
     metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
@@ -734,9 +714,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     NSDate *crashTimestamp = crashReport.systemInfo.timestamp ?: [NSDate date];
     
     // Store as ISO 8601 string for reliable persistence and API compatibility
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-    NSString *crashTimeISO = [isoFormatter stringFromDate:crashTimestamp];
+    NSString *crashTimeISO = BugSplatPersistedTimestampFromDate(crashTimestamp);
     metadata[kBugSplatMetaKeyTimestamp] = crashTimeISO;
 
     // Carry the crashed session's ID into the per-crash metadata so it survives offline
@@ -1025,16 +1003,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
 #if TARGET_OS_OSX
-    // Crash report has expired.
-    //
-    // The timestamp is persisted as an ISO-8601 string. This used to read it as an NSNumber and
-    // call -doubleValue on it, which NSString answers by parsing a leading number - "2026-08-27T..."
-    // came back as 2026, making every report look decades old, so any app that set
-    // expirationTimeInterval submitted all of its reports silently and never saw the dialog.
-    //
-    // An unparseable timestamp is treated as unknown, not as expired: skipping the check leaves
-    // the decision to autoSubmitCrashReport, which errs towards asking the user rather than
-    // quietly sending a report they were never shown.
+    // Crash report has expired. An unparseable timestamp is unknown, not expired - fall through to
+    // autoSubmitCrashReport rather than silently sending a report the user was never shown.
     if (self.expirationTimeInterval > 0) {
         NSDate *reportDate = BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp]);
         if (reportDate) {

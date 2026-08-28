@@ -312,3 +312,28 @@
 }
 
 @end
+
+#pragma mark - Persisted crash timestamps
+
+/// The one place the persisted timestamp format is defined. Changing it changes both the writers
+/// and the reader together, so they cannot drift apart.
+static NSISO8601DateFormatter *BugSplatPersistedTimestampFormatter(void)
+{
+    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    return formatter;
+}
+
+NSString *BugSplatPersistedTimestampFromDate(NSDate *date)
+{
+    return [BugSplatPersistedTimestampFormatter() stringFromDate:date];
+}
+
+NSDate *BugSplatDateFromPersistedTimestamp(id value)
+{
+    if (![value isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    return [BugSplatPersistedTimestampFormatter() dateFromString:(NSString *)value];
+}
