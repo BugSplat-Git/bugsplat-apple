@@ -556,11 +556,12 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     metadata[kBugSplatMetaKeyAttributes] = attributes;
 
-    // Leaving userSubmitted unset routes the report down the same path a crash report takes, so
-    // the user is asked before it is sent and can say what the app was doing when it froze.
-    // autoSubmitFatalHangReport opts out of asking: stamping the flag is precisely what
-    // makes the next-launch scanner skip the dialog, since shouldSendCrashSilently: checks it
-    // before it ever consults autoSubmitCrashReport.
+    // Leaving userSubmitted unset routes the report down the same submission path a crash report
+    // takes. That is not the same as showing a dialog: whether one appears is then
+    // autoSubmitCrashReport's call, which defaults to NO on macOS and YES on iOS.
+    // autoSubmitFatalHangReport opts out of that path entirely - stamping the flag is precisely
+    // what makes the next-launch scanner submit silently, since shouldSendCrashSilently: checks
+    // it before it ever consults autoSubmitCrashReport.
     if (self.autoSubmitFatalHangReport) {
         metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
     }
