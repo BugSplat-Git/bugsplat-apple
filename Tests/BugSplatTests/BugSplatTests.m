@@ -14,6 +14,7 @@
 
 #import "BugSplat+Testing.h"
 #import "BugSplatTestSupport.h"
+#import "BugSplatUtilities.h"
 #import "MockCrashReporter.h"
 #import "MockCrashStorage.h"
 #import "MockUserDefaults.h"
@@ -316,6 +317,56 @@
     
     XCTAssertFalse(result);
 }
+
+#if TARGET_OS_OSX
+
+#pragma mark - Expiration Tests
+
+- (void)testShouldSendCrashSilently_RecentReportIsNotExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate([NSDate date]) };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"A report written just now must not count as expired");
+}
+
+- (void)testShouldSendCrashSilently_OldReportIsExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDate *twoHoursAgo = [NSDate dateWithTimeIntervalSinceNow:-(2 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate(twoHoursAgo) };
+
+    XCTAssertTrue([self.bugSplat shouldSendCrashSilently:metadata],
+                  @"A report older than expirationTimeInterval must still expire");
+}
+
+- (void)testShouldSendCrashSilently_ExpirationIgnoredWhenNotConfigured
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    NSDate *longAgo = [NSDate dateWithTimeIntervalSinceNow:-(365 * 24 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate(longAgo) };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"Without expirationTimeInterval set, age must not matter");
+}
+
+- (void)testShouldSendCrashSilently_UnreadableTimestampIsNotTreatedAsExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    for (id value in @[ @"not a date", @0, [NSNull null], @[] ]) {
+        XCTAssertFalse([self.bugSplat shouldSendCrashSilently:@{ @"timestamp": value }],
+                       @"timestamp %@ should skip the expiration check, not expire the report", value);
+    }
+}
+
+#endif
 
 #if !TARGET_OS_OSX
 - (void)testShouldSendCrashSilently_iOS_TrueWhenAlwaysSendEnabled

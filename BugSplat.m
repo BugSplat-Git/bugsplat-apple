@@ -525,10 +525,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // so we snapshot current values directly - this is safe because the main thread is hung
     // and nothing else is mutating these properties while this runs.
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
     NSDate *now = [NSDate date];
-    NSString *nowISO = [isoFormatter stringFromDate:now];
+    NSString *nowISO = BugSplatPersistedTimestampFromDate(now);
 
     metadata[kBugSplatMetaKeyTimestamp] = nowISO;
     metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
@@ -716,9 +714,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     NSDate *crashTimestamp = crashReport.systemInfo.timestamp ?: [NSDate date];
     
     // Store as ISO 8601 string for reliable persistence and API compatibility
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-    NSString *crashTimeISO = [isoFormatter stringFromDate:crashTimestamp];
+    NSString *crashTimeISO = BugSplatPersistedTimestampFromDate(crashTimestamp);
     metadata[kBugSplatMetaKeyTimestamp] = crashTimeISO;
 
     // Carry the crashed session's ID into the per-crash metadata so it survives offline
@@ -1007,18 +1003,20 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
 #if TARGET_OS_OSX
-    // Crash report has expired
-    @try {
-        NSNumber *timestamp = metadata[kBugSplatMetaKeyTimestamp];
-        if (self.expirationTimeInterval > 0 && timestamp) {
-            NSTimeInterval timeSinceCrash = [[NSDate date] timeIntervalSince1970] - timestamp.doubleValue;
+    // Crash report has expired. An unparseable timestamp is unknown, not expired - skip the check
+    // and let the method return NO, which shows the dialog rather than silently sending a report
+    // the user was never shown. autoSubmitCrashReport was already ruled out above.
+    if (self.expirationTimeInterval > 0) {
+        NSDate *reportDate = BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp]);
+        if (reportDate) {
+            NSTimeInterval timeSinceCrash = -[reportDate timeIntervalSinceNow];
             if (timeSinceCrash > self.expirationTimeInterval) {
                 NSLog(@"BugSplat: Crash report expired (%.0f seconds old)", timeSinceCrash);
                 return YES;
             }
+        } else if (metadata[kBugSplatMetaKeyTimestamp]) {
+            NSLog(@"BugSplat: Could not read crash report timestamp; skipping the expiration check");
         }
-    } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception checking crash report expiration: %@ - %@", exception.name, exception.reason);
     }
 #else
     // iOS: User chose "Always Send"
