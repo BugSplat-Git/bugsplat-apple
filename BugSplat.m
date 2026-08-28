@@ -1003,8 +1003,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
 #if TARGET_OS_OSX
-    // Crash report has expired. An unparseable timestamp is unknown, not expired - fall through to
-    // autoSubmitCrashReport rather than silently sending a report the user was never shown.
+    // Crash report has expired. An unparseable timestamp is unknown, not expired - skip the check
+    // and let the method return NO, which shows the dialog rather than silently sending a report
+    // the user was never shown. autoSubmitCrashReport was already ruled out above.
     if (self.expirationTimeInterval > 0) {
         NSDate *reportDate = BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp]);
         if (reportDate) {
