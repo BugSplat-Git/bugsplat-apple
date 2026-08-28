@@ -141,6 +141,13 @@ static NSString *const kSessionIDKey = @"sessionID";
 /// Returns a real attachment + application log so hang enrichment can be verified end
 /// to end, recording the sessionID it was handed and how many times it was asked.
 @interface HangEnrichmentDelegate : NSObject <BugSplatDelegate>
+/// The session this delegate answers for. `enrichPendingHangReports` walks every -hang
+/// report in the crashes directory, which is shared with the rest of the suite and with
+/// the test processes xcodebuild runs in parallel, so the delegate is inert for any other
+/// session: it neither counts the call nor returns anything, because returning an
+/// attachment or a log would persist it into another test's report and mark that report
+/// enriched. Nil answers for everything.
+@property (nonatomic, strong, nullable) NSUUID *sessionIDUnderTest;
 @property (nonatomic, assign) NSInteger attachmentCallCount;
 @property (nonatomic, assign) NSInteger applicationLogCallCount;
 @property (nonatomic, strong, nullable) NSUUID *receivedAttachmentSessionID;
@@ -148,6 +155,11 @@ static NSString *const kSessionIDKey = @"sessionID";
 @end
 
 @implementation HangEnrichmentDelegate
+
+- (BOOL)answersForSessionID:(nullable NSUUID *)sessionID
+{
+    return self.sessionIDUnderTest == nil || [sessionID isEqual:self.sessionIDUnderTest];
+}
 
 - (BugSplatAttachment *)makeAttachment
 {
@@ -159,20 +171,29 @@ static NSString *const kSessionIDKey = @"sessionID";
 
 - (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
+    if (![self answersForSessionID:sessionID]) {
+        return @[];
+    }
     self.attachmentCallCount++;
     self.receivedAttachmentSessionID = sessionID;
     return @[[self makeAttachment]];
 }
 
-- (BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+- (nullable BugSplatAttachment *)attachmentForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
+    if (![self answersForSessionID:sessionID]) {
+        return nil;
+    }
     self.attachmentCallCount++;
     self.receivedAttachmentSessionID = sessionID;
     return [self makeAttachment];
 }
 
-- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+- (nullable NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
 {
+    if (![self answersForSessionID:sessionID]) {
+        return nil;
+    }
     self.applicationLogCallCount++;
     self.receivedApplicationLogSessionID = sessionID;
     return @"hang app log";
@@ -597,6 +618,7 @@ static NSString *const kSessionIDKey = @"sessionID";
     NSString *filename = [self plantHangReportWithSessionID:hangSessionID];
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = hangSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];
@@ -632,6 +654,7 @@ static NSString *const kSessionIDKey = @"sessionID";
     [self plantHangReportWithSessionID:hangSessionID];
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = hangSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];
@@ -652,9 +675,11 @@ static NSString *const kSessionIDKey = @"sessionID";
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
     XCTAssertTrue([[@"crash" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
-    XCTAssertTrue(([@{ kSessionIDKey: [NSUUID UUID].UUIDString } writeToFile:metaPath atomically:YES]));
+    NSUUID *crashSessionID = [NSUUID UUID];
+    XCTAssertTrue(([@{ kSessionIDKey: crashSessionID.UUIDString } writeToFile:metaPath atomically:YES]));
 
     HangEnrichmentDelegate *delegate = [[HangEnrichmentDelegate alloc] init];
+    delegate.sessionIDUnderTest = crashSessionID;
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat enrichPendingHangReports];

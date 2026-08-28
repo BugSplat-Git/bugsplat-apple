@@ -49,6 +49,27 @@ static NSString *const kBugSplatHangAttrDetectedAt = @"bugsplat-hang-detected-at
 static NSString *const kBugSplatHangAttrAppState = @"bugsplat-hang-app-state";
 static NSString *const kBugSplatHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
+// Attributes carried only by non-fatal (recovered) hang reports.
+static NSString *const kBugSplatHangAttrFatal = @"bugsplat-hang-fatal";
+static NSString *const kBugSplatHangAttrRecoveredAfterMs = @"bugsplat-hang-recovered-after-ms";
+
+// Exception names for the synthetic hang exception. The two names are deliberately
+// distinct so the backend groups hangs that ended in termination separately from hangs
+// the app recovered from; everything else about the two reports has the same shape.
+static NSString *const kBugSplatHangExceptionNameFatal = @"App Hang (Fatal)";
+static NSString *const kBugSplatHangExceptionNameNonFatal = @"App Hang (Non-Fatal)";
+
+// Volume controls for non-fatal hang uploads. A main thread can wedge, recover, and wedge
+// again many times in one session; the per-window throttle inside BugSplatHangTracker only
+// collapses a single hang into one report, so these bound what a session can cost.
+static const NSUInteger kBugSplatMaxNonFatalHangReportsPerSession = 3;
+static const NSTimeInterval kBugSplatMinNonFatalHangReportIntervalSeconds = 60.0;
+
+// Domain and code for the non-fatal hang paths that fail before the upload service is
+// reached, so a delegate that saw willSend always gets a didFail it can read.
+static NSString *const kBugSplatHangErrorDomain = @"com.bugsplat.hang";
+static const NSInteger kBugSplatHangErrorCodeUploadUnavailable = 1;
+
 // Keys for crash metadata
 static NSString *const kBugSplatMetaKeyUserName = @"userName";
 static NSString *const kBugSplatMetaKeyUserEmail = @"userEmail";
@@ -67,6 +88,19 @@ static NSString *const kBugSplatMetaKeySessionID = @"sessionID";
 // Set once a persisted hang report has had its delegate attachments / application log
 // gathered at next launch, so offline-retry launches don't re-invoke the delegate.
 static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
+// NO when the hang report was captured with only non-fatal reporting enabled: a report
+// still on disk at the next launch is by definition a hang the app never recovered from,
+// and the integrator did not opt in to fatal hang reports, so it is discarded rather than
+// uploaded. Set to YES once a report has been rewritten as non-fatal, so an in-session
+// upload that fails is still retried at the next launch.
+static NSString *const kBugSplatMetaKeyHangReportOnNextLaunch = @"hangReportOnNextLaunch";
+
+/// Reads that key: NO bars the report from every launch after the one that captured it.
+static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable metadata)
+{
+    NSNumber *reportOnNextLaunch = metadata[kBugSplatMetaKeyHangReportOnNextLaunch];
+    return [reportOnNextLaunch isKindOfClass:[NSNumber class]] && !reportOnNextLaunch.boolValue;
+}
 
 @interface BugSplat () <BugSplatHangTrackerDelegate>
 
@@ -84,6 +118,15 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 
 @property (nonatomic, strong, nullable) BugSplatHangTracker *hangTracker;
 @property (atomic, copy, nullable) NSString *currentHangFilename;
+/// CFAbsoluteTime at which the hang behind `currentHangFilename` was detected, used to
+/// report how long the main thread stayed wedged before it recovered. 0 when idle.
+@property (atomic, assign) CFAbsoluteTime currentHangDetectedAt;
+/// Non-fatal hang reports uploaded (or attempted) during this launch. Bounded by
+/// kBugSplatMaxNonFatalHangReportsPerSession.
+@property (atomic, assign) NSUInteger nonFatalHangReportCount;
+/// CFAbsoluteTime of the most recent non-fatal hang report, for the minimum-interval
+/// throttle. 0 when none has been reported yet.
+@property (atomic, assign) CFAbsoluteTime lastNonFatalHangReportTime;
 @property (nonatomic, copy, nullable) NSString *launchId;
 @property (nonatomic, strong, nullable) dispatch_queue_t hangQueue;
 
@@ -306,7 +349,9 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 
 - (void)startHangDetectionIfEnabled
 {
-    if (!self.enableHangDetection) {
+    // Either opt-in starts the same monitoring; they differ only in what happens to the
+    // captured report.
+    if (!self.enableHangDetection && !self.enableNonFatalHangReporting) {
         return;
     }
     if (self.hangTracker) {
@@ -360,7 +405,10 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
     }];
 
     [self.hangTracker start];
-    NSLog(@"BugSplat: Hang detection enabled (threshold %.2fs)", self.hangTracker.thresholdSeconds);
+    NSLog(@"BugSplat: Hang detection enabled (threshold %.2fs, fatal %@, non-fatal %@)",
+          self.hangTracker.thresholdSeconds,
+          self.enableHangDetection ? @"YES" : @"NO",
+          self.enableNonFatalHangReporting ? @"YES" : @"NO");
 }
 
 #if TARGET_OS_IOS || TARGET_OS_TV
@@ -431,7 +479,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
            appState:(NSString *)appState
 {
     // Callback runs on the tracker's watchdog thread; marshal to our serial queue.
+    // Stamp the detection time here rather than inside the persist step so
+    // bugsplat-hang-recovered-after-ms measures from detection, not from capture.
+    CFAbsoluteTime detectedAt = CFAbsoluteTimeGetCurrent();
     dispatch_async(self.hangQueue, ^{
+        self.currentHangDetectedAt = detectedAt;
         [self persistHangReportWithDuration:duration appState:appState];
     });
 }
@@ -440,12 +492,335 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 {
     dispatch_async(self.hangQueue, ^{
         NSString *filename = self.currentHangFilename;
+        CFAbsoluteTime detectedAt = self.currentHangDetectedAt;
         self.currentHangFilename = nil;
-        if (filename) {
-            [self cleanupCrashReportWithFilename:filename];
-            NSLog(@"BugSplat: Main thread recovered from hang; removed persisted report %@", filename);
+        self.currentHangDetectedAt = 0;
+        if (!filename) {
+            return;
         }
+
+        if ([self shouldReportRecoveredHang]) {
+            [self reportNonFatalHangWithFilename:filename detectedAt:detectedAt];
+            return;
+        }
+
+        [self cleanupCrashReportWithFilename:filename];
+        NSLog(@"BugSplat: Main thread recovered from hang; removed persisted report %@", filename);
     });
+}
+
+#pragma mark - Non-Fatal Hang Reporting
+
+/// Whether a hang the main thread recovered from should be uploaded rather than discarded.
+/// Called on the hang queue.
+- (BOOL)shouldReportRecoveredHang
+{
+    if (!self.enableNonFatalHangReporting) {
+        return NO;
+    }
+
+    if (self.nonFatalHangReportCount >= kBugSplatMaxNonFatalHangReportsPerSession) {
+        NSLog(@"BugSplat: Recovered hang not reported - session cap of %lu non-fatal hang report(s) reached",
+              (unsigned long)kBugSplatMaxNonFatalHangReportsPerSession);
+        return NO;
+    }
+
+    CFAbsoluteTime last = self.lastNonFatalHangReportTime;
+    if (last > 0 && (CFAbsoluteTimeGetCurrent() - last) < kBugSplatMinNonFatalHangReportIntervalSeconds) {
+        NSLog(@"BugSplat: Recovered hang not reported - less than %.0fs since the last non-fatal hang report",
+              kBugSplatMinNonFatalHangReportIntervalSeconds);
+        return NO;
+    }
+
+    return YES;
+}
+
+/**
+ * Turn the report persisted at detection time into a non-fatal report and upload it,
+ * leaving the app running. Called on the hang queue.
+ */
+- (void)reportNonFatalHangWithFilename:(NSString *)filename detectedAt:(CFAbsoluteTime)detectedAt
+{
+    NSDictionary *metadata = [self markHangReportNonFatalWithFilename:filename detectedAt:detectedAt];
+    if (!metadata) {
+        [self cleanupCrashReportWithFilename:filename];
+        return;
+    }
+
+    // Count the report against the session budget as soon as it is committed to disk, so a
+    // failing network can't let repeated hangs retry past the cap.
+    self.nonFatalHangReportCount = self.nonFatalHangReportCount + 1;
+    self.lastNonFatalHangReportTime = CFAbsoluteTimeGetCurrent();
+
+    NSUUID *reportSessionID = nil;
+    NSString *reportSessionIDString = metadata[kBugSplatMetaKeySessionID];
+    if ([reportSessionIDString isKindOfClass:[NSString class]]) {
+        reportSessionID = [[NSUUID alloc] initWithUUIDString:reportSessionIDString];
+    }
+
+    // The main thread has recovered, so the delegate can safely be asked for this session's
+    // attachments and application log, and told the report is about to be sent - all on the
+    // main thread, exactly as crash reports do at launch. The hop is async: the app keeps
+    // running and nothing blocks on the upload.
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+            return;
+        }
+
+        // The delegate has to be asked on main, but the resulting file I/O does not belong
+        // there: the tracker is still armed and a large session log written back to disk
+        // could wedge the very thread that just recovered. The hang queue is serial, so the
+        // write it is handed here is ordered ahead of the upload dispatched below.
+        [strongSelf enrichHangReportWithFilename:filename persistOnHangQueue:YES];
+
+        // Nothing to send through, so leave the report - already rewritten as non-fatal
+        // with hangReportOnNextLaunch=YES - for the next launch's scanner. willSend is not
+        // fired for a send that will not happen: a delegate that allocates per-send state
+        // there would never get the didFinish/didFail that releases it.
+        if (!strongSelf.uploadService) {
+            NSLog(@"BugSplat: No upload service; non-fatal hang report %@ will be sent on the next launch", filename);
+            return;
+        }
+
+        @try {
+            if ([strongSelf.delegate respondsToSelector:@selector(bugSplatWillSendCrashReport:sessionID:)]) {
+                [strongSelf.delegate bugSplatWillSendCrashReport:strongSelf sessionID:reportSessionID];
+            } else if ([strongSelf.delegate respondsToSelector:@selector(bugSplatWillSendCrashReport:)]) {
+                [strongSelf.delegate bugSplatWillSendCrashReport:strongSelf];
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"BugSplat: Exception in bugSplatWillSendCrashReport delegate (non-fatal hang): %@ - %@",
+                  exception.name, exception.reason);
+        }
+
+        dispatch_async(strongSelf.hangQueue, ^{
+            [strongSelf uploadNonFatalHangReportWithFilename:filename sessionID:reportSessionID];
+        });
+    });
+}
+
+/**
+ * Rewrite a persisted hang report in place so it reads as non-fatal: swap the exception
+ * name in the report text and add the non-fatal attributes to the metadata. Returns the
+ * metadata that was written, or nil if the report is unusable - in which case the caller
+ * discards it. Called on the hang queue.
+ */
+- (nullable NSDictionary *)markHangReportNonFatalWithFilename:(NSString *)filename detectedAt:(CFAbsoluteTime)detectedAt
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return nil;
+    }
+
+    NSString *crashFilePath = [[crashesDir stringByAppendingPathComponent:filename]
+                               stringByAppendingPathExtension:kBugSplatCrashFileExtension];
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:filename]
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+
+    NSString *reportText = [NSString stringWithContentsOfFile:crashFilePath
+                                                     encoding:NSUTF8StringEncoding
+                                                        error:NULL];
+    NSMutableDictionary *metadata = [[NSDictionary dictionaryWithContentsOfFile:metaFilePath] mutableCopy];
+    if (reportText.length == 0 || !metadata) {
+        NSLog(@"BugSplat: Recovered hang report %@ is incomplete on disk; discarding", filename);
+        return nil;
+    }
+
+    // The exception name is the only thing the backend uses to tell a hang from a crash, so
+    // swapping it is what moves this report into its own group. The reason string and the
+    // captured stacks are left untouched so the same hang site groups consistently.
+    //
+    // The swap has to be confirmed, not assumed: stringByReplacingOccurrencesOfString:
+    // returns the input unchanged when the name is absent, which would upload a report
+    // still reading "App Hang (Fatal)" while its metadata claims bugsplat-hang-fatal=false.
+    // That report would group with real fatal hangs, so discard it instead.
+    BOOL hasFatalName = [reportText rangeOfString:kBugSplatHangExceptionNameFatal].location != NSNotFound;
+    BOOL alreadyNonFatal = [reportText rangeOfString:kBugSplatHangExceptionNameNonFatal].location != NSNotFound;
+    if (!hasFatalName && !alreadyNonFatal) {
+        NSLog(@"BugSplat: Recovered hang report %@ carries neither hang exception name; discarding", filename);
+        return nil;
+    }
+
+    if (hasFatalName) {
+        NSString *nonFatalText = [reportText stringByReplacingOccurrencesOfString:kBugSplatHangExceptionNameFatal
+                                                                      withString:kBugSplatHangExceptionNameNonFatal];
+        NSData *nonFatalData = [nonFatalText dataUsingEncoding:NSUTF8StringEncoding];
+        if (!nonFatalData || ![nonFatalData writeToFile:crashFilePath atomically:YES]) {
+            NSLog(@"BugSplat: Failed to rewrite recovered hang report %@ as non-fatal; discarding", filename);
+            return nil;
+        }
+    }
+
+    NSMutableDictionary<NSString *, NSString *> *attributes =
+        [metadata[kBugSplatMetaKeyAttributes] isKindOfClass:[NSDictionary class]]
+            ? [metadata[kBugSplatMetaKeyAttributes] mutableCopy]
+            : [NSMutableDictionary dictionary];
+    attributes[kBugSplatHangAttrFatal] = @"false";
+    if (detectedAt > 0) {
+        attributes[kBugSplatHangAttrRecoveredAfterMs] =
+            [NSString stringWithFormat:@"%.0f", (CFAbsoluteTimeGetCurrent() - detectedAt) * 1000.0];
+    }
+    metadata[kBugSplatMetaKeyAttributes] = attributes;
+
+    // Now that the report is non-fatal it is uploadable whatever enableHangDetection says,
+    // so a failed in-session upload still retries at the next launch.
+    metadata[kBugSplatMetaKeyHangReportOnNextLaunch] = @YES;
+
+    if (![metadata writeToFile:metaFilePath atomically:YES]) {
+        NSLog(@"BugSplat: Failed to rewrite recovered hang metadata for %@; discarding", filename);
+        return nil;
+    }
+
+    return metadata;
+}
+
+/**
+ * Upload a recovered hang report in the background. Called on the hang queue.
+ *
+ * Deliberately does not go through processPendingCrashReports: that path owns the
+ * launch-time state machine (sendingInProgress, the crash dialog, clearing the session's
+ * custom attributes, chaining to the next pending report) and running it mid-session would
+ * disturb a live app. On failure the report is left on disk with userSubmitted=YES, so the
+ * ordinary next-launch scanner retries it silently.
+ */
+- (void)uploadNonFatalHangReportWithFilename:(NSString *)filename sessionID:(nullable NSUUID *)reportSessionID
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        [self finishNonFatalHangUploadWithSuccess:NO
+                                            error:[self nonFatalHangUploadErrorWithDescription:@"Crashes directory is unavailable"]
+                                        sessionID:reportSessionID];
+        return;
+    }
+
+    BugSplatUploadService *uploadService = self.uploadService;
+    if (!uploadService) {
+        NSLog(@"BugSplat: No upload service; non-fatal hang report %@ will be sent on the next launch", filename);
+        [self finishNonFatalHangUploadWithSuccess:NO
+                                            error:[self nonFatalHangUploadErrorWithDescription:@"No upload service"]
+                                        sessionID:reportSessionID];
+        return;
+    }
+
+    NSString *crashFilePath = [[crashesDir stringByAppendingPathComponent:filename]
+                               stringByAppendingPathExtension:kBugSplatCrashFileExtension];
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:filename]
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+
+    NSData *reportData = [NSData dataWithContentsOfFile:crashFilePath];
+    NSDictionary *persistedMetadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
+    if (!reportData || reportData.length == 0 || !persistedMetadata) {
+        NSLog(@"BugSplat: Non-fatal hang report %@ vanished before upload; discarding", filename);
+        [self cleanupCrashReportWithFilename:filename];
+        [self finishNonFatalHangUploadWithSuccess:NO
+                                            error:[self nonFatalHangUploadErrorWithDescription:@"Report files vanished before upload"]
+                                        sessionID:reportSessionID];
+        return;
+    }
+
+    BugSplatCrashMetadata *uploadMetadata = [[BugSplatCrashMetadata alloc] init];
+    uploadMetadata.database = persistedMetadata[kBugSplatMetaKeyDatabase];
+    uploadMetadata.applicationName = persistedMetadata[kBugSplatMetaKeyApplicationName];
+    uploadMetadata.applicationVersion = persistedMetadata[kBugSplatMetaKeyApplicationVersion];
+    uploadMetadata.userName = persistedMetadata[kBugSplatMetaKeyUserName];
+    uploadMetadata.userEmail = persistedMetadata[kBugSplatMetaKeyUserEmail];
+    uploadMetadata.userDescription = persistedMetadata[kBugSplatMetaKeyComments];
+    uploadMetadata.crashTime = persistedMetadata[kBugSplatMetaKeyTimestamp];
+    uploadMetadata.attributes = persistedMetadata[kBugSplatMetaKeyAttributes];
+    uploadMetadata.applicationLog = persistedMetadata[kBugSplatMetaKeyApplicationLog];
+    uploadMetadata.notes = persistedMetadata[kBugSplatMetaKeyNotes];
+    uploadMetadata.applicationKey = persistedMetadata[kBugSplatMetaKeyAppKey];
+
+    NSArray<BugSplatAttachment *> *attachments = [self loadPersistedAttachmentsForCrashFilename:filename];
+
+    NSLog(@"BugSplat: Uploading non-fatal hang report %@ (app: %@ %@, database: %@)...",
+          filename, uploadMetadata.applicationName, uploadMetadata.applicationVersion, uploadMetadata.database);
+
+    __weak typeof(self) weakSelf = self;
+    [uploadService uploadCrashReport:reportData
+                       crashFilename:@"crash.crashlog"
+                         attachments:attachments
+                            metadata:uploadMetadata
+                          completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+            return;
+        }
+
+        if (success) {
+            NSLog(@"BugSplat: Non-fatal hang report %@ uploaded successfully", filename);
+            dispatch_async(strongSelf.hangQueue, ^{
+                [strongSelf cleanupCrashReportWithFilename:filename];
+            });
+        } else {
+            // Leave the files in place - the next-launch scanner retries them silently.
+            NSLog(@"BugSplat: Failed to upload non-fatal hang report %@: %@ (will retry on next launch)",
+                  filename, error);
+        }
+
+        [strongSelf finishNonFatalHangUploadWithSuccess:success error:error sessionID:reportSessionID];
+    }];
+}
+
+/// An NSError for the non-fatal hang paths that fail before the upload service is reached,
+/// so the delegate's didFail callback always carries a reason.
+- (NSError *)nonFatalHangUploadErrorWithDescription:(NSString *)description
+{
+    return [NSError errorWithDomain:kBugSplatHangErrorDomain
+                               code:kBugSplatHangErrorCodeUploadUnavailable
+                           userInfo:@{NSLocalizedDescriptionKey: description}];
+}
+
+/**
+ * Deliver the one terminal lifecycle callback for a non-fatal hang upload, on the main
+ * thread.
+ *
+ * bugSplatWillSendCrashReport: has already fired by the time this report reaches the
+ * upload, so every way out of it has to end in exactly one didFinish/didFail - a delegate
+ * that allocates per-send state in willSend leaks it otherwise. The main-thread hop is
+ * explicit because BugSplatUploadService only guarantees main for network outcomes: its
+ * validation failures run the completion synchronously on the caller's thread, which here
+ * is the hang queue.
+ */
+- (void)finishNonFatalHangUploadWithSuccess:(BOOL)success
+                                      error:(nullable NSError *)error
+                                  sessionID:(nullable NSUUID *)reportSessionID
+{
+    // bugSplat:didFailWithError: takes a nonnull NSError, which Swift delegates see as
+    // non-optional, but the upload completion's error is nullable. No current failure path
+    // leaves it nil; substitute one rather than rely on that staying true.
+    NSError *reportedError = success
+        ? nil
+        : (error ?: [self nonFatalHangUploadErrorWithDescription:@"Non-fatal hang upload failed"]);
+
+    dispatch_block_t notify = ^{
+        @try {
+            if (success) {
+                if ([self.delegate respondsToSelector:@selector(bugSplatDidFinishSendingCrashReport:sessionID:)]) {
+                    [self.delegate bugSplatDidFinishSendingCrashReport:self sessionID:reportSessionID];
+                } else if ([self.delegate respondsToSelector:@selector(bugSplatDidFinishSendingCrashReport:)]) {
+                    [self.delegate bugSplatDidFinishSendingCrashReport:self];
+                }
+            } else {
+                if ([self.delegate respondsToSelector:@selector(bugSplat:didFailWithError:sessionID:)]) {
+                    [self.delegate bugSplat:self didFailWithError:reportedError sessionID:reportSessionID];
+                } else if ([self.delegate respondsToSelector:@selector(bugSplat:didFailWithError:)]) {
+                    [self.delegate bugSplat:self didFailWithError:reportedError];
+                }
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"BugSplat: Exception in upload lifecycle delegate (non-fatal hang): %@ - %@",
+                  exception.name, exception.reason);
+        }
+    };
+
+    if ([NSThread isMainThread]) {
+        notify();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), notify);
+    }
 }
 
 /**
@@ -456,7 +831,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (void)persistHangReportWithDuration:(NSTimeInterval)duration appState:(NSString *)appState
 {
     NSString *reason = [NSString stringWithFormat:@"Main thread unresponsive for %.0f ms", duration * 1000.0];
-    NSException *hangException = [NSException exceptionWithName:@"App Hang (Fatal)"
+    // Capture cannot know the outcome yet, so it always writes the fatal name;
+    // markHangReportNonFatalWithFilename:detectedAt: rewrites it if the app recovers.
+    NSException *hangException = [NSException exceptionWithName:kBugSplatHangExceptionNameFatal
                                                          reason:reason
                                                        userInfo:nil];
 
@@ -496,7 +873,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
 
     if (reportText.length == 0) {
-        reportText = [NSString stringWithFormat:@"App Hang (Fatal)\n%@\n[Hang report text unavailable]\n", reason];
+        reportText = [NSString stringWithFormat:@"%@\n%@\n[Hang report text unavailable]\n",
+                      kBugSplatHangExceptionNameFatal, reason];
     }
 
     NSString *crashesDir = [self crashesDirectoryPath];
@@ -536,6 +914,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
     // The hang happened in THIS session, so the current session ID is the right one
     metadata[kBugSplatMetaKeySessionID] = self.sessionID.UUIDString;
+    // A report still on disk at the next launch is a hang the app never recovered from.
+    // Only upload it then if fatal hang reporting was opted in to when it was captured.
+    metadata[kBugSplatMetaKeyHangReportOnNextLaunch] = @(self.enableHangDetection);
     if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
     if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
     if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
@@ -818,13 +1199,25 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 }
 
 /**
- * Enrich a single persisted hang report. Reads its session ID from the .meta file,
+ * Enrich a single persisted hang report. Called at the next launch for a hang the app
+ * never recovered from, and - once the main thread is running again - just before a
+ * recovered hang is uploaded in-session. Reads its session ID from the .meta file,
  * asks the delegate (preferring the sessionID-aware variants) for attachments and an
  * application log for that session, persists the attachments alongside the report and
  * the application log into the .meta, then marks the report enriched so offline-retry
  * launches don't invoke the delegate again.
  */
 - (void)enrichHangReportWithFilename:(NSString *)hangFilename
+{
+    [self enrichHangReportWithFilename:hangFilename persistOnHangQueue:NO];
+}
+
+/**
+ * As above. When persistOnHangQueue is YES the delegate is still queried on the calling
+ * (main) thread, but writing the attachments and the updated metadata back to disk is
+ * handed to the serial hang queue instead of running inline - see the in-session caller.
+ */
+- (void)enrichHangReportWithFilename:(NSString *)hangFilename persistOnHangQueue:(BOOL)persistOnHangQueue
 {
     NSString *crashesDir = [self crashesDirectoryPath];
     if (!crashesDir) {
@@ -837,6 +1230,17 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     if (!metadata) {
         // No (or unreadable) metadata: leave the report for processPendingCrashReports,
         // which handles malformed reports.
+        return;
+    }
+
+    // This report survived to a new launch, so the hang was fatal. If it was captured with
+    // only non-fatal reporting enabled, uploading it now would deliver a fatal hang report
+    // the integrator never asked for - discard it instead. Reports already rewritten as
+    // non-fatal set this to YES, so an in-session upload that failed is still retried.
+    if (BugSplatHangReportBarredFromLaterLaunch(metadata)) {
+        NSLog(@"BugSplat: Discarding hang report %@ - fatal hang reporting was not enabled when it was captured",
+              hangFilename);
+        [self cleanupCrashReportWithFilename:hangFilename];
         return;
     }
 
@@ -885,10 +1289,6 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         NSLog(@"BugSplat: Exception in delegate attachment method (hang): %@ - %@", exception.name, exception.reason);
     }
 
-    if (attachments.count > 0) {
-        [self persistAttachments:attachments forCrashFilename:hangFilename];
-    }
-
     // Application log, preferring the sessionID-aware variant.
     @try {
         if ([self.delegate respondsToSelector:@selector(applicationLogForBugSplat:sessionID:)]) {
@@ -905,11 +1305,24 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // Mark enriched (even when nothing was gathered) so we don't re-scan the delegate
     // on every subsequent launch, matching the once-at-ingestion model used for crashes.
     metadata[kBugSplatMetaKeyHangEnriched] = @YES;
-    if ([metadata writeToFile:metaFilePath atomically:YES]) {
-        NSLog(@"BugSplat: Enriched hang report %@ (%lu attachment(s), session %@)",
-              hangFilename, (unsigned long)attachments.count, hangSessionID.UUIDString ?: @"none");
+
+    dispatch_block_t persist = ^{
+        if (attachments.count > 0) {
+            [self persistAttachments:attachments forCrashFilename:hangFilename];
+        }
+
+        if ([metadata writeToFile:metaFilePath atomically:YES]) {
+            NSLog(@"BugSplat: Enriched hang report %@ (%lu attachment(s), session %@)",
+                  hangFilename, (unsigned long)attachments.count, hangSessionID.UUIDString ?: @"none");
+        } else {
+            NSLog(@"BugSplat: Failed to rewrite hang metadata after enrichment for %@", hangFilename);
+        }
+    };
+
+    if (persistOnHangQueue && self.hangQueue) {
+        dispatch_async(self.hangQueue, persist);
     } else {
-        NSLog(@"BugSplat: Failed to rewrite hang metadata after enrichment for %@", hangFilename);
+        persist();
     }
 }
 
@@ -928,7 +1341,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         return;
     }
     
-    NSArray<NSString *> *pendingCrashFiles = [self getPendingCrashFiles];
+    NSArray<NSString *> *pendingCrashFiles = [self pendingCrashFilesForCrashPipeline];
     if (pendingCrashFiles.count == 0) {
         NSLog(@"BugSplat: No pending crash reports found");
         return;
@@ -1079,6 +1492,71 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [crashFilenames sortUsingSelector:@selector(compare:)];
     
     return crashFilenames;
+}
+
+/// The .meta sidecar for a pending report, or nil when it is missing or unreadable.
+- (nullable NSDictionary *)persistedMetadataForCrashFilename:(NSString *)baseName
+{
+    NSString *crashesDir = [self crashesDirectoryPath];
+    if (!crashesDir) {
+        return nil;
+    }
+
+    NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:baseName]
+                              stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+    return [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
+}
+
+/**
+ * YES when a pending report is a hang captured by the session that is running right now.
+ *
+ * The in-session non-fatal path owns such a report and uploads it outside the crash state
+ * machine. Letting that machine claim it would submit it as a crash - clearing the live
+ * session's custom attributes on success, including bugsplat-hang-launch-id - and the
+ * Don't Send path would delete it out from under an upload that has already fired
+ * bugSplatWillSendCrashReport:. A failed in-session upload is still retried at the next
+ * launch, where the session ID no longer matches.
+ */
+- (BOOL)isCurrentSessionHangReportWithFilename:(NSString *)baseName
+{
+    if (![baseName hasSuffix:kBugSplatHangFilenameSuffix]) {
+        return NO;
+    }
+
+    NSString *reportSessionID = [self persistedMetadataForCrashFilename:baseName][kBugSplatMetaKeySessionID];
+    return [reportSessionID isKindOfClass:[NSString class]]
+        && [reportSessionID isEqualToString:self.sessionID.UUIDString];
+}
+
+/**
+ * The pending reports processPendingCrashReports may upload, with the hang reports it must
+ * not touch removed: this session's own recovered hangs, and hangs captured without
+ * fatal-hang opt-in, which are discarded here rather than sent.
+ *
+ * enrichHangReportWithFilename: applies the same opt-in rule, but only at launch;
+ * processPendingCrashReports also runs mid-session, a second after each successful upload.
+ */
+- (NSArray<NSString *> *)pendingCrashFilesForCrashPipeline
+{
+    NSMutableArray<NSString *> *uploadable = [NSMutableArray array];
+
+    for (NSString *baseName in [self getPendingCrashFiles]) {
+        if ([self isCurrentSessionHangReportWithFilename:baseName]) {
+            continue;
+        }
+
+        if ([baseName hasSuffix:kBugSplatHangFilenameSuffix] &&
+            BugSplatHangReportBarredFromLaterLaunch([self persistedMetadataForCrashFilename:baseName])) {
+            NSLog(@"BugSplat: Discarding hang report %@ - fatal hang reporting was not enabled when it was captured",
+                  baseName);
+            [self cleanupCrashReportWithFilename:baseName];
+            continue;
+        }
+
+        [uploadable addObject:baseName];
+    }
+
+    return uploadable;
 }
 
 #if TARGET_OS_OSX
@@ -2006,11 +2484,19 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         NSArray<NSString *> *pendingCrashFiles = [self getPendingCrashFiles];
         NSLog(@"BugSplat: Cleaning up all %lu pending crash report(s)", (unsigned long)pendingCrashFiles.count);
         
+        NSUInteger skipped = 0;
         for (NSString *crashFilename in pendingCrashFiles) {
+            // Declining a crash says nothing about a hang this session already recovered
+            // from and may be uploading right now; deleting it would race that upload.
+            if ([self isCurrentSessionHangReportWithFilename:crashFilename]) {
+                skipped++;
+                continue;
+            }
             [self cleanupCrashReportWithFilename:crashFilename];
         }
         
-        NSLog(@"BugSplat: All pending crash reports cleaned up");
+        NSLog(@"BugSplat: All pending crash reports cleaned up (%lu in-session hang report(s) left in place)",
+              (unsigned long)skipped);
         
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception in cleanupAllPendingCrashReports: %@ - %@", exception.name, exception.reason);
@@ -2087,6 +2573,36 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (dispatch_queue_t)hangQueueForTesting
 {
     return self.hangQueue;
+}
+
+- (NSUInteger)nonFatalHangReportCountForTesting
+{
+    return self.nonFatalHangReportCount;
+}
+
+- (void)setNonFatalHangReportCountForTesting:(NSUInteger)count
+{
+    self.nonFatalHangReportCount = count;
+}
+
+- (void)setLastNonFatalHangReportTimeForTesting:(CFAbsoluteTime)time
+{
+    self.lastNonFatalHangReportTime = time;
+}
+
++ (NSUInteger)maxNonFatalHangReportsPerSessionForTesting
+{
+    return kBugSplatMaxNonFatalHangReportsPerSession;
+}
+
++ (NSTimeInterval)minNonFatalHangReportIntervalForTesting
+{
+    return kBugSplatMinNonFatalHangReportIntervalSeconds;
+}
+
+- (BugSplatHangTracker *)hangTrackerForTesting
+{
+    return self.hangTracker;
 }
 
 @end

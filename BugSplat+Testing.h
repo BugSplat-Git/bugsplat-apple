@@ -27,7 +27,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSString *)crashesDirectoryPath;
 - (void)handleNewCrashFromPLCrashReporter;
 - (void)enrichPendingHangReports;
+- (void)enrichHangReportWithFilename:(NSString *)hangFilename;
+- (void)startHangDetectionIfEnabled;
 - (void)processPendingCrashReports;
+- (void)cleanupAllPendingCrashReports;
+- (NSArray<NSString *> *)pendingCrashFilesForCrashPipeline;
 
 @end
 
@@ -103,6 +107,25 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// The basename of the hang report most recently persisted by the hang delegate.
 - (nullable NSString *)currentHangFilename;
+
+/// The tracker created by `-startHangDetectionIfEnabled`, or nil when detection is off.
+- (nullable BugSplatHangTracker *)hangTrackerForTesting;
+
+/// Number of non-fatal hang reports committed to disk for upload during this session.
+- (NSUInteger)nonFatalHangReportCountForTesting;
+
+/// Seed the per-session non-fatal hang report count to exercise the session cap.
+- (void)setNonFatalHangReportCountForTesting:(NSUInteger)count;
+
+/// Seed the timestamp of the last non-fatal hang report to exercise the minimum-interval
+/// throttle. Pass 0 to clear it.
+- (void)setLastNonFatalHangReportTimeForTesting:(CFAbsoluteTime)time;
+
+/// Maximum number of non-fatal hang reports uploaded per launch.
++ (NSUInteger)maxNonFatalHangReportsPerSessionForTesting;
+
+/// Minimum number of seconds between non-fatal hang reports.
++ (NSTimeInterval)minNonFatalHangReportIntervalForTesting;
 
 @end
 
