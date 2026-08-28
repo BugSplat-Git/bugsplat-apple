@@ -207,9 +207,11 @@ NS_ASSUME_NONNULL_BEGIN
  * Set `enableNonFatalHangReporting` to report those recovered hangs instead of discarding
  * them.
  *
- * Hang reports carry the exception name `App Hang (Fatal)` and include attributes prefixed
- * with `bugsplat-hang-` (duration, detection time, app state, launch id) that can be used
- * to correlate with crashes from the same launch.
+ * These fatal hang reports carry the exception name `App Hang (Fatal)` and include
+ * attributes prefixed with `bugsplat-hang-` (duration, detection time, app state, launch
+ * id) that can be used to correlate with crashes from the same launch. Recovered hangs
+ * reported via `enableNonFatalHangReporting` keep that attribute shape but group under a
+ * different exception name.
  *
  * Detection is suppressed when a debugger is attached or the app is not active. As a
  * consequence, hangs that begin while the app is in the background (including those
