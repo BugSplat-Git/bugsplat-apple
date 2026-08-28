@@ -147,6 +147,8 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
         self.currentCrashFilename = nil;
         self.isTestInstance = NO;
         self.hangDetectionThreshold = 2.0;
+        // Auto-submitted by default: the user was never asked, because the app was frozen then killed.
+        self.autoSubmitFatalHangReport = YES;
         _sessionID = [NSUUID UUID];
 
         // Configure PLCrashReporter
@@ -196,6 +198,8 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
         self.currentCrashFilename = nil;
         self.isTestInstance = YES;
         self.hangDetectionThreshold = 2.0;
+        // Auto-submitted by default: the user was never asked, because the app was frozen then killed.
+        self.autoSubmitFatalHangReport = YES;
         _sessionID = [NSUUID UUID];
 
         _crashReporterInternal = crashReporter;
@@ -550,16 +554,23 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     metadata[kBugSplatMetaKeyAttributes] = attributes;
 
-    // Mark auto-submittable so the next-launch scanner uploads silently without showing a dialog.
-    metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+    // Leaving userSubmitted unset routes the report down the same submission path a crash report
+    // takes. That is not the same as showing a dialog: whether one appears is then
+    // autoSubmitCrashReport's call, which defaults to NO on macOS and YES on iOS.
+    // autoSubmitFatalHangReport opts out of that path entirely - stamping the flag is precisely
+    // what makes the next-launch scanner submit silently, since shouldSendCrashSilently: checks
+    // it before it ever consults autoSubmitCrashReport.
+    if (self.autoSubmitFatalHangReport) {
+        metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+    }
 
     NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
     if (![metadata writeToFile:metaFilePath atomically:YES]) {
         // Without the .meta file the next-launch scanner sees an orphan .crash that
-        // lacks userSubmitted=YES, database, and attributes - it would either fail to
-        // upload or surface a dialog instead of the intended silent submit. Drop the
-        // .crash too so we don't leak a half-formed report.
+        // lacks database and attributes - it would either fail to upload or surface a
+        // dialog carrying none of the hang's context. Drop the .crash too so we don't
+        // leak a half-formed report.
         NSLog(@"BugSplat: Failed to write hang metadata; removing orphan crash file");
         [[NSFileManager defaultManager] removeItemAtPath:crashFilePath error:nil];
         return;
