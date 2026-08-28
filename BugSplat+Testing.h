@@ -30,6 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)enrichHangReportWithFilename:(NSString *)hangFilename;
 - (void)startHangDetectionIfEnabled;
 - (void)processPendingCrashReports;
+- (void)cleanupAllPendingCrashReports;
 
 @end
 

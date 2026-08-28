@@ -37,6 +37,57 @@ static NSString *const kFatalExceptionName = @"App Hang (Fatal)";
 static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
 
+/// Records the upload lifecycle callbacks a non-fatal hang delivers, and whether each one
+/// arrived on the main thread. `onWillSend` runs inside bugSplatWillSendCrashReport:, which
+/// is the window a real crash dialog's Don't Send can delete the report files in.
+@interface HangLifecycleDelegate : NSObject <BugSplatDelegate>
+@property (nonatomic, copy, nullable) dispatch_block_t onWillSend;
+@property (nonatomic, assign) NSUInteger willSendCount;
+@property (nonatomic, assign) NSUInteger didFinishCount;
+@property (nonatomic, assign) NSUInteger didFailCount;
+@property (nonatomic, assign) BOOL allCallbacksOnMainThread;
+@end
+
+@implementation HangLifecycleDelegate
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        _allCallbacksOnMainThread = YES;
+    }
+    return self;
+}
+
+- (void)recordThread
+{
+    self.allCallbacksOnMainThread = self.allCallbacksOnMainThread && [NSThread isMainThread];
+}
+
+- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+{
+    [self recordThread];
+    self.willSendCount++;
+    if (self.onWillSend) {
+        self.onWillSend();
+    }
+}
+
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+{
+    [self recordThread];
+    self.didFinishCount++;
+}
+
+- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error sessionID:(nullable NSUUID *)sessionID
+{
+    [self recordThread];
+    self.didFailCount++;
+}
+
+@end
+
+
 @interface BugSplatHangPersistenceTests : XCTestCase
 @property (nonatomic, strong) BugSplat *bugSplat;
 @property (nonatomic, copy, nullable) NSString *filenameToCleanup;
@@ -160,6 +211,16 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
                                                                  applicationVersion:@"1.0"
                                                                          urlSession:self.mockSession];
     [self.bugSplat setUploadServiceForTesting:service];
+}
+
+/// Rewrite a persisted report's session ID so it looks like it came from an earlier
+/// launch, which is what takes it out of the in-session hang path's ownership.
+- (void)reassignFilename:(NSString *)filename toSessionID:(NSString *)sessionID
+{
+    NSMutableDictionary *metadata = [[self metadataForFilename:filename] mutableCopy];
+    XCTAssertNotNil(metadata);
+    metadata[@"sessionID"] = sessionID;
+    XCTAssertTrue([metadata writeToFile:[self metaPathForFilename:filename] atomically:YES]);
 }
 
 /// Detect a hang and wait for the report to land on disk, returning its basename.
@@ -511,6 +572,161 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     XCTAssertFalse([fm fileExistsAtPath:[self crashPathForFilename:filename]],
                    @"A fatal hang must not be uploaded when only non-fatal reporting was enabled");
     XCTAssertFalse([fm fileExistsAtPath:[self metaPathForFilename:filename]]);
+}
+
+#pragma mark - Crash Pipeline Isolation
+
+- (void)testProcessPendingCrashReports_LeavesThisSessionsRecoveredHangAlone
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    // Silent submission either way, so nothing in this test can raise the crash dialog.
+    self.bugSplat.autoSubmitCrashReport = YES;
+    [self installMockUploadServiceSucceeding:NO];
+
+    NSString *filename = [self persistHangReport];
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+    XCTAssertTrue([self waitForCondition:^BOOL {
+        return self.mockSession.requestCount > 0;
+    } timeout:10.0], @"In-session upload should have been attempted");
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    XCTAssertTrue([fm fileExistsAtPath:[self crashPathForFilename:filename]],
+                  @"The failed upload leaves the report for the next launch");
+
+    // The crash-success path re-enters this a second after every upload, mid-session.
+    [self.bugSplat processPendingCrashReports];
+
+    XCTAssertNotEqualObjects([self.bugSplat currentCrashFilename], filename,
+                             @"The crash pipeline must not claim a hang the running session owns - "
+                             @"submitting it would clear the live session's attributes");
+    XCTAssertFalse([self.bugSplat isSendingInProgress]);
+    XCTAssertTrue([fm fileExistsAtPath:[self crashPathForFilename:filename]]);
+}
+
+- (void)testCleanupAllPendingCrashReports_KeepsThisSessionsRecoveredHang
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    [self installMockUploadServiceSucceeding:NO];
+
+    NSString *filename = [self persistHangReport];
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+    XCTAssertTrue([self waitForCondition:^BOOL {
+        return self.mockSession.requestCount > 0;
+    } timeout:10.0], @"In-session upload should have been attempted");
+
+    // Don't Send on the crash dialog runs this. It must not delete a hang report that is
+    // being uploaded outside the dialog's state machine.
+    [self.bugSplat cleanupAllPendingCrashReports];
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    XCTAssertTrue([fm fileExistsAtPath:[self crashPathForFilename:filename]],
+                  @"Declining a crash must not discard this session's recovered hang");
+    XCTAssertTrue([fm fileExistsAtPath:[self metaPathForFilename:filename]]);
+}
+
+- (void)testProcessPendingCrashReports_DiscardsHangCapturedWithoutFatalOptIn
+{
+    self.bugSplat.enableHangDetection = NO;
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    self.bugSplat.autoSubmitCrashReport = YES;
+    // A failing service: if the scanner did upload the report it would stay on disk, so
+    // "gone" can only mean it was discarded.
+    [self installMockUploadServiceSucceeding:NO];
+
+    NSString *filename = [self persistHangReport];
+    XCTAssertEqualObjects([self metadataForFilename:filename][kHangReportOnNextLaunchKey], @NO);
+    [self reassignFilename:filename toSessionID:[NSUUID UUID].UUIDString];
+
+    [self.bugSplat processPendingCrashReports];
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    XCTAssertFalse([fm fileExistsAtPath:[self crashPathForFilename:filename]],
+                   @"A hang captured without fatal opt-in must be discarded, never uploaded as fatal");
+    XCTAssertNotEqualObjects([self.bugSplat currentCrashFilename], filename);
+}
+
+#pragma mark - Upload Lifecycle Callbacks
+
+- (void)testNonFatalHangUpload_ReportVanishingAfterWillSendStillDeliversDidFail
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    [self installMockUploadServiceSucceeding:YES];
+
+    HangLifecycleDelegate *delegate = [[HangLifecycleDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    NSString *filename = [self persistHangReport];
+    __weak typeof(self) weakSelf = self;
+    delegate.onWillSend = ^{
+        [weakSelf removeReportFilesForFilename:filename];
+    };
+
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+
+    XCTAssertTrue([self waitForCondition:^BOOL {
+        return delegate.didFailCount > 0;
+    } timeout:10.0], @"A report that vanishes after willSend must still end in didFail");
+    XCTAssertEqual(delegate.willSendCount, (NSUInteger)1);
+    XCTAssertEqual(delegate.didFinishCount, (NSUInteger)0);
+    XCTAssertEqual(self.mockSession.requestCount, (NSUInteger)0, @"There was nothing left to upload");
+    XCTAssertTrue(delegate.allCallbacksOnMainThread,
+                  @"Lifecycle callbacks are documented as main-thread");
+}
+
+- (void)testNonFatalHangUpload_WithoutUploadService_SkipsWillSend
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+
+    HangLifecycleDelegate *delegate = [[HangLifecycleDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    NSString *filename = [self persistHangReport];
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+
+    // Enrichment still runs - it is the last step before the (impossible) send.
+    XCTAssertTrue([self waitForCondition:^BOOL {
+        return [[self metadataForFilename:filename][kHangEnrichedKey] boolValue];
+    } timeout:5.0]);
+    [self waitForCondition:^BOOL { return delegate.willSendCount > 0; } timeout:0.5];
+
+    XCTAssertEqual(delegate.willSendCount, (NSUInteger)0,
+                   @"willSend must not fire when no send can follow it");
+    XCTAssertEqual(delegate.didFailCount, (NSUInteger)0);
+    XCTAssertEqual(delegate.didFinishCount, (NSUInteger)0);
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:[self crashPathForFilename:filename]],
+                  @"The report is left for the next launch");
+}
+
+- (void)testRecovery_ReportWithoutFatalExceptionName_IsDiscardedNotUploaded
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    [self installMockUploadServiceSucceeding:YES];
+
+    NSString *filename = [self persistHangReport];
+
+    // Stand in for a report format that no longer carries the name the rewrite keys off.
+    // Renaming is what separates the two hang groups, so an unrenamed report must not go up.
+    XCTAssertTrue([@"Incident Identifier: 00000000-0000-0000-0000-000000000000\n"
+                   writeToFile:[self crashPathForFilename:filename]
+                    atomically:YES
+                      encoding:NSUTF8StringEncoding
+                         error:nil]);
+
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+    [self waitForCondition:^BOOL { return self.mockSession.requestCount > 0; } timeout:1.0];
+
+    XCTAssertEqual(self.mockSession.requestCount, (NSUInteger)0,
+                   @"A report that still reads App Hang (Fatal) must not be uploaded as non-fatal");
+    NSFileManager *fm = [NSFileManager defaultManager];
+    XCTAssertFalse([fm fileExistsAtPath:[self crashPathForFilename:filename]]);
+    XCTAssertFalse([fm fileExistsAtPath:[self metaPathForFilename:filename]]);
+    XCTAssertEqual([self.bugSplat nonFatalHangReportCountForTesting], (NSUInteger)0,
+                   @"A discarded report must not spend one of the session's three uploads");
 }
 
 #pragma mark - Tracker Start Gating
