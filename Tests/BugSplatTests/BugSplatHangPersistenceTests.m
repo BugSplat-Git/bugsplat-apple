@@ -146,8 +146,11 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 /// The non-fatal path hops to the main queue (to ask the delegate for attachments, as the
 /// crash path does) and back to the hang queue, so draining the hang queue alone is not
 /// enough - the main run loop has to turn. Spins it until `condition` holds or time runs out.
+/// Off the main thread it would spin the wrong run loop and time out instead of failing
+/// with a useful message, so that is asserted rather than left to a confusing timeout.
 - (BOOL)waitForCondition:(BOOL (^)(void))condition timeout:(NSTimeInterval)timeout
 {
+    XCTAssertTrue([NSThread isMainThread], @"waitForCondition: must run on the main thread");
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     while (!condition() && [deadline timeIntervalSinceNow] > 0) {
         [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
@@ -594,13 +597,18 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     XCTAssertTrue([fm fileExistsAtPath:[self crashPathForFilename:filename]],
                   @"The failed upload leaves the report for the next launch");
 
-    // The crash-success path re-enters this a second after every upload, mid-session.
+    // The crash-success path re-enters processPendingCrashReports a second after every
+    // upload, mid-session. Assertions stay scoped to this report: the crashes directory is
+    // shared with the rest of the suite, so anything global (a pending count, or
+    // isSendingInProgress) would flake on whatever else happens to be on disk.
+    XCTAssertFalse([[self.bugSplat pendingCrashFilesForCrashPipeline] containsObject:filename],
+                   @"The crash pipeline must not be offered a hang the running session owns - "
+                   @"submitting it would clear the live session's attributes");
+
     [self.bugSplat processPendingCrashReports];
 
     XCTAssertNotEqualObjects([self.bugSplat currentCrashFilename], filename,
-                             @"The crash pipeline must not claim a hang the running session owns - "
-                             @"submitting it would clear the live session's attributes");
-    XCTAssertFalse([self.bugSplat isSendingInProgress]);
+                             @"...and must not select it");
     XCTAssertTrue([fm fileExistsAtPath:[self crashPathForFilename:filename]]);
 }
 

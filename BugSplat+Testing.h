@@ -31,6 +31,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)startHangDetectionIfEnabled;
 - (void)processPendingCrashReports;
 - (void)cleanupAllPendingCrashReports;
+- (NSArray<NSString *> *)pendingCrashFilesForCrashPipeline;
 
 @end
 
