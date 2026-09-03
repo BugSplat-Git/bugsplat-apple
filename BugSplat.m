@@ -1853,8 +1853,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
  * each report's persisted values alone). Comments are not, since they describe the
  * report the dialog was shown for.
  */
-- (void)markAllPendingCrashesAsSubmittedWithUserName:(NSString *)userName
-                                           userEmail:(NSString *)userEmail
+- (void)markAllPendingCrashesAsSubmittedWithUserName:(nullable NSString *)userName
+                                           userEmail:(nullable NSString *)userEmail
                                       exceptFilename:(NSString *)crashFilename
 {
     @try {
@@ -1868,7 +1868,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                                   forCrashFilename:pendingFilename];
         }
     } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception in markAllPendingCrashesAsSubmitted: %@ - %@", exception.name, exception.reason);
+        NSLog(@"BugSplat: Exception in markAllPendingCrashesAsSubmittedWithUserName: %@ - %@", exception.name, exception.reason);
     }
 }
 

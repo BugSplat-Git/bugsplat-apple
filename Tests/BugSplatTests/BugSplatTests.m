@@ -386,6 +386,11 @@
 - (void)plantPendingReportNamed:(NSString *)filename metadata:(NSDictionary *)metadata
 {
     NSString *dir = [self.bugSplat crashesDirectoryPath];
+    // Nil when the directory could not be created. Without this the nil path turns into a
+    // writeToFile failure three lines down, which says nothing about the actual cause.
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return; }
+
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
     XCTAssertTrue([[@"test crash report" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
@@ -395,6 +400,9 @@
 - (NSDictionary *)metadataForPlantedReportNamed:(NSString *)filename
 {
     NSString *dir = [self.bugSplat crashesDirectoryPath];
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return nil; }
+
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
     return [NSDictionary dictionaryWithContentsOfFile:metaPath];
 }
@@ -402,6 +410,9 @@
 - (void)removePlantedReportsNamed:(NSArray<NSString *> *)filenames
 {
     NSString *dir = [self.bugSplat crashesDirectoryPath];
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return; }
+
     for (NSString *filename in filenames) {
         for (NSString *ext in @[@"crash", @"meta"]) {
             NSString *path = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:ext];
