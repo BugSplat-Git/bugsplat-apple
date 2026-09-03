@@ -21,8 +21,8 @@ let package = Package(
         // BugSplat.xcframework contains PLCrashReporter statically linked
         .binaryTarget(
             name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/3.6.0/BugSplat.xcframework.zip",
-            checksum: "e7252936931b203e3a284435b3f4800c31a705c7eddd00538d0b51248f047a91"
+            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/3.6.1/BugSplat.xcframework.zip",
+            checksum: "f2cb64f9efcb3e038f6d15ede3b6a40f4c3351c299d32bee6fd2451b1cca1651"
         ),
         // Wrapper target that links dependencies
         // Sources/BugSplatPackage/Empty.swift satisfies SPM's requirement for source files
