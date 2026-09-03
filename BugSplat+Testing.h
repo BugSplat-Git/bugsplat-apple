@@ -28,6 +28,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)handleNewCrashFromPLCrashReporter;
 - (void)enrichPendingHangReports;
 - (void)processPendingCrashReports;
+- (void)markAllPendingCrashesAsSubmittedWithUserName:(nullable NSString *)userName
+                                           userEmail:(nullable NSString *)userEmail
+                                      exceptFilename:(NSString *)crashFilename;
 
 @end
 

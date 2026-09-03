@@ -1126,6 +1126,14 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                             if (userEmail.length > 0) self.userEmail = userEmail;
                         }
                         
+                        // The user's approval covers every pending report, not just the one the
+                        // dialog described. Mark the others before this upload starts so they are
+                        // sent silently after it, and retried silently on the next launch if the
+                        // batch is interrupted, instead of each getting its own dialog.
+                        [self markAllPendingCrashesAsSubmittedWithUserName:userName
+                                                                 userEmail:userEmail
+                                                            exceptFilename:crashFilename];
+                        
                         // Submit this crash with user-provided details
                         // Note: After this completes, remaining crashes will be sent SILENTLY
                         [self submitPersistedCrashReportWithFilename:crashFilename
@@ -1225,6 +1233,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
             UIAlertAction *sendAction = [UIAlertAction actionWithTitle:@"Send"
                                                                  style:UIAlertActionStyleDefault
                                                                handler:^(UIAlertAction *action) {
+                // The user's approval covers every pending report, not just the one the alert
+                // described. The alert collects no name or email, so nil leaves each report's
+                // own persisted values in place.
+                [self markAllPendingCrashesAsSubmittedWithUserName:nil
+                                                         userEmail:nil
+                                                    exceptFilename:crashFilename];
+                
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
                                                     metadata:metadata
@@ -1250,6 +1265,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                 } @catch (NSException *exception) {
                     NSLog(@"BugSplat: Exception in bugSplatWillSendCrashReportsAlways delegate: %@ - %@", exception.name, exception.reason);
                 }
+                
+                // Same as "Send": this approval covers every pending report.
+                [self markAllPendingCrashesAsSubmittedWithUserName:nil
+                                                         userEmail:nil
+                                                    exceptFilename:crashFilename];
                 
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
@@ -1817,6 +1837,39 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     
     // Write back to disk
     [metadata writeToFile:metaFilePath atomically:YES];
+}
+
+/**
+ * Mark every pending crash report other than crashFilename as user-submitted.
+ *
+ * The dialog is shown once, for the newest report, and the user's approval covers
+ * everything that is pending: older crashes, hang reports, and reports left over from
+ * earlier launches. Stamping them all before the first upload starts means the chained
+ * processPendingCrashReports pass sends them silently, and an interrupted batch
+ * (offline, force-quit) retries them silently on the next launch instead of showing
+ * another dialog.
+ *
+ * The name and email the user just entered are reused for the other reports (nil leaves
+ * each report's persisted values alone). Comments are not, since they describe the
+ * report the dialog was shown for.
+ */
+- (void)markAllPendingCrashesAsSubmittedWithUserName:(nullable NSString *)userName
+                                           userEmail:(nullable NSString *)userEmail
+                                      exceptFilename:(NSString *)crashFilename
+{
+    @try {
+        for (NSString *pendingFilename in [self getPendingCrashFiles]) {
+            if ([pendingFilename isEqualToString:crashFilename]) {
+                continue;
+            }
+            [self markCrashAsSubmittedWithComments:nil
+                                          userName:userName
+                                         userEmail:userEmail
+                                  forCrashFilename:pendingFilename];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in markAllPendingCrashesAsSubmittedWithUserName: %@ - %@", exception.name, exception.reason);
+    }
 }
 
 - (NSString *)crashesDirectoryPath
