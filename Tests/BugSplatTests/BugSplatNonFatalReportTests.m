@@ -365,6 +365,27 @@
     XCTAssertEqualObjects(self.mockCrashReporter.lastLiveReportException.reason, @"Sync failed");
 }
 
+- (void)testPostError_EmptyDomain_StampsTheSameFallbackAsTheReportName
+{
+    [self installUploadService];
+    [self queueSuccessfulUploadFlow];
+
+    NSError *error = [NSError errorWithDomain:@"" code:5 userInfo:nil];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"post completes"];
+    [self.bugSplat postError:error completion:^(BugSplatReportResult *result, NSError *postError) {
+        [expectation fulfill];
+    }];
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    // An empty domain attribute would identify nothing, and would not match a search for the
+    // name the report was actually filed under.
+    NSDictionary *attributes = [self commitRequestAttributes];
+    XCTAssertEqualObjects(attributes[@"bugsplat-nonfatal-name"], @"NSError");
+    XCTAssertEqualObjects(attributes[@"bugsplat-nonfatal-error-domain"], @"NSError");
+    XCTAssertEqualObjects(attributes[@"bugsplat-nonfatal-error-code"], @"5");
+}
+
 - (void)testPostError_ErrorAttributesCannotBeOverriddenByCaller
 {
     [self installUploadService];

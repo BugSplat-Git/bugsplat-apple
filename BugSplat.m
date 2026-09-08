@@ -1656,9 +1656,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // Group by domain, not by domain+code: the stack is what distinguishes one failure from
     // another, and folding the code into the name would split a single call site across as
     // many groups as it has failure codes. The code travels as a searchable attribute instead.
+    // The domain attribute reuses `name` rather than error.domain so the two always agree.
+    // An NSError with an empty domain would otherwise be filed under the name "NSError" while
+    // carrying an empty domain attribute - a value that identifies nothing and that a search
+    // for the name it was filed under would never match.
     NSString *name = error.domain.length > 0 ? error.domain : @"NSError";
     NSDictionary<NSString *, NSString *> *reserved = @{
-        kBugSplatNonFatalAttrErrorDomain: error.domain ?: @"",
+        kBugSplatNonFatalAttrErrorDomain: name,
         kBugSplatNonFatalAttrErrorCode: [@(error.code) stringValue]
     };
 
