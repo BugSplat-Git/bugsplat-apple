@@ -61,6 +61,18 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setUploadServiceForTesting:(BugSplatUploadService *)uploadService;
 
 /**
+ * Redirects persisted crash and hang reports to `path` instead of the shared directory under
+ * Application Support. Pass nil to restore the default.
+ *
+ * Every BugSplat instance otherwise writes to the same directory. The test schemes set
+ * `parallelizable = "YES"`, so XCTest runs test classes in separate worker processes at the
+ * same time - and a scan like -enrichPendingHangReports walks every report in that directory,
+ * including ones another class planted. Each test that touches the crashes directory points
+ * this at its own temporary directory in -setUp and removes it in -tearDown.
+ */
+- (void)setCrashesDirectoryPathOverride:(nullable NSString *)path;
+
+/**
  * Check if start has been invoked.
  */
 - (BOOL)isStartInvoked;

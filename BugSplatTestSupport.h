@@ -68,6 +68,25 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, strong, nullable) NSData *customData;
 
+@optional
+
+/**
+ * Capture a report for the live process without crashing, marking the calling thread as
+ * the faulting one. Used by the non-fatal reporting APIs (`-postException:...`).
+ *
+ * Optional because it is only needed by those APIs: a conforming type that does not
+ * implement it simply cannot post non-fatal reports. PLCrashReporter declares this exact
+ * selector, so it satisfies the requirement without any adapter.
+ *
+ * @param exception An exception to record as the report's uncaught exception, or nil. When
+ *                  the exception carries `callStackReturnAddresses`, those are recorded as
+ *                  the report's last-exception backtrace.
+ * @param outError Populated when the report could not be generated.
+ * @return The report data, or nil on failure.
+ */
+- (nullable NSData *)generateLiveReportWithException:(nullable NSException *)exception
+                                               error:(NSError * _Nullable * _Nullable)outError;
+
 @end
 
 

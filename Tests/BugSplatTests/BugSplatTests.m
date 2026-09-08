@@ -15,6 +15,7 @@
 #import "BugSplat+Testing.h"
 #import "BugSplatTestSupport.h"
 #import "BugSplatUtilities.h"
+#import "BugSplatTestCrashDirectory.h"
 #import "MockCrashReporter.h"
 #import "MockCrashStorage.h"
 #import "MockUserDefaults.h"
@@ -29,6 +30,7 @@
 @property (nonatomic, strong) MockCrashStorage *mockCrashStorage;
 @property (nonatomic, strong) MockUserDefaults *mockUserDefaults;
 @property (nonatomic, strong) MockBundle *mockBundle;
+@property (nonatomic, copy) NSString *isolatedCrashesDirectory;
 
 @end
 
@@ -52,10 +54,18 @@
                                                crashStorage:self.mockCrashStorage
                                                userDefaults:self.mockUserDefaults
                                                      bundle:self.mockBundle];
+
+    self.isolatedCrashesDirectory = BugSplatTestsMakeIsolatedCrashesDirectory();
+    [self.bugSplat setCrashesDirectoryPathOverride:self.isolatedCrashesDirectory];
 }
 
 - (void)tearDown
 {
+    // The whole directory belongs to this test, so removing it takes every planted report
+    // with it - no per-file bookkeeping needed.
+    [[NSFileManager defaultManager] removeItemAtPath:self.isolatedCrashesDirectory error:nil];
+    self.isolatedCrashesDirectory = nil;
+
     [self.mockCrashReporter reset];
     [self.mockCrashStorage reset];
     [self.mockUserDefaults reset];

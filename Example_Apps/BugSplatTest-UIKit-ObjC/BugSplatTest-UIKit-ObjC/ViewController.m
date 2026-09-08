@@ -416,16 +416,33 @@
 }
 
 - (void)triggerNonCrashError {
-    // ObjC lets us actually catch a real NSException — out-of-bounds is the
-    // tidiest one to provoke. Catch, then log the exception name in the entry
-    // detail, matching the SwiftUI sample's "NSInvalidArgumentException caught"
-    // shape with the real exception name we observed.
+    // Catch a real NSException, then hand it to postException: - BugSplat captures a stack
+    // trace for it and uploads the report while the app keeps running. The app does not
+    // crash, and the report shows up in the dashboard next to the real crashes, tagged
+    // with the bugsplat-nonfatal attribute.
     @try {
         NSArray *empty = @[];
         (void)[empty objectAtIndex:99];
     } @catch (NSException *exception) {
-        NSString *detail = [NSString stringWithFormat:@"%@ caught", exception.name];
-        [BSPActivityLog record:BSPActivityTypeError detail:detail];
+        __weak typeof(self) weakSelf = self;
+        [[BugSplat shared] postException:exception
+                              attributes:@{@"screen": @"Home"}
+                             attachments:nil
+                              completion:^(BugSplatReportResult * _Nullable result, NSError * _Nullable error) {
+            if (error) {
+                [BSPActivityLog record:BSPActivityTypeError
+                                detail:[NSString stringWithFormat:@"Report failed: %@", error.localizedDescription]];
+            } else if (result.crashId) {
+                [BSPActivityLog record:BSPActivityTypeError
+                                detail:[NSString stringWithFormat:@"Non-crash error sent (report #%@)", result.crashId]];
+            } else {
+                [BSPActivityLog record:BSPActivityTypeError detail:@"Non-crash error sent"];
+            }
+            [weakSelf refreshRecentActivity];
+        }];
+
+        [BSPActivityLog record:BSPActivityTypeError
+                        detail:[NSString stringWithFormat:@"%@ caught - sending stack trace", exception.name]];
     }
     [self refreshRecentActivity];
 }

@@ -343,6 +343,82 @@ BugSplat.shared().postFeedback(
 
 All parameters except `title` are optional. When `userName`, `userEmail`, or `appKey` are nil, BugSplat falls back to the corresponding property values set on the `BugSplat` singleton. You can also include file attachments using an array of `BugSplatAttachment` objects.
 
+### Non-Fatal Errors
+
+BugSplat can send a stack trace for something that did *not* terminate your app - an error you caught and recovered from, a failed precondition, a bad server response. This is the Apple counterpart to `BugSplat::CreateXmlReport` in the Windows SDK.
+
+Call it from the `catch` block that handled the problem. BugSplat snapshots every thread in the process at that point, marks the calling thread as the faulting one, and uploads the report while your app keeps running.
+
+**Swift:**
+
+```swift
+do {
+    try riskyOperation()
+} catch {
+    BugSplat.shared().postError(error) { result, postError in
+        if let postError {
+            print("Report failed: \(postError.localizedDescription)")
+        } else if let crashId = result?.crashId {
+            print("Reported as #\(crashId)")
+        }
+    }
+}
+```
+
+**Obj-C:**
+
+```objc
+@try {
+    [self riskyOperation];
+} @catch (NSException *exception) {
+    [[BugSplat shared] postException:exception
+                          attributes:@{@"screen": @"Checkout"}
+                         attachments:nil
+                          completion:^(BugSplatReportResult * _Nullable result, NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"Report failed: %@", error.localizedDescription);
+        } else {
+            NSLog(@"Reported as #%@", result.crashId);
+        }
+    }];
+}
+```
+
+When you have neither an `NSError` nor an `NSException` - a state machine that reached an impossible state, say - use the name/reason form:
+
+```swift
+BugSplat.shared().postException(
+    name: "ImageDecodeFailure",
+    reason: "unsupported pixel format \(format)",
+    attributes: ["asset": assetID],
+    attachments: nil
+) { result, error in }
+```
+
+Keep `name` stable and low-cardinality: it identifies this *class* of event, so don't interpolate an id or a timestamp into it. Put the varying detail in `reason` or in attributes.
+
+#### How non-fatal reports appear in the dashboard
+
+Non-fatal reports upload as ordinary Apple crash reports (crash type `macOS`/`iOS`), which is what lets the server symbolicate them against the same dSYMs your crash reports use. They therefore land in the same list as real crashes, and are tagged with these attributes so you can tell them apart:
+
+| Attribute | Value |
+| --- | --- |
+| `bugsplat-nonfatal` | Always `true` |
+| `bugsplat-nonfatal-name` | The exception name, error domain, or the `name:` you passed |
+| `bugsplat-nonfatal-captured-at` | ISO-8601 time the stack was captured |
+| `bugsplat-nonfatal-error-domain` | `postError` only - the error's domain |
+| `bugsplat-nonfatal-error-code` | `postError` only - the error's code |
+
+These five attributes are set by the SDK and cannot be overwritten by the `attributes` you pass, so a dashboard filter on `bugsplat-nonfatal` can be trusted. Any other attributes you supply are merged over the session attributes set with `setValue:forAttribute:`.
+
+#### Things to know
+
+- **`start` must have been called first.** Otherwise the completion handler receives an error and nothing is uploaded.
+- **Capturing the stack is synchronous**, on the order of a few milliseconds; only the upload is asynchronous. Don't call this in a tight loop on a hot path.
+- **A failed upload is not retried.** Unlike crash reports, non-fatal reports are not persisted to disk for a next-launch retry - the failure is reported through the completion handler so you can decide what to do.
+- **`BugSplatDelegate` is not consulted** for attachments. Pass whatever you want attached directly.
+- The completion handler is always invoked on the main queue, and is optional.
+
 ### Crash Reporter Customization
 
 There are several ways to customize your BugSplat crash reporter.
