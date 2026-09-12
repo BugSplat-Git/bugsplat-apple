@@ -34,7 +34,7 @@ jobs:
           repository: ${{ env.NATIVE_REPO }}
           ref: ${{ inputs.native_ref }}
           path: native
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN }}   # read access to bugsplat-native (internal); GH_PAT is scoped to this repo
 
       - name: Resolve version
         id: version

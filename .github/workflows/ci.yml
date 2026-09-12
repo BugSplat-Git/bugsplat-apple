@@ -25,7 +25,7 @@ jobs:
           repository: ${{ env.NATIVE_REPO }}
           ref: ${{ env.NATIVE_REF }}
           path: native
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN }}   # read access to bugsplat-native (internal); GH_PAT is scoped to this repo
 
       - name: Toolchain versions
         run: |
@@ -123,7 +123,7 @@ jobs:
           repository: ${{ env.NATIVE_REPO }}
           ref: ${{ env.NATIVE_REF }}
           path: native
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN }}   # read access to bugsplat-native (internal); GH_PAT is scoped to this repo
       - name: Cache Crashpad build
         uses: actions/cache@v4
         with:
