@@ -1,0 +1,10 @@
+/* iOS/tvOS "send report?" prompt. The macOS dialog is localized by BugSplatReporter's theme strings. */
+"BugSplat.prompt.crashTitle" = "%@ quit unexpectedly";
+"BugSplat.prompt.hangTitle" = "%@ stopped responding";
+"BugSplat.prompt.message" = "Would you like to send a report to help fix the problem?";
+"BugSplat.prompt.name" = "Name (optional)";
+"BugSplat.prompt.email" = "Email (optional)";
+"BugSplat.prompt.description" = "What were you doing? (optional)";
+"BugSplat.prompt.send" = "Send";
+"BugSplat.prompt.dontSend" = "Don't Send";
+"BugSplat.prompt.alwaysSend" = "Always Send";

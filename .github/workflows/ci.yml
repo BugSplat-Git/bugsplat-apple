@@ -1,0 +1,157 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # bugsplat-native provides the framework this package wraps. Bump NATIVE_REF as branches merge
+  # (feat/m5-swift-binding -> feat/m1-core -> main -> a release tag).
+  NATIVE_REPO: BugSplat-Git/bugsplat-native
+  NATIVE_REF: feat/m5-swift-binding
+  CRASHPAD_COMMIT: db44314646cbd0825a73b58dd2b7b5f4faca64a7   # pinned in bugsplat-native; keep in sync
+
+jobs:
+  macos:
+    name: macOS (build native, unit + runtime tests)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout bugsplat-native
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.NATIVE_REPO }}
+          ref: ${{ env.NATIVE_REF }}
+          path: native
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+          cmake --version | head -1
+          ninja --version
+
+      # ---- Crashpad, pinned, built with GN via depot_tools and cached by commit (as bugsplat-native's CI does)
+      - name: Cache Crashpad build
+        id: crashpad-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/crashpad-work
+          key: crashpad-${{ env.CRASHPAD_COMMIT }}-macos-15-v1
+
+      - name: Fetch depot_tools and build Crashpad
+        if: steps.crashpad-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$GITHUB_WORKSPACE/depot_tools"
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+          gclient --version
+          mkdir -p crashpad-work && cd crashpad-work
+          fetch --no-history crashpad
+          cd crashpad
+          git fetch --depth 1 origin "$CRASHPAD_COMMIT" && git checkout "$CRASHPAD_COMMIT"
+          gclient sync
+          gn gen out/mac-release --args='is_debug=false target_cpu="arm64"'
+          ninja -C out/mac-release client handler:crashpad_handler snapshot minidump util
+
+      # ---- bugsplat-native -> BugSplatNative.xcframework
+      - name: Build bugsplat-native and assemble BugSplatNative.xcframework
+        run: |
+          scripts/build-native.sh --native native --crashpad-root "$GITHUB_WORKSPACE/crashpad-work/crashpad"
+          ls -la Frameworks/BugSplatNative.xcframework
+          ls -la Frameworks/BugSplatNative.xcframework/*/BugSplatNative.framework/Versions/A/Helpers
+
+      # ---- the Swift package
+      - name: Build
+        run: |
+          set -o pipefail
+          swift build -v 2>&1 | tail -50
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          swift test --skip RuntimeTests 2>&1 | tail -80
+
+      - name: Runtime test (capture -> monitor import -> upload to fred)
+        env:
+          BUGSPLAT_RUNTIME_TESTS: "1"
+          BUGSPLAT_TEST_STORE_ROOT: ${{ runner.temp }}/bugsplat-runtime
+        run: |
+          set -o pipefail
+          swift test --filter RuntimeTests 2>&1 | tee runtime.log | tail -60
+          grep -E "BUGSPLAT_RUNTIME_(CRASH|FEEDBACK|STRUCTURED)_ID=" runtime.log
+
+      - name: Build the macOS example
+        run: |
+          set -o pipefail
+          swift build --package-path Examples/macOS-HelloCrash 2>&1 | tail -20
+
+      - name: Package the framework
+        run: |
+          cd Frameworks && zip -qry BugSplatNative.xcframework.zip BugSplatNative.xcframework
+          swift package compute-checksum BugSplatNative.xcframework.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BugSplatNative.xcframework
+          path: Frameworks/BugSplatNative.xcframework.zip
+
+      - name: Store logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: |
+            runtime.log
+            ${{ runner.temp }}/bugsplat-runtime/**/BugSplat.log
+          if-no-files-found: ignore
+
+  # iOS/tvOS: turned on with the repository variable BUGSPLAT_IOS_CI=true once bugsplat-native
+  # ships its iOS toolchain and in-process backend (cmake/ios.toolchain.cmake, crashpad-inproc).
+  ios:
+    name: iOS simulator (build + unit tests)
+    if: vars.BUGSPLAT_IOS_CI == 'true'
+    runs-on: macos-15
+    needs: macos
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout bugsplat-native
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.NATIVE_REPO }}
+          ref: ${{ env.NATIVE_REF }}
+          path: native
+          token: ${{ secrets.GH_PAT }}
+      - name: Cache Crashpad build
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/crashpad-work
+          key: crashpad-${{ env.CRASHPAD_COMMIT }}-ios-v1
+      - name: Build Crashpad for iOS
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$GITHUB_WORKSPACE/depot_tools"
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+          gclient --version
+          mkdir -p crashpad-work && cd crashpad-work && [ -d crashpad ] || fetch --no-history crashpad
+          cd crashpad && git fetch --depth 1 origin "$CRASHPAD_COMMIT" && git checkout "$CRASHPAD_COMMIT" && gclient sync
+          gn gen out/ios-release --args='is_debug=false target_os="ios" target_cpu="arm64"'
+          gn gen out/iossim-release --args='is_debug=false target_os="ios" target_environment="simulator" target_cpu="arm64"'
+          ninja -C out/ios-release client snapshot minidump util
+          ninja -C out/iossim-release client snapshot minidump util
+      - name: Build bugsplat-native for iOS and the simulator
+        run: |
+          for slice in ios iossim; do
+            cmake -S native -B build-$slice -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE=native/cmake/ios.toolchain.cmake -DBUGSPLAT_IOS_SLICE=$slice \
+              -DBUGSPLAT_CRASHPAD_ROOT="$GITHUB_WORKSPACE/crashpad-work/crashpad" -DBUGSPLAT_CRASHPAD_OUT="$GITHUB_WORKSPACE/crashpad-work/crashpad/out/$slice-release" \
+              -DBUGSPLAT_BUILD_TESTS=OFF -DBUGSPLAT_BUILD_MONITOR=OFF -DBUGSPLAT_BUILD_REPORTER=OFF
+            cmake --build build-$slice
+          done
+          native/bindings/swift/make-xcframework.sh --version "$(cat native/VERSION)" --ios build-ios --ios-simulator build-iossim \
+            --out Frameworks/BugSplatNative.xcframework --privacy Sources/BugSplat/Resources/PrivacyInfo.xcprivacy
+      - name: Unit tests on the simulator
+        run: |
+          set -o pipefail
+          xcodebuild test -scheme BugSplat -destination 'platform=iOS Simulator,name=iPhone 16' -skip-testing:BugSplatTests/RuntimeTests CODE_SIGNING_ALLOWED=NO 2>&1 | tail -60

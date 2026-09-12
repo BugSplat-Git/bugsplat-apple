@@ -14,79 +14,48 @@
 
 ## Introduction 👋
 
-The BugSplat.xcframework enables posting crash reports from iOS, macOS, and Mac Catalyst applications to BugSplat. Visit [bugsplat.com](https://www.bugsplat.com) for more information and to sign up for an account.
+BugSplat 9 for Apple platforms is a Swift API over [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native), BugSplat's cross-platform crash reporter built on Crashpad. It reports crashes, hangs, caught errors and user feedback from macOS, iOS and tvOS apps to [BugSplat](https://www.bugsplat.com).
+
+On macOS everything that matters happens **out of process**: `BugSplatMonitor` captures the crash and writes the dump, `BugSplatReporter.app` shows the dialog and uploads the report, and the support-response page opens for the user. Your app only describes the report. On iOS and tvOS capture is in process and reports are sent at the next launch.
+
+Version 9 is a new SDK, not an update: the API is Swift-first, the reporter is the same themeable one used on Windows and Linux, and the previous in-process crash reporter is gone. See [Migrating from 2.x and 3.x](#migrating-from-2x-and-3x) if you are upgrading.
 
 ## Requirements 📋
 
-- BugSplat for iOS supports iOS 13 and later.
-- BugSplat for macOS supports macOS 11.5 and later.
+- macOS 13 or later, iOS 15 or later, tvOS 15 or later (beta)
+- Xcode 15.3 or later (Swift 5.10)
+- Mac Catalyst is not supported
 
 ## Integration 🏗️
 
-The BugSplat crash reporting SDK can be integrated into your project via the following methods:
-- Using Swift Package Manager
-- Using CocoaPods
-- Manually adding xcframeworks
+### Swift Package Manager
 
-### Swift Package Manager (SPM)
+Add `https://github.com/BugSplat-Git/bugsplat-apple` to your project's package dependencies and add the `BugSplat` product to your **application target**. The package brings `BugSplatNative.xcframework` with it; Xcode embeds it in your app and signs it with your identity. On macOS the framework carries `BugSplatMonitor` and `BugSplatReporter.app` in its `Helpers` directory, so nothing else needs to ship.
 
-Add the following URL to your project's `Additional Package Dependencies`:
-
-```sh
-https://github.com/BugSplat-Git/bugsplat-apple
+```swift
+dependencies: [
+    .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "9.0.0")
+]
 ```
+
+> [!IMPORTANT]
+> If only an intermediate framework target depends on the package, also add the `BugSplat` product to the app target so the native framework gets embedded and re-signed. A missing framework surfaces as `BugSplatError.monitorNotFound` / `.reporterNotFound` from `BugSplat.start`; there is no silent in-process fallback on macOS.
 
 ### CocoaPods
 
-Add the following to your `Podfile`:
-
 ```ruby
-pod 'BugSplat', '~> 3.0'
+pod 'BugSplat', '~> 9.0'
 ```
 
-Then run `pod install`.
+### Manual
 
-### Manually Add xcframeworks
-
-To manually integrate BugSplat into your Xcode project, BugSplat.xcframework needs to be added and configured within Xcode.
-
-1. Download the latest released xcframework (BugSplat.xcframework.zip) from the [Releases](https://github.com/BugSPlat-Git/bugsplat-apple/releases) page. The zip will contain BugSplat.xcframework.
-2. Unzip the archive.
-3. In Xcode, select your app target, then go to the General tab, scroll down to Framework, Libraries, and Embedded Content, then click the "+" and navigate to where you unzipped the archive in step 2. Select BugSplat.xcframework, then tap the "Add" button. Once added, select Embed & Sign for the xcframework.
-
-### Troubleshooting: "Library not loaded" / "different Team IDs" on macOS
-
-If your app integrates BugSplat with Swift Package Manager and crashes at launch with:
-
-```
-dyld: Library not loaded: @rpath/BugSplat.framework/Versions/A/BugSplat
-Reason: ... code signature ... not valid for use in process:
-mapping process and mapped file (non-platform) have different Team IDs
-```
-
-the package resolved and built correctly — this is a code-signing issue at load time.
-`BugSplat.framework` ships with an ad-hoc (linker) signature and no Team ID. When your
-app is signed with your team's identity and has the Hardened Runtime's Library
-Validation enabled, `dyld` refuses to load any non-platform library that is not signed
-with the same Team ID.
-
-This typically happens when only an **intermediate framework target** depends on the
-BugSplat package. Xcode links against the unsigned copy of `BugSplat.framework` in the
-build products directory, but never embeds and re-signs it into the app bundle —
-embedding only happens for package products attached to an **application** target.
-
-**Fix:** also add the BugSplat package product to your app target —
-select the app target, General → *Frameworks, Libraries, and Embedded Content* → `+` →
-BugSplat. Xcode then embeds the framework in the app bundle and re-signs it with your
-signing identity, which satisfies Library Validation.
+Download `BugSplatNative.xcframework.zip` from the [Releases](https://github.com/BugSplat-Git/bugsplat-apple/releases) page, add it to *Frameworks, Libraries, and Embedded Content* (Embed & Sign), and add `Sources/BugSplat` to your project.
 
 ## Usage 🧑‍💻
 
 ### Configuration
 
-BugSplat requires a few Xcode configuration steps to integrate the xcframework with your BugSplat account.
-
-Add the following case-sensitive key to your app's `Info.plist`, replacing `DATABASE_NAME` with your customer-specific BugSplat database name.
+Add your database to `Info.plist` (or pass it to `start`):
 
 ```xml
 <key>BugSplatDatabase</key>
@@ -94,489 +63,160 @@ Add the following case-sensitive key to your app's `Info.plist`, replacing `DATA
 ```
 
 > [!NOTE]
-> For macOS apps, you must enable Outgoing network connections (client) in the Signing & Capabilities of the Target.
+> Sandboxed macOS apps need *Outgoing Connections (Client)*. App Sandbox / Mac App Store apps: the out-of-process handshake is being validated; until then use the SDK in non-sandboxed builds.
 
-### Symbol Upload
-
-To symbolicate crash reports, you must upload your app's `dSYM` files to the BugSplat server. There are scripts to help with this.
-
-Download BugSplat's cross-platform tool, [symbol-upload-macos](https://docs.bugsplat.com/education/faq/how-to-upload-symbol-files-with-symbol-upload) for Apple Silicon by entering the following command in your terminal.
-
-```sh
-curl -sL -O "https://app.bugsplat.com/download/symbol-upload-macos"
-```
-
-Alternatively, you can download the Intel version via the following command.
-
-```sh
-curl -sL -O "https://app.bugsplat.com/download/symbol-upload-macos-intel"
-```
-
-Make `symbol-upload-macos` executable
-
-```sh
-chmod +x symbol-upload-macos
-```
-
-Several options exist to integrate `symbol-upload-macos` into the app build process.
-
-- Create an Xcode build-phase script to upload dSYM files after every build. See example script [Symbol_Upload_Examples/Build-Phase-symbol-upload.sh](Symbol_Upload_Examples/Build-Phase-symbol-upload.sh)
-
-- Create an Xcode Archive post-action script in the target's Build Scheme to upload dSYM files after the app is archived and ready for submission to TestFlight or the App Store. See example script [Symbol_Upload_Examples/Archive-post-action-upload.sh](Symbol_Upload_Examples/Archive-post-action-upload.sh)
-- Manually upload an `xcarchive` or `dSYM` file generated by Xcode via BugSplat's [Versions](https://app.bugsplat.com/v2/versions) page.
-
-> [!NOTE]
-> For the build-phase script to create dSYM files, change Build Settings `DEBUG_INFORMATION_FORMAT` from `DWARF` to `DWARF with dSYM File`. See inline notes within each script for modifications to Xcode Build Settings required for each script to work.
-
-Please refer to our [documentation](https://docs.bugsplat.com/education/faq/how-to-upload-symbol-files-with-symbol-upload) to learn more about how to use `symbol-upload-macos`.
-
-### Initialization
-
-Several iOS and macOS test app examples are included within the [Example_Apps](Example_Apps) folder to show how simple and quickly BugSplat can be integrated into an app and ready to submit crash reports.
-
-You can instantiate BugSplat by following the language-specific examples below.
-
-#### Swift (UIKit)
+### Start
 
 ```swift
 import BugSplat
 
+var options = BugSplat.Options()
+options.uploadPolicy = .dialog                       // .quiet, or .manual to drain reports yourself
+options.hangDetection = .init(timeout: 5, policy: .report)
+options.attributes = ["build": "nightly"]
+
+do {
+    try BugSplat.start(options: options)             // database, application and version from Info.plist
+} catch {
+    print("BugSplat could not start: \(error)")      // a packaging error, see BugSplatError
+}
+```
+
+SwiftUI:
+
+```swift
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Initialize BugSplat
-        BugSplat.shared().delegate = self
-        BugSplat.shared().autoSubmitCrashReport = false
-        BugSplat.shared().start()
-
-        return true
-    }
-}
-
-extension AppDelegate: BugSplatDelegate {
-    // MARK: BugSplatDelegate
-    func bugSplatWillSendCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillSendCrashReportsAlways(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillCancelSendingCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillShowSubmitCrashReportAlert(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error) {
-        print("\(#file) - \(#function)")
-    }
+struct MyApp: App {
+    init() { try? BugSplat.start() }
+    var body: some Scene { WindowGroup { ContentView() } }
 }
 ```
 
-#### Swift (SwiftUI)
-
-```swift
-import BugSplat
-
-@main
-struct BugSplatTestSwiftUIApp: App {
-    private let bugSplat = BugSplatInitializer()
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
-}
-
-@objc class BugSplatInitializer: NSObject, BugSplatDelegate {
-    override init() {
-        super.init()
-        BugSplat.shared().delegate = self
-        BugSplat.shared().autoSubmitCrashReport = false
-        BugSplat.shared().start()
-    }
-
-    // MARK: BugSplatDelegate
-    func bugSplatWillSendCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillSendCrashReportsAlways(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillCancelSendingCrashReport(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplatWillShowSubmitCrashReportAlert(_ bugSplat: BugSplat) {
-        print("\(#file) - \(#function)")
-    }
-
-    func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error) {
-        print("\(#file) - \(#function)")
-    }
-}
-```
-
-#### Obj-C
+Objective-C:
 
 ```objc
-#import <BugSplat/BugSplat.h>
+@import BugSplat;
 
-@interface AppDelegate () <BugSplatDelegate>
-@end
-
-@implementation AppDelegate
-- (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-    // Initialize BugSplat
-    [[BugSplat shared] setDelegate:self];
-    [[BugSplat shared] setAutoSubmitCrashReport:NO];
-    [[BugSplat shared] start];
-}
-
-#pragma mark - BugSplatDelegate
-
-- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat {
-    NSLog(@"bugSplatWillSendCrashReport called");
-}
-
-- (void)bugSplatWillSendCrashReportsAlways:(BugSplat *)bugSplat {
-    NSLog(@"bugSplatWillSendCrashReportsAlways called");
-}
-
-- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat {
-    NSLog(@"bugSplatDidFinishSendingCrashReport called");
-}
-
-- (void)bugSplatWillCancelSendingCrashReport:(BugSplat *)bugSplat {
-    NSLog(@"bugSplatWillCancelSendingCrashReport called");
-}
-
-- (void)bugSplatWillShowSubmitCrashReportAlert:(BugSplat *)bugSplat {
-    NSLog(@"bugSplatWillShowSubmitCrashReportAlert called");
-}
-
-- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error {
-    NSLog(@"bugSplat:didFailWithError: %@", [error localizedDescription]);
-}
+BugSplatConfiguration *config = [BugSplatConfiguration new];
+config.uploadPolicy = BugSplatUploadPolicyDialog;
+NSError *error = nil;
+[BugSplat startWithDatabase:nil application:nil version:nil configuration:config error:&error];
 ```
 
-### Attributes
+### Describe the report
 
-BugSplat supports custom attributes that can be added to a crash report. These attributes are searchable in the BugSplat dashboard.
+Every one of these can change at any time after `start`, from any thread. What is set at the instant of the crash is what the report carries.
 
 ```swift
-BugSplat.shared().setValue("Value of Attribute", forAttribute: "AttributeName")
+BugSplat.user = "ada@example.com"
+BugSplat.email = "ada@example.com"
+BugSplat.key = "level-3"                              // selects the localized support response
+BugSplat.userDescription = "what the user was doing"
+BugSplat.notes = "feature flags: a,b"
+try BugSplat.setAttribute("branch", value: "main")    // up to 64, searchable in the dashboard
+try BugSplat.addAttachment(logFileURL)                // up to 24 files, copied at crash time
+print(BugSplat.environment!)                          // "macOS 15.2 (24C101) arm64", overridable
 ```
 
-```objc
-[[BugSplat shared] setValue:@"Value of Attribute" forAttribute:@"AttributeName"];
-```
+`environment` is a first-class report property, like `user` and `email`: the SDK fills it with the OS, build and hardware it runs on and sends it with every report.
 
-It is important to understand how attributes are set, as well as if and when attributes will be included in a crash report.
-
-Attributes and their associated values are programmatically set at any time while an app is running. Attributes are unique `NSString` keys so there can only be one attribute of a given name in any given set of attributes. Every time BugSplat's `setValue:forAttribute:` API is called, this attribute/value pair will be added to an `NSDictionary<NSString *, NSString *>`. If the app session terminates due to a crash, the attributes are handled as follows:
-
-    1. The attributes set during the session are recorded with the crash report at the moment the crash occurs.
-    2. Upon the next launch, the recorded attributes are read back from the crash report and sent as form fields on the crash upload request.
-    3. Attributes are NOT sent as an attachment, on any platform, so they never consume an attachment slot and are never suppressed by attachments returned from `BugSplatDelegate`.
-
-Put another way, attributes and their values are only valid for the lifetime of the app session and are only used in a crash report if the crash occurs during that app session. Any attributes set in the prior app session are uploaded with the crash report that is processed during the next launch of the app. If the app terminates normally, any attributes recorded during the prior `normal` app session are discarded.
-
-
-Please take a look at the framework-specific [sample applications](#sample-applications-) for more examples showing how to use attributes.
-
-### User Feedback
-
-BugSplat supports submitting user feedback (non-crash reports) from your application. Feedback is uploaded using crash type ID 36 (`User.Feedback`) and appears in the BugSplat dashboard alongside crash reports.
-
-**Swift:**
+### Reports that are not crashes
 
 ```swift
-BugSplat.shared().postFeedback(
-    title: "Login button unresponsive",
-    description: "The login button doesn't respond on the first tap.",
-    userName: nil,
-    userEmail: nil,
-    appKey: nil,
-    attachments: nil
-) { error in
-    if let error {
-        print("Feedback failed: \(error.localizedDescription)")
-    } else {
-        print("Feedback submitted successfully!")
-    }
+try BugSplat.captureReport()                          // a dump of the live process; the app keeps running
+
+let result = try await BugSplat.postFeedback(title: "Login button unresponsive",
+                                             description: "Nothing happens on the first tap",
+                                             attachments: [screenshotURL])
+print(result.crashId, result.infoURL ?? "")
+
+do { try riskyOperation() } catch {
+    try await BugSplat.post(error)                    // a structured report with the call stack
 }
 ```
 
-**Obj-C:**
+`BugSplat.Report` builds structured reports by hand (threads, frames, modules, registers) for engines and script runtimes; `Report(exception:)` takes an `NSException`.
 
-```objc
-[[BugSplat shared] postFeedback:@"Login button unresponsive"
-                    description:@"The login button doesn't respond on the first tap."
-                       userName:nil
-                      userEmail:nil
-                         appKey:nil
-                    attachments:nil
-                     completion:^(NSError * _Nullable error) {
-    if (error) {
-        NSLog(@"Feedback failed: %@", error.localizedDescription);
-    } else {
-        NSLog(@"Feedback submitted successfully!");
-    }
-}];
-```
+### Hang detection
 
-All parameters except `title` are optional. When `userName`, `userEmail`, or `appKey` are nil, BugSplat falls back to the corresponding property values set on the `BugSplat` singleton. You can also include file attachments using an array of `BugSplatAttachment` objects.
+With `options.hangDetection` set, the watchdog pings the main dispatch queue. Once it stops answering for `timeout`, a report of the whole process is captured out of process (`reportKind = hang`); with `.report` the app continues, with `.reportAndTerminate` the macOS dialog offers Wait / Close and terminates the app on Close. Processes without a main run loop call `BugSplat.heartbeat()`; extra threads register with `BugSplat.watchThread(name:)`.
 
-### Crash Reporter Customization
+### The macOS dialog
 
-There are several ways to customize your BugSplat crash reporter.
+`BugSplatReporter.app` shows the BugSplat dialog after the crash: description, name and email, the report files, "always send", then the support-response page. Its look and strings come from `theme/theme.json` and `theme/strings.<locale>.json` inside the framework's `Helpers`; point `options.themeDirectory` at your own copy to brand it. See bugsplat-native's [THEME.md](https://github.com/BugSplat-Git/bugsplat-native/blob/main/reporter/docs/THEME.md).
 
-#### Custom Banner Image
+### iOS and tvOS
 
-- BugSplat for macOS provides the ability to configure a custom image to be displayed in the crash reporter UI for branding purposes. The image view dimensions are 440x110 and will scale down proportionately. There are 2 ways developers can provide an image:
-
-  1. Set the image property directly on BugSplat
-  2. Provide an image named `bugsplat-logo` in the main app bundle or asset catalog
-
-#### User Details
-
-- BugSplat for macOS provides the ability for the user to provide a name and email when submitting a crash report. To provide the name and email, set `askUserDetails` to `NO` to prevent the name and email fields from displaying in the crash reporter UI. Defaults to `YES`.
-
-#### Auto Submit
-
-- By default, BugSplat will auto-submit crash reports for iOS and prompt the end user to submit a crash report for macOS. This default can be changed using a BugSplat property autoSubmitCrashReport. Set `autoSubmitCrashReport` to `YES` in order to send crash reports to the server automatically without presenting the crash reporter dialogue.
-
-#### Persist User Details
-
-- BugSplat for macOS provides the ability to persist the user name and email entered in a crash reporter UI. Set `persistUserDetails` to `YES` to save and restore the user's name and email when presenting the crash reporter dialogue. Defaults to `NO`.
-
-#### Expiration Time
-
-- Set `expirationTimeInterval` to a desired value (in seconds) whereby if the difference in time between when the crash occurred and the next launch is greater than the set expiration time, auto-send the report without presenting the crash reporter dialogue. Defaults to `-1`, which represents no expiration.
-
-#### Application Name and Version
-
-By default, BugSplat uses values from your app's `Info.plist` (`CFBundleDisplayName`/`CFBundleName` for application name and `CFBundleShortVersionString` for version). You can override these values programmatically before calling `start`:
-
-**Swift:**
+Crash capture is in process. At the next launch, reports from the previous session are handled according to the upload policy: uploaded silently (`.quiet`, or once the user chose "Always Send"), left for you (`.manual`), or offered through an in-app prompt with Send / Don't Send / Always Send and name, email and description fields (`.dialog`). `BugSplatDelegate` hears about the prompt and every upload:
 
 ```swift
-BugSplat.shared().applicationName = "MyCustomAppName"
-BugSplat.shared().applicationVersion = "2.0.0-beta"
-BugSplat.shared().start()
-```
+BugSplat.delegate = self
 
-**Obj-C:**
-
-```objc
-[[BugSplat shared] setApplicationName:@"MyCustomAppName"];
-[[BugSplat shared] setApplicationVersion:@"2.0.0-beta"];
-[[BugSplat shared] start];
-```
-
-> [!NOTE]
-> These values must be set before calling `start`. Any changes made after `start` is invoked will be ignored.
-
-#### Application Key
-
-Set an `appKey` to identify your application build, environment, or user locale. In the BugSplat dashboard, you can configure custom localized support responses for crash groups based on the `appKey` value using the "Support Response" button on the Crash Group page. See [Support Responses](https://docs.bugsplat.com/introduction/production/setting-up-custom-support-responses) for more information.
-
-**Swift:**
-
-```swift
-BugSplat.shared().appKey = "en-US"
-```
-
-**Obj-C:**
-
-```objc
-[[BugSplat shared] setAppKey:@"en-US"];
-```
-
-#### Notes
-
-Add arbitrary additional data to include with crash reports. Notes can also be modified in the BugSplat dashboard after a crash is submitted.
-
-**Swift:**
-
-```swift
-BugSplat.shared().notes = "Debug build, feature-x enabled"
-```
-
-**Obj-C:**
-
-```objc
-[[BugSplat shared] setNotes:@"Debug build, feature-x enabled"];
-```
-
-#### Attachments
-
-BugSplat supports uploading attachments with crash reports. There are delegate methods provided by `BugSplatDelegate` that can be implemented to provide attachments to be uploaded. Implement `attachmentsForBugSplat:sessionID:` (Swift: `attachments(for:sessionID:)`) to return any number of attachments; it is supported on both macOS and iOS. The single-attachment `attachmentForBugSplat:` variants remain available for existing integrations. Attachments are independent of [Attributes](#attributes) — attributes are sent as form fields on the upload request, not as an attachment.
-
-#### Associating Per-Session Files with Crash Reports
-
-Crash reports are processed and uploaded at the **next launch** after a crash — not at crash time. By the time `BugSplatDelegate` asks your app for attachments, your app is running a new session, so a fixed file path that gets overwritten each launch (e.g. `app.log`) no longer contains the crashed session's data.
-
-To make this association reliable, BugSplat provides a per-launch session ID:
-
-- `BugSplat.shared().sessionID` — a `UUID` generated when the `BugSplat` instance is first created (e.g. via `BugSplat.shared()`), stable for the lifetime of the process, and readable before or after `start()` is called.
-- The ID is embedded into any crash report captured during that session, and sessionID-aware delegate callbacks pass the **crashed** session's ID back to you at the next launch:
-  - `attachments(for:sessionID:)` / `attachment(for:sessionID:)` (Obj-C: `attachmentsForBugSplat:sessionID:` / `attachmentForBugSplat:sessionID:`)
-  - `applicationLog(for:sessionID:)` (Obj-C: `applicationLogForBugSplat:sessionID:`)
-  - `bugSplatWillSendCrashReport(_:sessionID:)` (Obj-C: `bugSplatWillSendCrashReport:sessionID:`)
-  - `bugSplatDidFinishSendingCrashReport(_:sessionID:)` (Obj-C: `bugSplatDidFinishSendingCrashReport:sessionID:`)
-  - `bugSplat(_:didFailWithError:sessionID:)` (Obj-C: `bugSplat:didFailWithError:sessionID:`)
-
-When a sessionID-aware method is implemented, it is called instead of its legacy counterpart. The `sessionID` parameter is `nil` for crash reports recorded by SDK versions that predate session tracking.
-
-The recommended pattern — name session-scoped files after the session ID so the file name itself is the mapping:
-
-**Swift:**
-
-```swift
-// 1. After start(), write this session's log to a file named after the session ID.
-//    A fixed path that is overwritten each launch cannot be recovered later.
-bugSplat.start()
-let logURL = logsDirectory.appendingPathComponent("\(bugSplat.sessionID.uuidString).log")
-
-// 2. At the next launch after a crash, return the crashed session's log.
-func attachment(for bugSplat: BugSplat, sessionID: UUID?) -> BugSplatAttachment? {
-    guard let sessionID,
-          let data = try? Data(contentsOf: logsDirectory.appendingPathComponent("\(sessionID.uuidString).log")) else {
-        return nil // report predates session tracking, or the log is gone
-    }
-    return BugSplatAttachment(filename: "session.log", attachmentData: data, contentType: "text/plain")
-}
-
-// 3. Once the report is delivered, the log is safe to delete. This is called once
-//    per report, so cleanup is correct even when several queued reports upload at once.
-func bugSplatDidFinishSendingCrashReport(_ bugSplat: BugSplat, sessionID: UUID?) {
-    guard let sessionID else { return }
-    try? FileManager.default.removeItem(at: logsDirectory.appendingPathComponent("\(sessionID.uuidString).log"))
-}
-
-// 4. On failure, keep the file - the SDK retries the upload on a future launch.
-func bugSplat(_ bugSplat: BugSplat, didFailWithError error: Error, sessionID: UUID?) { }
-```
-
-**Obj-C:**
-
-```objc
-// 1. After start, write this session's log to a file named after the session ID.
-[[BugSplat shared] start];
-NSString *logPath = [logsDirectory stringByAppendingPathComponent:
-    [NSString stringWithFormat:@"%@.log", [BugSplat shared].sessionID.UUIDString]];
-
-// 2. At the next launch after a crash, return the crashed session's log.
-- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
-{
-    if (!sessionID) return @[]; // report predates session tracking
-    NSString *path = [logsDirectory stringByAppendingPathComponent:
-        [NSString stringWithFormat:@"%@.log", sessionID.UUIDString]];
-    NSData *data = [NSData dataWithContentsOfFile:path];
-    if (!data) return @[];
-    return @[[[BugSplatAttachment alloc] initWithFilename:@"session.log"
-                                           attachmentData:data
-                                              contentType:@"text/plain"]];
-}
-
-// 3. Once the report is delivered, the log is safe to delete.
-- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
-{
-    if (!sessionID) return;
-    NSString *path = [logsDirectory stringByAppendingPathComponent:
-        [NSString stringWithFormat:@"%@.log", sessionID.UUIDString]];
-    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+func bugSplatDidSendReport(crashId: Int64, infoURL: URL?, folder: URL) {
+    if let infoURL { show(infoURL) }                  // the support response for this crash
 }
 ```
 
-A few practical notes:
+### Pending reports
 
-- **Use per-session file names.** The session ID can only recover a file that still exists at the next launch. Truncating or overwriting a single fixed path each launch destroys the crashed session's data before BugSplat can ask for it.
-- **Prune old session files yourself.** Sessions that end normally never produce a crash report, so they never get a `didFinishSending` callback. Delete session files older than a few days at startup (never the current session's).
-- **Hang reports work the same way.** A fatal hang persists its session ID alongside the report, and at the next launch BugSplat asks your delegate for that session's attachments and application log — and fires the upload lifecycle callbacks — exactly as it does for a crash, so the per-session log file shown above is attached to hang reports too. (Because a hang is captured while the main thread is unresponsive, this delegate work is deferred to the next launch rather than done at hang time, but that is transparent to your delegate implementation.)
+Under `.manual` (any platform) the app owns the reports:
 
-Every app in `Example_Apps` demonstrates this pattern end to end.
+```swift
+for report in BugSplat.pendingReports() {             // kind, crashTime, attributes, attachments, ...
+    let result = try await BugSplat.send(report, description: "sent from settings")
+    // or: try BugSplat.discard(report)
+}
+try BugSplat.postPendingReports()                     // everything, silently, in the background
+```
 
-#### Bitcode
+### Symbols
 
-Bitcode was introduced by Apple to allow apps sent to the App Store to be recompiled by Apple itself and apply the latest optimization. Bitcode has now been officially deprecated by Apple and should be removed or disabled. If Bitcode is enabled, the symbols generated for your app in the store will be different than the ones from your own build system. We recommend that you disable bitcode in order for BugSplat to reliably symbolicate crash reports. Disabling bitcode significantly simplifies symbols management and currently doesn't have any known downsides for iOS apps.
+Upload your app's dSYMs after every archive with [symbol-upload](https://docs.bugsplat.com/education/faq/how-to-upload-symbol-files-with-symbol-upload); it converts them to the Breakpad `.sym` files the server symbolicates Crashpad reports with:
 
-#### Localization
+```sh
+symbol-upload-macos -b DATABASE -a "My App" -v "1.2.3 (456)" -f "**/*.dSYM" -d "$ARCHIVE_DSYMS_PATH" -m
+```
 
-For macOS, the BugSplat crash dialogue can be localized and supports eight languages out of the box.
+`Symbol_Upload_Examples/Build-Phase-symbol-upload.sh` shows a build-phase script. Keep bitcode off.
 
-1. English
-2. Finnish
-3. French
-4. German
-5. Italian
-6. Japanese
-7. Norwegian
-8. Swedish
+### Diagnostics
 
-Additional languages may be supported by adding the language bundle and strings file to `BugSplat.xcframework/macos-arm64_x86_64/BugSplat.framework/Versions/A/Resources/`
+`BugSplat.logFileURL` is `BugSplat.log` inside the store (`~/Library/Application Support/BugSplat/<application>-<version>/`); it is the first place to look. `options.logHandler` receives the same lines.
 
-## Sample Applications 🧑‍🏫
+## Migrating from 2.x and 3.x
 
-`Example_Apps` includes several iOS and macOS BugSplat Test apps. Integrating BugSplat only requires the xcframework and a few lines of code.
+Concepts carry over; names do not. There are no compatibility shims: old-style calls do not compile, and reports left behind by 2.x/3.x are not imported.
 
-1. Clone the [bugsplat-apple repo](https://github.com/BugSplat-Git/bugsplat-apple).
+| 2.x / 3.x | 9.0 |
+|---|---|
+| `BugSplat.shared().start()` with properties set before it | `try BugSplat.start(database:application:version:options:)` |
+| `bugSplatDatabase`, `applicationName`, `applicationVersion` | parameters of `start` (Info.plist defaults unchanged) |
+| `userName`, `userEmail`, `appKey`, `notes` | `BugSplat.user`, `.email`, `.key`, `.notes`; plus `.userDescription`, `.environment` |
+| `setValue(_:forAttribute:)` | `try BugSplat.setAttribute(_:value:)` |
+| `BugSplatDelegate.attachments(for:sessionID:)`, `BugSplatAttachment` | `try BugSplat.addAttachment(url)` / `removeAttachment`, at any time; files are copied at crash time, so per-session files and `sessionID` are no longer needed |
+| `autoSubmitCrashReport` | `options.uploadPolicy` (`.dialog` / `.quiet` / `.manual`) and `BugSplat.isQuietMode` |
+| `enableHangDetection`, `hangDetectionThreshold`, `autoSubmitFatalHangReport` | `options.hangDetection = .init(timeout:policy:)`; non-fatal hangs are reported too |
+| `postFeedback(title:description:userName:userEmail:appKey:attributes:attachments:completion:)` | `try await BugSplat.postFeedback(title:description:attachments:)` (user, email, key and attributes come from the session) |
+| `bannerImage`, `askUserDetails`, `persistUserDetails`, `presentModally`, `expirationTimeInterval` | the reporter theme (`theme.json`) and `preferences.json` in the store |
+| delegate `willSend` / `didFinishSending` / `didFail` (macOS) | none: the dialog and upload run after the app has died; on iOS/tvOS see `BugSplatDelegate` |
+| PLCrashReporter `.crashlog` reports (type 13) | Crashpad minidumps (type 5); symbolication from `.sym` files produced from your dSYMs |
 
-1. Open `BugSplat.xcworkspace` in Xcode. This workspace contains the SDK and all example apps. Select an example app scheme to run. For iOS, set the destination to be your iOS device. After running from Xcode, stop the process and relaunch from the iOS device directly.
+## Examples 🧑‍🏫
 
-1. Once the app launches, click the "crash" button when prompted.
-
-1. Relaunch the app on the iOS device. At this point, a crash report should be submitted to bugsplat.com
-
-1. Visit BugSplat's [Crashes](https://app.bugsplat.com/v2/crashes) page. When prompted for credentials, enter user `fred@bugsplat.com` and password `Flintstone`. The crash you posted from BugSplatTester should be at the top of the list of crashes.
-
-1. Click the "Crash ID" link to view more details about your crash.
+- `Examples/macOS-HelloCrash`: a command-line app (`swift run HelloCrash [crash|capture|feedback|error|hang] [quiet|manual]`).
+- `Examples/iOS-SwiftUI`: a SwiftUI app with crash, capture, feedback and hang buttons and the in-app prompt.
 
 ## Contributing 🤝
 
-BugSplat is an open-source project, and we welcome contributions from the community. To configure a development environment, follow the instructions below.
-
-### Development
-
-Clone this repository and open the workspace:
-
 ```sh
-git clone https://github.com/BugSplat-Git/bugsplat-apple
-cd bugsplat-apple
-open BugSplat.xcworkspace
+git clone https://github.com/BugSplat-Git/bugsplat-apple && cd bugsplat-apple
+scripts/build-native.sh      # clones bugsplat-native, builds Crashpad + the native library, assembles Frameworks/BugSplatNative.xcframework
+swift build && swift test    # see Tests/README.md for the runtime test
+open Package.swift           # or use it from Xcode
 ```
 
-The workspace contains the SDK frameworks, test targets, and example apps. Use the `BugSplatMacTests` or `BugSplatIOSTests` schemes to run unit tests.
-
-### Building xcframework
-
-To build a distributable `BugSplat.xcframework`:
-
-```sh
-./makeXCFramework.sh
-...
-xcframework successfully written out to: .../bugsplat-apple/xcframeworks/BugSplat.xcframework
-```
-
-If all goes smoothly, `BugSplat.xcframework` will be the result in the xcframeworks folder.
+The native side (C ABI, monitor, reporter, uploader) lives in [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native); this repository is the Swift layer, the iOS/tvOS prompt and the packaging. `bindings/swift/make-xcframework.sh` over there defines the framework layout.
 
 ### Releasing
 
-To release a new version of BugSplat.xcframework, push a new tag to the `main` branch. The [release](.github/workflows/release.yml) workflow will build the xcframework, update `Package.swift`, and publish the zipped archive to the [Releases](https://github.com/BugSplat-Git/bugsplat-apple/releases) page.
+Run the `release` workflow with the bugsplat-native ref to build. It publishes `BugSplatNative.xcframework.zip`, rewrites `Package.swift` to the release URL and checksum, bumps the podspec, commits and tags the version from bugsplat-native's `VERSION` file.
