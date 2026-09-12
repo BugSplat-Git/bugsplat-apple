@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       native_ref:
-        description: bugsplat-native ref to build (branch, tag or commit)
+        description: "bugsplat-native ref to build (branch, tag or commit)"
         default: main
       version:
-        description: Release version (default: bugsplat-native's VERSION file)
+        description: "Release version (default: bugsplat-native's VERSION file)"
         required: false
 
 permissions:
