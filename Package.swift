@@ -1,38 +1,55 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.9
 import PackageDescription
 
-// Bundle up BugSplat.xcframework as a Swift Package suitable for integration with Swift Package Manager
-// PLCrashReporter is statically linked into BugSplat - no separate framework needed
+// BugSplat for Apple platforms, 9.0: a Swift API over bugsplat-native's C ABI.
+//
+// Two targets:
+//   BugSplatNative  the binary framework produced by bugsplat-native
+//                   (libbugsplat + BugSplatMonitor + BugSplatReporter.app on macOS).
+//                   During development and in CI it is built into Frameworks/ by
+//                   scripts/build-native.sh; releases replace `path:` with a
+//                   `url:`/`checksum:` pair pointing at the GitHub release asset.
+//   BugSplat        the Swift API (this repository).
 let package = Package(
     name: "BugSplat",
+    defaultLocalization: "en",
     platforms: [
-        .iOS(.v13),
-        .macOS("11.5"),
-        .tvOS(.v13)
+        .macOS(.v13),
+        .iOS(.v15),
+        .tvOS(.v15),
     ],
     products: [
-        .library(
-            name: "BugSplat",
-            targets: ["BugSplatPackage"]
-        )
+        .library(name: "BugSplat", targets: ["BugSplat"]),
     ],
     targets: [
-        // For releases: update the URL and checksum to point to the GitHub release
-        // BugSplat.xcframework contains PLCrashReporter statically linked
         .binaryTarget(
-            name: "BugSplat",
-            url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/3.6.1/BugSplat.xcframework.zip",
-            checksum: "f2cb64f9efcb3e038f6d15ede3b6a40f4c3351c299d32bee6fd2451b1cca1651"
+            name: "BugSplatNative",
+            path: "Frameworks/BugSplatNative.xcframework"
         ),
-        // Wrapper target that links dependencies
-        // Sources/BugSplatPackage/Empty.swift satisfies SPM's requirement for source files
         .target(
-            name: "BugSplatPackage",
-            dependencies: ["BugSplat"],
+            name: "BugSplat",
+            dependencies: ["BugSplatNative"],
+            path: "Sources/BugSplat",
+            resources: [
+                .process("Resources"),
+            ],
             linkerSettings: [
-                .linkedLibrary("z"), // Required for zip compression
-                .linkedLibrary("c++") // Required by PLCrashReporter (statically linked)
+                .linkedFramework("Foundation"),
+                .linkedFramework("Security"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreText"),
+                .linkedFramework("IOKit", .when(platforms: [.macOS])),
+                .linkedFramework("AppKit", .when(platforms: [.macOS])),
+                .linkedFramework("UIKit", .when(platforms: [.iOS, .tvOS])),
+                .linkedLibrary("c++"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bsm", .when(platforms: [.macOS])),
             ]
-        )
+        ),
+        .testTarget(
+            name: "BugSplatTests",
+            dependencies: ["BugSplat"],
+            path: "Tests/BugSplatTests"
+        ),
     ]
 )

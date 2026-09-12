@@ -1,148 +1,130 @@
-name: Build and Release XCFramework
+name: release
 
+# Builds BugSplatNative.xcframework from bugsplat-native at a ref, publishes it as a GitHub release
+# asset, and rewrites Package.swift so consumers get the binary target by URL + checksum.
+# Versions come from bugsplat-native's VERSION file (9.x.y; every repo tags the same version).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      native_ref:
+        description: "bugsplat-native ref to build (branch, tag or commit)"
+        default: main
+      version:
+        description: "Release version (default: bugsplat-native's VERSION file)"
+        required: false
 
-# Add permissions block to allow writing
 permissions:
   contents: write
-  pull-requests: write
+
+env:
+  NATIVE_REPO: BugSplat-Git/bugsplat-native
+  CRASHPAD_COMMIT: db44314646cbd0825a73b58dd2b7b5f4faca64a7
 
 jobs:
-  check-version:
-    runs-on: ubuntu-latest
-    outputs:
-      current: ${{ steps.semver.outputs.current }}
-      next: ${{ steps.semver.outputs.next }}
-      next_strict: ${{ steps.semver.outputs.nextStrict }}
-      should_build: ${{ steps.check.outputs.should_build }}
-    
+  release:
+    runs-on: macos-15
     steps:
-    - name: Get Next Version
-      id: semver
-      uses: ietf-tools/semver-action@v1
-      with:
-        token: ${{ secrets.GH_PAT }}
-        branch: main
-        noVersionBumpBehavior: silent
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
 
-    - name: Check Version Bump
-      id: check
-      run: |
-        if [ -z "${{ steps.semver.outputs.next }}" ] || [ "${{ steps.semver.outputs.next }}" = "${{ steps.semver.outputs.current }}" ]; then
-          echo "No version bump needed. Current version: ${{ steps.semver.outputs.current }}"
-          echo "should_build=false" >> $GITHUB_OUTPUT
-        else
-          echo "Version bump needed from ${{ steps.semver.outputs.current }} to ${{ steps.semver.outputs.next }}"
-          echo "should_build=true" >> $GITHUB_OUTPUT
-        fi
+      - name: Checkout bugsplat-native
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.NATIVE_REPO }}
+          ref: ${{ inputs.native_ref }}
+          path: native
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN }}   # read access to bugsplat-native (internal); GH_PAT is scoped to this repo
 
-  build-and-release:
-    needs: check-version
-    if: needs.check-version.outputs.should_build == 'true'
-    runs-on: macos-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GH_PAT }}
-        submodules: recursive
-        
-    - name: Install the Apple certificate
-      env:
-        BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      run: |
-        # create variables
-        CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+      - name: Resolve version
+        id: version
+        run: |
+          v="${{ inputs.version }}"
+          [ -n "$v" ] || v="$(tr -d '[:space:]' < native/VERSION)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Releasing $v"
 
-        # import certificate from secrets
-        echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+      - name: Install the Apple certificate
+        if: env.BUILD_CERTIFICATE_BASE64 != ''
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
 
-        # create temporary keychain
-        security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-        security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-        security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+      - name: Cache Crashpad build
+        id: crashpad-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/crashpad-work
+          key: crashpad-${{ env.CRASHPAD_COMMIT }}-macos-15-v1
 
-        # import certificate to keychain
-        security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-        security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-        security list-keychain -d user -s $KEYCHAIN_PATH
+      - name: Fetch depot_tools and build Crashpad
+        if: steps.crashpad-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$GITHUB_WORKSPACE/depot_tools"
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+          gclient --version
+          mkdir -p crashpad-work && cd crashpad-work
+          fetch --no-history crashpad
+          cd crashpad
+          git fetch --depth 1 origin "$CRASHPAD_COMMIT" && git checkout "$CRASHPAD_COMMIT"
+          gclient sync
+          gn gen out/mac-release --args='is_debug=false target_cpu="arm64"'
+          ninja -C out/mac-release client handler:crashpad_handler snapshot minidump util
 
-    - name: Set up Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
-        
-    - name: Build BugSplat XCFramework
-      run: |
-        # Build the xcframework (PLCrashReporter is statically linked from Vendor/)
-        ./makeXCFramework.sh
-        
-        # Create zip archive
-        cd xcframeworks
-        zip -y -r BugSplat.xcframework.zip BugSplat.xcframework
+      - name: Build BugSplatNative.xcframework
+        env:
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+        run: |
+          args=(--native native --crashpad-root "$GITHUB_WORKSPACE/crashpad-work/crashpad")
+          if [ -n "$SIGNING_IDENTITY" ]; then args+=(--sign "$SIGNING_IDENTITY"); fi
+          scripts/build-native.sh "${args[@]}"
+          cd Frameworks && zip -qry BugSplatNative.xcframework.zip BugSplatNative.xcframework
 
-        # Extract macOS dylib for game engine integration (e.g., Unity)
-        cp BugSplat.xcframework/macos-arm64_x86_64/BugSplat.framework/Versions/A/BugSplat BugSplat-macOS.dylib
-        install_name_tool -id "@rpath/BugSplat-macOS.dylib" BugSplat-macOS.dylib
-        
-    - name: Update Package.swift
-      run: |
-        CHECKSUM=$(swift package compute-checksum xcframeworks/BugSplat.xcframework.zip)
-        URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/${{ needs.check-version.outputs.next_strict }}/BugSplat.xcframework.zip"
-        
-        # Update the URL and checksum in Package.swift
-        sed -i '' 's|url: "https://github.com/BugSplat-Git/bugsplat-apple/releases/download/[^"]*"|url: "'"$URL"'"|' Package.swift
-        sed -i '' 's|checksum: "[^"]*"|checksum: "'"$CHECKSUM"'"|' Package.swift
-          
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
-        git add Package.swift
-        git commit -m "chore: release ${{ needs.check-version.outputs.next_strict }}"
-        git push origin HEAD:main
+      - name: Tests
+        run: |
+          set -o pipefail
+          swift test --skip RuntimeTests 2>&1 | tail -40
 
-    - name: Create and Push Tag
-      run: |
-        git tag ${{ needs.check-version.outputs.next_strict }}
-        git push origin ${{ needs.check-version.outputs.next_strict }}
-        
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.check-version.outputs.next_strict }}
-        files: |
-          xcframeworks/BugSplat.xcframework.zip
-          xcframeworks/BugSplat-macOS.dylib
-        name: Release ${{ needs.check-version.outputs.next_strict }}
-        body: |
-          Release of BugSplat.xcframework version ${{ needs.check-version.outputs.next_strict }}
-          
-          This release includes:
-          - BugSplat.xcframework (iOS, macOS, tvOS)
-          - PLCrashReporter statically linked
-          
-          ## Swift Package Manager
-          
-          ```swift
-          dependencies: [
-              .package(url: "https://github.com/BugSplat-Git/bugsplat-apple.git", from: "${{ needs.check-version.outputs.next_strict }}")
-          ]
-          ```
-          
-          ## Manual Integration
+      - name: Point Package.swift and the podspec at the release asset
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHECKSUM=$(swift package compute-checksum Frameworks/BugSplatNative.xcframework.zip)
+          URL="https://github.com/BugSplat-Git/bugsplat-apple/releases/download/$VERSION/BugSplatNative.xcframework.zip"
+          python3 - "$URL" "$CHECKSUM" "$VERSION" <<'EOF'
+          import re, sys
+          url, checksum, version = sys.argv[1:4]
+          p = "Package.swift"; s = open(p).read()
+          s2 = re.sub(r'path: "Frameworks/BugSplatNative\.xcframework"', f'url: "{url}",\n            checksum: "{checksum}"', s)
+          assert s2 != s, "binary target not found"
+          open(p, "w").write(s2)
+          p = "BugSplat.podspec"; s = open(p).read()
+          open(p, "w").write(re.sub(r"s\.version\s*=\s*'[^']*'", f"s.version      = '{version}'", s))
+          EOF
+          git diff --stat
 
-          Download `BugSplat.xcframework.zip`, unzip, and add to your Xcode project.
-
-          ## Game Engine Integration (Unity, etc.)
-
-          Download `BugSplat-macOS.dylib` for macOS native plugin integration.
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+      - name: Commit, tag and publish
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add Package.swift BugSplat.podspec
+          git commit -m "chore: release $VERSION"
+          git tag "$VERSION"
+          git push origin HEAD:main
+          git push origin "$VERSION"
+          gh release create "$VERSION" Frameworks/BugSplatNative.xcframework.zip \
+            --title "BugSplat $VERSION" \
+            --notes "BugSplatNative.xcframework $VERSION (macOS arm64) built from bugsplat-native ${{ inputs.native_ref }}. Swift Package Manager: \`.package(url: \"https://github.com/BugSplat-Git/bugsplat-apple.git\", from: \"$VERSION\")\`."

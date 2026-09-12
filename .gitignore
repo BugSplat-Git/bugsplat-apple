@@ -1,8 +1,9 @@
 .DS_Store
 xcuserdata
-xcframeworks
-archives
-build/*
 .build
+build/
+# The native framework is built by scripts/build-native.sh (or downloaded from a release); never committed.
+Frameworks/
+native/
+*.xcframework.zip
 Tools/symbol-upload-macos
-.build
