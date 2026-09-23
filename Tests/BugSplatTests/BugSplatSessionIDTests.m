@@ -18,6 +18,7 @@
 #import "BugSplatTestSupport.h"
 #import "BugSplatUploadService.h"
 #import "BugSplatUploadService+Testing.h"
+#import "BugSplatTestCrashDirectory.h"
 #import "MockCrashReporter.h"
 #import "MockCrashStorage.h"
 #import "MockUserDefaults.h"
@@ -26,13 +27,6 @@
 
 // Mirrors kBugSplatMetaKeySessionID in BugSplat.m - a well-known persisted string.
 static NSString *const kSessionIDKey = @"sessionID";
-
-// Live-report generation is part of PLCrashReporter but not of the injection
-// protocol; declare just the selector we need so tests can drive a real reporter
-// without importing the vendored framework headers.
-@protocol BugSplatLiveReportGenerating <NSObject>
-- (NSData *)generateLiveReportWithException:(NSException *)exception error:(NSError **)error;
-@end
 
 #pragma mark - Recording delegates
 
@@ -211,8 +205,8 @@ static NSString *const kSessionIDKey = @"sessionID";
 @property (nonatomic, strong) MockCrashStorage *mockCrashStorage;
 @property (nonatomic, strong) MockUserDefaults *mockUserDefaults;
 @property (nonatomic, strong) MockBundle *mockBundle;
-@property (nonatomic, strong) NSMutableArray<NSString *> *filenamesToCleanup;
 
+@property (nonatomic, copy) NSString *isolatedCrashesDirectory;
 @end
 
 @implementation BugSplatSessionIDTests
@@ -225,7 +219,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.mockCrashStorage = [[MockCrashStorage alloc] init];
     self.mockUserDefaults = [[MockUserDefaults alloc] init];
     self.mockBundle = [[MockBundle alloc] init];
-    self.filenamesToCleanup = [NSMutableArray array];
 
     [self.mockBundle setObject:@"TestApp" forInfoDictionaryKey:@"CFBundleName"];
     [self.mockBundle setObject:@"1.0.0" forInfoDictionaryKey:@"CFBundleShortVersionString"];
@@ -235,24 +228,17 @@ static NSString *const kSessionIDKey = @"sessionID";
                                                crashStorage:self.mockCrashStorage
                                                userDefaults:self.mockUserDefaults
                                                      bundle:self.mockBundle];
+
+    self.isolatedCrashesDirectory = BugSplatTestsMakeIsolatedCrashesDirectory();
+    [self.bugSplat setCrashesDirectoryPathOverride:self.isolatedCrashesDirectory];
 }
 
 - (void)tearDown
 {
-    NSString *dir = [self.bugSplat crashesDirectoryPath];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    for (NSString *filename in self.filenamesToCleanup) {
-        for (NSString *ext in @[@"crash", @"meta"]) {
-            NSString *path = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:ext];
-            [fm removeItemAtPath:path error:nil];
-        }
-        // Attachments are persisted as {filename}-{index}.data
-        for (NSInteger index = 0; index < 5; index++) {
-            NSString *attachmentName = [NSString stringWithFormat:@"%@-%ld", filename, (long)index];
-            NSString *path = [[dir stringByAppendingPathComponent:attachmentName] stringByAppendingPathExtension:@"data"];
-            [fm removeItemAtPath:path error:nil];
-        }
-    }
+    // The whole directory belongs to this test, so removing it takes every report, meta file
+    // and attachment with it - no per-file bookkeeping needed.
+    [[NSFileManager defaultManager] removeItemAtPath:self.isolatedCrashesDirectory error:nil];
+    self.isolatedCrashesDirectory = nil;
 
     [self.mockCrashReporter reset];
     [self.mockCrashStorage reset];
@@ -287,18 +273,9 @@ static NSString *const kSessionIDKey = @"sessionID";
 
     NSException *exception = [NSException exceptionWithName:@"TestCrash" reason:@"simulated" userInfo:nil];
     NSError *reportError = nil;
-    NSData *reportData = [(id<BugSplatLiveReportGenerating>)reporter generateLiveReportWithException:exception
-                                                                                               error:&reportError];
+    NSData *reportData = [reporter generateLiveReportWithException:exception error:&reportError];
     XCTAssertNotNil(reportData, @"Failed to generate live crash report: %@", reportError);
     return reportData;
-}
-
-- (void)recordCurrentCrashFilenameForCleanup
-{
-    NSString *filename = [self.bugSplat currentCrashFilename];
-    if (filename) {
-        [self.filenamesToCleanup addObject:filename];
-    }
 }
 
 #pragma mark - Property tests
@@ -348,7 +325,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     XCTAssertTrue(delegate.attachmentsCallbackInvoked, @"plural sessionID-aware variant should be preferred on every platform");
     XCTAssertFalse(delegate.attachmentCallbackInvoked);
@@ -368,7 +344,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.mockCrashReporter.pendingCrashReportData = [self crashReportDataWithEmbeddedSessionID:crashedSessionID];
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     NSString *filename = [self.bugSplat currentCrashFilename];
     XCTAssertNotNil(filename);
@@ -391,7 +366,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     XCTAssertTrue(delegate.attachmentsCallbackInvoked);
     XCTAssertFalse(delegate.legacyAttachmentsCallbackInvoked, @"Legacy variant should not be called when the sessionID-aware variant is implemented");
@@ -407,7 +381,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     XCTAssertTrue(delegate.legacyAttachmentsCallbackInvoked, @"Legacy delegates must keep working");
 }
@@ -425,7 +398,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     XCTAssertTrue([self.bugSplat setValue:@"boss-fight" forAttribute:@"level"]);
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     NSString *filename = [self.bugSplat currentCrashFilename];
     XCTAssertNotNil(filename);
@@ -459,7 +431,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     self.bugSplat.delegate = delegate;
 
     [self.bugSplat handleNewCrashFromPLCrashReporter];
-    [self recordCurrentCrashFilenameForCleanup];
 
     XCTAssertTrue(delegate.attachmentsCallbackInvoked);
     XCTAssertNil(delegate.receivedAttachmentSessionID,
@@ -474,7 +445,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     // after any timestamp-based leftovers so processPendingCrashReports picks it.
     NSUUID *crashedSessionID = [NSUUID UUID];
     NSString *filename = @"99999999999";
-    [self.filenamesToCleanup addObject:filename];
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -520,7 +490,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     // after any timestamp-based leftovers so processPendingCrashReports picks it.
     NSUUID *crashedSessionID = [NSUUID UUID];
     NSString *filename = @"99999999998";
-    [self.filenamesToCleanup addObject:filename];
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -573,7 +542,6 @@ static NSString *const kSessionIDKey = @"sessionID";
 - (NSString *)plantHangReportWithSessionID:(NSUUID *)sessionID
 {
     NSString *filename = @"99999999997-hang";
-    [self.filenamesToCleanup addObject:filename];
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -647,7 +615,6 @@ static NSString *const kSessionIDKey = @"sessionID";
     // A regular crash report (no -hang suffix) must be left untouched — crashes are
     // enriched on the PLCrashReporter path, not here.
     NSString *filename = @"99999999996";
-    [self.filenamesToCleanup addObject:filename];
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];

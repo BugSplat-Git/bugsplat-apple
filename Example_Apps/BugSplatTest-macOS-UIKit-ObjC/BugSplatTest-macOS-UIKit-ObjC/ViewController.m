@@ -411,15 +411,34 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
 }
 
 - (void)triggerNonCrashError:(id)sender {
-    NSString *caughtName = @"NSException";
+    // Catch a real NSException, then hand it to postException: - BugSplat captures a stack
+    // trace for it and uploads the report while the app keeps running. The app does not
+    // crash, and the report shows up in the dashboard next to the real crashes, tagged
+    // with the bugsplat-nonfatal attribute.
     @try {
         NSArray *empty = @[];
         (void)empty[99];
-    } @catch (NSException *e) {
-        caughtName = e.name ?: @"NSException";
+    } @catch (NSException *exception) {
+        __weak typeof(self) weakSelf = self;
+        [[BugSplat shared] postException:exception
+                              attributes:@{@"screen": @"Main"}
+                             attachments:nil
+                              completion:^(BugSplatReportResult * _Nullable result, NSError * _Nullable error) {
+            if (error) {
+                [BSPActivityLog record:BSPActivityTypeError
+                                detail:[NSString stringWithFormat:@"Report failed: %@", error.localizedDescription]];
+            } else if (result.crashId) {
+                [BSPActivityLog record:BSPActivityTypeError
+                                detail:[NSString stringWithFormat:@"Non-crash error sent (report #%@)", result.crashId]];
+            } else {
+                [BSPActivityLog record:BSPActivityTypeError detail:@"Non-crash error sent"];
+            }
+            [weakSelf renderRecentActivity];
+        }];
+
+        [BSPActivityLog record:BSPActivityTypeError
+                        detail:[NSString stringWithFormat:@"%@ caught - sending stack trace", exception.name]];
     }
-    [BSPActivityLog record:BSPActivityTypeError
-                    detail:[NSString stringWithFormat:@"%@ caught", caughtName]];
     [self renderRecentActivity];
 }
 

@@ -32,6 +32,26 @@ NS_ASSUME_NONNULL_BEGIN
                                            userEmail:(nullable NSString *)userEmail
                                       exceptFilename:(NSString *)crashFilename;
 
+/**
+ * Redirects persisted crash and hang reports to `path` instead of the shared directory under
+ * Application Support. Pass nil to restore the default.
+ *
+ * Every BugSplat instance otherwise writes to the same directory. The test schemes set
+ * `parallelizable = "YES"`, so XCTest runs test classes in separate worker processes at the
+ * same time - and a scan like -enrichPendingHangReports walks every report in that directory,
+ * including ones another class planted. Each test that touches the crashes directory points
+ * this at its own temporary directory in -setUp and removes it in -tearDown.
+ *
+ * Declared here rather than in the (Testing) category below: this is the setter of a property
+ * synthesized on the main class, and clang warns (-Wincomplete-implementation) about a
+ * category that declares a method its own @implementation does not define.
+ */
+- (void)setCrashesDirectoryPathOverride:(nullable NSString *)path;
+
+/// The basename of the hang report most recently persisted by the hang delegate. Declared here
+/// for the same reason as the setter above - it is a synthesized property accessor.
+- (nullable NSString *)currentHangFilename;
+
 @end
 
 /**
@@ -103,9 +123,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Serial queue that hang delegate callbacks dispatch onto; `dispatch_sync` on
 /// this queue to wait for pending hang work to drain.
 - (nullable dispatch_queue_t)hangQueueForTesting;
-
-/// The basename of the hang report most recently persisted by the hang delegate.
-- (nullable NSString *)currentHangFilename;
 
 @end
 

@@ -15,6 +15,7 @@
 
 #import <BugSplat/BugSplat.h>
 #import "BugSplat+Testing.h"
+#import "BugSplatTestCrashDirectory.h"
 
 // Keys shared with BugSplat.m. Duplicated here rather than exposed via a
 // testing header because they are an implementation detail the backend also
@@ -31,7 +32,7 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
 @interface BugSplatHangPersistenceTests : XCTestCase
 @property (nonatomic, strong) BugSplat *bugSplat;
-@property (nonatomic, copy, nullable) NSString *filenameToCleanup;
+@property (nonatomic, copy) NSString *isolatedCrashesDirectory;
 @end
 
 @implementation BugSplatHangPersistenceTests
@@ -47,32 +48,23 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
     self.bugSplat.applicationVersion = @"1.0";
     self.bugSplat.enableHangDetection = YES;
     [self.bugSplat setupHangInfrastructureForTesting];
+
+    self.isolatedCrashesDirectory = BugSplatTestsMakeIsolatedCrashesDirectory();
+    [self.bugSplat setCrashesDirectoryPathOverride:self.isolatedCrashesDirectory];
 }
 
 - (void)tearDown
 {
-    NSString *filename = self.filenameToCleanup;
-    if (filename) {
-        [self removeReportFilesForFilename:filename];
-    }
-    self.filenameToCleanup = nil;
+    // The whole directory belongs to this test, so removing it takes every report and meta
+    // file with it - no per-file bookkeeping needed.
+    [[NSFileManager defaultManager] removeItemAtPath:self.isolatedCrashesDirectory error:nil];
+    self.isolatedCrashesDirectory = nil;
     self.bugSplat = nil;
     [super tearDown];
 }
 
 #pragma mark - Helpers
 
-- (void)removeReportFilesForFilename:(NSString *)filename
-{
-    NSString *dir = [self.bugSplat crashesDirectoryPath];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    for (NSString *ext in @[@"crash", @"meta"]) {
-        NSString *path = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:ext];
-        if ([fm fileExistsAtPath:path]) {
-            [fm removeItemAtPath:path error:nil];
-        }
-    }
-}
 
 - (void)drainHangQueue
 {
@@ -91,7 +83,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename, @"Hang delegate should have persisted a report");
     XCTAssertTrue([filename hasSuffix:@"-hang"], @"Hang report filename should carry the -hang suffix");
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -109,7 +100,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -129,7 +119,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -159,7 +148,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -186,7 +174,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -204,7 +191,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -249,7 +235,6 @@ static NSString *const kHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];

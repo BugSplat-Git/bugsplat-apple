@@ -14,6 +14,7 @@
 int bugSplatInit(const char * bugSplatDatabase);
 int bugSplatSetAttributeValue(std::string attribute, std::string value);
 int bugSplatSendFeedback(std::string title, std::string description);
+int bugSplatPostException(std::string name, std::string reason);
 void mainObjCRunLoop();
 
 #endif /* BugSplatInit_hpp */

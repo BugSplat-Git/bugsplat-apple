@@ -49,6 +49,26 @@ static NSString *const kBugSplatHangAttrDetectedAt = @"bugsplat-hang-detected-at
 static NSString *const kBugSplatHangAttrAppState = @"bugsplat-hang-app-state";
 static NSString *const kBugSplatHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
+// Attribute keys stamped onto reports posted for non-fatal events (caught exceptions and
+// errors). Non-fatals upload as ordinary Apple crash reports so they symbolicate against the
+// same dSYMs, which means these attributes are the only thing that tells them apart from a
+// real crash in the dashboard. The SDK owns them: caller-supplied attributes are merged
+// underneath, never over, so a filter on bugsplat-nonfatal can be trusted.
+static NSString *const kBugSplatNonFatalAttrMarker = @"bugsplat-nonfatal";
+static NSString *const kBugSplatNonFatalAttrName = @"bugsplat-nonfatal-name";
+static NSString *const kBugSplatNonFatalAttrCapturedAt = @"bugsplat-nonfatal-captured-at";
+static NSString *const kBugSplatNonFatalAttrErrorDomain = @"bugsplat-nonfatal-error-domain";
+static NSString *const kBugSplatNonFatalAttrErrorCode = @"bugsplat-nonfatal-error-code";
+
+// Errors surfaced by the non-fatal posting APIs before an upload is ever attempted. Once the
+// upload starts, errors come from BugSplatUploadService's own domain instead.
+static NSString *const kBugSplatNonFatalErrorDomain = @"com.bugsplat.nonfatal";
+typedef NS_ENUM(NSInteger, BugSplatNonFatalErrorCode) {
+    BugSplatNonFatalErrorCodeInvalidArgument = 1,
+    BugSplatNonFatalErrorCodeNotStarted = 2,
+    BugSplatNonFatalErrorCodeCaptureFailed = 3
+};
+
 // Keys for crash metadata
 static NSString *const kBugSplatMetaKeyUserName = @"userName";
 static NSString *const kBugSplatMetaKeyUserEmail = @"userEmail";
@@ -79,6 +99,10 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 @property (nonatomic, strong, nullable) id<BugSplatBundleProtocol> bundleInternal;
 @property (nonatomic, strong, nullable) BugSplatUploadService *uploadService;
 @property (nonatomic, copy, nullable) NSString *currentCrashFilename;
+// Root directory for persisted crash and hang reports. Nil means the default location under
+// Application Support; -setCrashesDirectoryPathOverride: (BugSplat+Testing.h) points it
+// somewhere else so parallel test classes do not share one directory.
+@property (nonatomic, copy, nullable) NSString *crashesDirectoryPathOverride;
 @property (nonatomic, assign) BOOL isTestInstance;
 @property (nonatomic, strong, readwrite) NSUUID *sessionID;
 
@@ -1579,6 +1603,268 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [self.uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
 }
 
+#pragma mark - Non-Fatal Error Reporting
+
+- (void)postException:(NSException *)exception
+           completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    [self postException:exception attributes:nil attachments:nil completion:completion];
+}
+
+- (void)postException:(NSException *)exception
+           attributes:(NSDictionary<NSString *, NSString *> *)attributes
+          attachments:(NSArray<BugSplatAttachment *> *)attachments
+           completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (!exception) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postException requires a non-nil exception"
+                          completion:completion];
+        return;
+    }
+
+    // Hand PLCrashReporter the real exception: if it was actually raised it carries
+    // callStackReturnAddresses from the throw site, which lands in the report as the last
+    // exception backtrace alongside the live thread stacks.
+    [self postNonFatalReportWithException:exception
+                                     name:exception.name
+                                   reason:exception.reason
+                       reservedAttributes:nil
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+- (void)postError:(NSError *)error
+       completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    [self postError:error attributes:nil attachments:nil completion:completion];
+}
+
+- (void)postError:(NSError *)error
+       attributes:(NSDictionary<NSString *, NSString *> *)attributes
+      attachments:(NSArray<BugSplatAttachment *> *)attachments
+       completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (!error) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postError requires a non-nil error"
+                          completion:completion];
+        return;
+    }
+
+    // Group by domain, not by domain+code: the stack is what distinguishes one failure from
+    // another, and folding the code into the name would split a single call site across as
+    // many groups as it has failure codes. The code travels as a searchable attribute instead.
+    // The domain attribute reuses `name` rather than error.domain so the two always agree.
+    // An NSError with an empty domain would otherwise be filed under the name "NSError" while
+    // carrying an empty domain attribute - a value that identifies nothing and that a search
+    // for the name it was filed under would never match.
+    NSString *name = error.domain.length > 0 ? error.domain : @"NSError";
+    NSDictionary<NSString *, NSString *> *reserved = @{
+        kBugSplatNonFatalAttrErrorDomain: name,
+        kBugSplatNonFatalAttrErrorCode: [@(error.code) stringValue]
+    };
+
+    // A synthesized exception has no callStackReturnAddresses, so the report's stacks come
+    // from the live thread snapshot - with the calling thread marked as the faulting one.
+    NSException *exception = [NSException exceptionWithName:name
+                                                     reason:error.localizedDescription
+                                                   userInfo:nil];
+
+    [self postNonFatalReportWithException:exception
+                                     name:name
+                                   reason:error.localizedDescription
+                       reservedAttributes:reserved
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+- (void)postExceptionWithName:(NSString *)name
+                       reason:(NSString *)reason
+                   attributes:(NSDictionary<NSString *, NSString *> *)attributes
+                  attachments:(NSArray<BugSplatAttachment *> *)attachments
+                   completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (name.length == 0) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postExceptionWithName requires a non-empty name"
+                          completion:completion];
+        return;
+    }
+
+    NSException *exception = [NSException exceptionWithName:name reason:reason userInfo:nil];
+
+    [self postNonFatalReportWithException:exception
+                                     name:name
+                                   reason:reason
+                       reservedAttributes:nil
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+/**
+ * Shared body of the non-fatal posting APIs, and the Apple counterpart to the Windows SDK's
+ * BugSplat::CreateXmlReport: snapshot the process, upload, keep running.
+ *
+ * The snapshot is taken synchronously on the calling thread, which is the whole point - it is
+ * the caller's stack that explains the caught error, and hopping queues first would replace it
+ * with the stack of a worker. Only the upload is asynchronous.
+ *
+ * @param exception The exception PLCrashReporter records as the report's uncaught exception.
+ * @param name Report name, used for the bugsplat-nonfatal-name attribute.
+ * @param reason Detail for this occurrence; becomes the report description.
+ * @param reservedAttributes SDK-derived attributes that outrank caller-supplied ones.
+ * @param attributes Caller-supplied attributes for this report only.
+ * @param attachments Files to include. The delegate is deliberately not consulted: it exists
+ *        to gather state about a crash that already happened, and calling it here would fire
+ *        it on an arbitrary thread on an ordinary code path.
+ * @param completion Delivered on the main queue.
+ */
+- (void)postNonFatalReportWithException:(NSException *)exception
+                                   name:(NSString *)name
+                                 reason:(NSString *)reason
+                     reservedAttributes:(NSDictionary<NSString *, NSString *> *)reservedAttributes
+                             attributes:(NSDictionary<NSString *, NSString *> *)attributes
+                            attachments:(NSArray<BugSplatAttachment *> *)attachments
+                             completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    // The upload service is created by -start, so its absence is the reliable signal that the
+    // caller has not started BugSplat yet (isStartInvoked is also NO while -start is midway
+    // through processing pending crashes, when posting is in fact already fine).
+    BugSplatUploadService *uploadService = self.uploadService;
+    if (!uploadService) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeNotStarted
+                             message:@"BugSplat has not been started - call -start before posting a non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    id<BugSplatCrashReporterProtocol> crashReporter = self.crashReporterInternal;
+    if (![crashReporter respondsToSelector:@selector(generateLiveReportWithException:error:)]) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:@"The configured crash reporter cannot capture live reports"
+                          completion:completion];
+        return;
+    }
+
+    NSDate *capturedAt = [NSDate date];
+
+    NSError *captureError = nil;
+    NSData *liveReportData = nil;
+    @try {
+        liveReportData = [crashReporter generateLiveReportWithException:exception error:&captureError];
+    } @catch (NSException *thrown) {
+        NSLog(@"BugSplat: Exception generating non-fatal report: %@ - %@", thrown.name, thrown.reason);
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:[NSString stringWithFormat:@"Exception capturing non-fatal report: %@", thrown.reason ?: thrown.name]
+                          completion:completion];
+        return;
+    }
+
+    if (liveReportData.length == 0) {
+        NSLog(@"BugSplat: Failed to generate non-fatal report: %@", captureError);
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:captureError.localizedDescription ?: @"Failed to capture a non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    NSString *reportText = nil;
+    @try {
+        NSError *parseError = nil;
+        PLCrashReport *parsed = [[PLCrashReport alloc] initWithData:liveReportData error:&parseError];
+        if (parsed) {
+            reportText = [PLCrashReportTextFormatter stringValueForCrashReport:parsed
+                                                                withTextFormat:PLCrashReportTextFormatiOS];
+        } else {
+            NSLog(@"BugSplat: Failed to parse non-fatal report: %@", parseError);
+        }
+    } @catch (NSException *thrown) {
+        NSLog(@"BugSplat: Exception formatting non-fatal report: %@ - %@", thrown.name, thrown.reason);
+    }
+
+    NSData *reportData = [reportText dataUsingEncoding:NSUTF8StringEncoding];
+    if (reportData.length == 0) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:@"Failed to format the captured non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    // Session attributes first, then this call's attributes, then the SDK's own - so a caller
+    // cannot overwrite bugsplat-nonfatal and hide the report from a dashboard filter.
+    NSMutableDictionary<NSString *, NSString *> *mergedAttributes =
+        self.attributes ? [self.attributes mutableCopy] : [NSMutableDictionary dictionary];
+    [mergedAttributes addEntriesFromDictionary:attributes ?: @{}];
+    [mergedAttributes addEntriesFromDictionary:reservedAttributes ?: @{}];
+    mergedAttributes[kBugSplatNonFatalAttrMarker] = @"true";
+    mergedAttributes[kBugSplatNonFatalAttrName] = name;
+    mergedAttributes[kBugSplatNonFatalAttrCapturedAt] = BugSplatPersistedTimestampFromDate(capturedAt);
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = self.bugSplatDatabase;
+    metadata.applicationName = self.resolvedApplicationName;
+    metadata.applicationVersion = self.resolvedApplicationVersion;
+    metadata.userName = self.userName;
+    metadata.userEmail = self.userEmail;
+    metadata.userDescription = reason;
+    metadata.applicationKey = self.appKey;
+    metadata.notes = self.notes;
+    metadata.crashTime = BugSplatPersistedTimestampFromDate(capturedAt);
+    metadata.attributes = mergedAttributes;
+    // crashTypeId is deliberately left nil so the upload service stamps the platform's own
+    // type (macOS/iOS) and the server symbolicates the report with the app's dSYMs.
+
+    NSLog(@"BugSplat: Uploading non-fatal report '%@' (app: %@ %@, database: %@)...",
+          name, metadata.applicationName, metadata.applicationVersion, metadata.database);
+
+    [uploadService uploadCrashReport:reportData
+                       crashFilename:@"crash.crashlog"
+                         attachments:attachments
+                            metadata:metadata
+                          completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        // Already delivered on the main queue by the upload service.
+        if (!completion) {
+            if (!success) {
+                NSLog(@"BugSplat: Failed to upload non-fatal report '%@': %@", name, error);
+            }
+            return;
+        }
+
+        if (success) {
+            completion([[BugSplatReportResult alloc] initWithCrashId:crashId infoUrl:infoUrl], nil);
+        } else {
+            NSLog(@"BugSplat: Failed to upload non-fatal report '%@': %@", name, error);
+            completion(nil, error ?: [NSError errorWithDomain:kBugSplatNonFatalErrorDomain
+                                                         code:BugSplatNonFatalErrorCodeCaptureFailed
+                                                     userInfo:@{NSLocalizedDescriptionKey: @"Non-fatal report upload failed"}]);
+        }
+    }];
+}
+
+/// Reports a non-fatal posting failure that happened before any upload was attempted, on the
+/// main queue so callers get the same delivery contract as a completed upload.
+- (void)deliverNonFatalFailure:(BugSplatNonFatalErrorCode)code
+                       message:(NSString *)message
+                    completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    NSLog(@"BugSplat: %@", message);
+
+    if (!completion) {
+        return;
+    }
+
+    NSError *error = [NSError errorWithDomain:kBugSplatNonFatalErrorDomain
+                                         code:code
+                                     userInfo:@{NSLocalizedDescriptionKey: message}];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil, error);
+    });
+}
+
 #pragma mark - Properties
 
 - (NSBundle *)bundle
@@ -1875,10 +2161,14 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (NSString *)crashesDirectoryPath
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
-    NSString *appSupportDir = paths.firstObject;
-    NSString *crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
-    
+    NSString *crashesDir = self.crashesDirectoryPathOverride;
+
+    if (!crashesDir) {
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+        NSString *appSupportDir = paths.firstObject;
+        crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
+    }
+
     if (![fileManager fileExistsAtPath:crashesDir]) {
         NSError *error = nil;
         [fileManager createDirectoryAtPath:crashesDir withIntermediateDirectories:YES attributes:nil error:&error];
