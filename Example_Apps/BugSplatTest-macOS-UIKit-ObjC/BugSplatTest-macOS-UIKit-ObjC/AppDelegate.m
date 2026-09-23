@@ -17,10 +17,6 @@ static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
 /// the sample demonstrates normal crash reporting out of the box.
 static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
 
-/// Where this sample keeps its own tally of crashes, kept up to date whether or not the
-/// report is actually sent to BugSplat.
-static NSString *const kLocalCrashCountKey = @"LocalCrashCount";
-
 @interface AppDelegate () <BugSplatDelegate>
 
 /// URL for the current session's log file. The file is named after BugSplat's
@@ -238,26 +234,19 @@ static NSString *const kLocalCrashCountKey = @"LocalCrashCount";
 ///
 /// Returning NO discards the report: nothing is uploaded, no crash dialog appears, and the
 /// report is deleted. Detection keeps working either way, so the app can still record that a
-/// crash happened - which is what makes "count crashes but never report them" possible.
+/// crash happened, if it wants to, without anything being sent.
 ///
 /// Two things worth noting. This fires on the NEXT launch, when the report is about to be
 /// sent, not at the moment of the crash - so the delegate has to be set before -start.
 /// And it fires once per delivery attempt, so a report whose upload failed is offered again
 /// on a later launch.
 - (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo {
+    // Whatever you want to do with the fact that a crash happened goes here - your own
+    // analytics, an internal log, a counter you keep yourself. BugSplat does not tally
+    // reports for you; crashInfo describes this one and that is the whole of it.
     NSLog(@"bugSplat:shouldSendCrashReport: %@", crashInfo);
 
-    // Record the crash locally regardless of whether it gets reported. This is the part
-    // that keeps working when reporting is switched off.
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger crashCount = [defaults integerForKey:kLocalCrashCountKey] + 1;
-    [defaults setInteger:crashCount forKey:kLocalCrashCountKey];
-    NSLog(@"Local crash count is now %ld (%@, session %@)",
-          (long)crashCount,
-          crashInfo.type == BugSplatCrashInfoTypeFatalHang ? @"fatal hang" : @"crash",
-          crashInfo.sessionID.UUIDString);
-
-    if ([defaults boolForKey:kCrashReportingDisabledKey]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kCrashReportingDisabledKey]) {
         NSLog(@"Crash reporting is disabled - discarding this report without uploading it");
         return NO;
     }
