@@ -484,6 +484,77 @@ One use for this is recording that a crash happened without sending it anywhere 
 
 Crash *detection* keeps working either way - the handler stays installed, so the next crash is still captured and offered to the hook.
 
+### Hang Detection
+
+A hang is the main thread going unresponsive - a synchronous network call, a lock held too long, a runaway loop. BugSplat can report hangs that end in the app being killed, hangs the app recovers from, or both. All of it is opt-in and off by default.
+
+```objc
+[[BugSplat shared] setEnableHangDetection:YES];          // hangs that killed the app
+[[BugSplat shared] setEnableNonFatalHangReporting:YES];  // hangs the app recovered from
+[[BugSplat shared] setHangDetectionThreshold:2.0];       // seconds; default 2.0
+[[BugSplat shared] start];                                // must be called on the main thread
+```
+
+```swift
+BugSplat.shared().enableHangDetection = true
+BugSplat.shared().enableNonFatalHangReporting = true
+BugSplat.shared().hangDetectionThreshold = 2.0
+BugSplat.shared().start()
+```
+
+All three must be set **before** `start`, and `start` must be called on the main thread when either is enabled - the main thread's Mach port is captured there, so the report names the right thread. Debug builds assert; release builds capture the wrong thread silently.
+
+#### Fatal vs non-fatal
+
+Whether a hang is fatal is only knowable *after* it ends, but the report has to be captured *during* it - that stall is the whole point of the stack it carries. So BugSplat always captures at detection time, then decides what to do with the report:
+
+| | `enableHangDetection` | `enableNonFatalHangReporting` |
+| --- | --- | --- |
+| **What it reports** | The app never recovered - watchdog kill, force quit | The main thread resumed and the app kept running |
+| **Exception name** | `App Hang (Fatal)` | `App Hang (Non-Fatal)` |
+| **When it uploads** | The next launch | Immediately, in the background, during the same session |
+| **If the other is off** | A recovered hang is discarded | A hang that never recovered is discarded at the next launch |
+
+The two names are deliberately distinct so the backend groups them separately. Either property on its own starts main-thread monitoring, and `hangDetectionThreshold` applies to both - so you can opt in to only one.
+
+#### Attributes
+
+Every hang report carries these, which is what lets you correlate a hang with crashes from the same launch:
+
+| Attribute | Meaning |
+| --- | --- |
+| `bugsplat-hang-duration-ms` | How long the main thread was unresponsive when the hang was declared |
+| `bugsplat-hang-detected-at` | When detection fired |
+| `bugsplat-hang-app-state` | App state at detection |
+| `bugsplat-hang-launch-id` | Identifies the launch, for correlating with other reports from it |
+
+Non-fatal reports add `bugsplat-hang-fatal` (`false`) and `bugsplat-hang-recovered-after-ms`.
+
+#### Volume control
+
+A wedging-and-recovering main thread could otherwise produce a report every few seconds, so non-fatal uploads are capped at **3 per launch** with **at least 60 seconds between them**. Reports beyond those limits are discarded exactly as they are when the feature is off. Fatal hangs are not capped - the app only dies once.
+
+#### When detection is suppressed
+
+Detection deliberately goes quiet in situations that look like a hang but are not:
+
+- **A debugger is attached.** Breakpoints stop the main thread by design.
+- **The app is not active.** As a consequence, hangs that begin in the background - including background-task expiry kills - are not reported.
+- **Modal UI is up.** `-runModal` on an alert or panel, menu tracking and live window dragging all block the main thread from servicing the run loop, which is indistinguishable from a hang. Without this an open save panel would be reported as a hang on every use. macOS only; UIKit has no blocking modal run loop.
+- **The process was suspended.** Waking up does not fire a hang for time spent asleep.
+
+Hang detection is also a no-op inside app extensions.
+
+#### Choosing a threshold
+
+`hangDetectionThreshold` defaults to 2.0 seconds and is clamped to a 0.1s floor. Typical production values are 1.0-5.0. Pick something above any work your app legitimately does on the main thread - image decoding, JSON parsing, Core Data migrations - or you will report yourself.
+
+#### Submission
+
+Fatal hang reports are auto-submitted by default (`autoSubmitFatalHangReport`, default `YES`): the app was frozen and then killed, so the user never had a chance to consent, and the report is marked to skip the dialog when it is persisted. Set it to `NO` to have fatal hangs take the same submission path a crash does, so the user can describe what the app was doing - usually the only thing that makes a hang actionable.
+
+Both kinds pass through [`bugSplat:shouldSendCrashReport:`](#deciding-whether-to-send-a-report), so an app can count hangs without reporting them, or suppress them entirely. For non-fatal hangs the hook fires during the session that recovered rather than at the next launch.
+
 ### Crash Reporter Customization
 
 There are several ways to customize your BugSplat crash reporter.
