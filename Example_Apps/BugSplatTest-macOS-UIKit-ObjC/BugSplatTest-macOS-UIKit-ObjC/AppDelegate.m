@@ -13,9 +13,7 @@
 /// (there is no crash report to deliver), so their logs must be cleaned up by age instead.
 static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
 
-/// Set to YES in user defaults to see the "detect but don't report" path below. Left off so
-/// the sample demonstrates normal crash reporting out of the box.
-static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
+NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
 
 @interface AppDelegate () <BugSplatDelegate>
 
@@ -39,6 +37,10 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
     // only ships an App menu + Window menu, so without this Cmd+A in the
     // feedback sheet is dead.
     [self installEditMenu];
+
+    // Default to sharing, so the sample reports normally until the Privacy checkbox is
+    // unticked. Registered rather than written, so the user's own choice always wins.
+    [[NSUserDefaults standardUserDefaults] registerDefaults:@{ BSPShareCrashReportsDefaultsKey: @YES }];
 
     // Initialize BugSplat
     [[BugSplat shared] setDelegate:self];
@@ -90,7 +92,7 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
 - (void)showShouldSendCrashReportSummary {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSUInteger count = self.shouldSendCrashReportCallCount;
-        BOOL disabled = [[NSUserDefaults standardUserDefaults] boolForKey:kCrashReportingDisabledKey];
+        BOOL share = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey];
 
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = [NSString stringWithFormat:@"shouldSendCrashReport fired %lu time%@ this launch",
@@ -98,13 +100,13 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
 
         if (count == 0) {
             alert.informativeText = @"No pending crash or fatal hang reports were found.";
-        } else if (disabled) {
+        } else if (share) {
             alert.informativeText = [NSString stringWithFormat:
-                @"%@ discarded without uploading - CrashReportingDisabled is ON.",
+                @"%@ allowed through - crash report sharing is ON.",
                 count == 1 ? @"That report was" : @"Those reports were"];
         } else {
             alert.informativeText = [NSString stringWithFormat:
-                @"%@ allowed through - CrashReportingDisabled is OFF.",
+                @"%@ discarded without uploading - crash report sharing is OFF.",
                 count == 1 ? @"That report was" : @"Those reports were"];
         }
 
@@ -287,12 +289,14 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
     self.shouldSendCrashReportCallCount++;
     NSLog(@"bugSplat:shouldSendCrashReport: %@", crashInfo);
 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:kCrashReportingDisabledKey]) {
-        NSLog(@"Crash reporting is disabled - discarding this report without uploading it");
-        return NO;
+    // The user's answer to "Share crash reports with the developer" in the Privacy section.
+    // A real app would read whatever its own settings or enterprise config expose.
+    BOOL share = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey];
+    if (!share) {
+        NSLog(@"Crash report sharing is off - discarding this report without uploading it");
     }
 
-    return YES;
+    return share;
 }
 
 /// sessionID identifies the session the crash report being sent was recorded in,

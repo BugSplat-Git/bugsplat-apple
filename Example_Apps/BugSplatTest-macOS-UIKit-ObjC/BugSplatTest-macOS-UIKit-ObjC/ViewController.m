@@ -6,6 +6,7 @@
 //
 
 #import "ViewController.h"
+#import "AppDelegate.h"
 #import "BSPDemoTheme.h"
 #import "BSPDemoViews.h"
 #import "BSPActivityLog.h"
@@ -26,6 +27,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
 @interface ViewController ()
 @property (nonatomic, strong) NSStackView *contentStack;
 @property (nonatomic, strong) NSStackView *recentActivityList;
+@property (nonatomic, weak) NSButton *shareCrashReportsCheckbox;
 @property (nonatomic, strong) NSTextField *recentEmptyLabel;
 @property (nonatomic, strong) NSTextField *footerLabel;
 @property (nonatomic, strong) id keyEventMonitor;
@@ -95,6 +97,8 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
     [self addArranged:[self buildSubtitle] spacingAfter:22];
     [self addArranged:[self buildSectionHeader:@"TRIGGER AN EVENT"] spacingAfter:12];
     [self addArranged:[self buildCardGrid] spacingAfter:18];
+    [self addArranged:[self buildSectionHeader:@"PRIVACY"] spacingAfter:12];
+    [self addArranged:[self buildCrashReportingToggle] spacingAfter:18];
     [self addArranged:[self buildRecentActivityCard] spacingAfter:18];
     [self addArranged:[self buildFooter] spacingAfter:0];
 }
@@ -251,6 +255,57 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
         [bottomRow.trailingAnchor constraintEqualToAnchor:grid.trailingAnchor],
     ]];
     return grid;
+}
+
+/// Checkbox backing BSPShareCrashReportsDefaultsKey, which the app delegate's
+/// -bugSplat:shouldSendCrashReport: reads to decide whether a pending report is sent.
+///
+/// Phrased affirmatively, matching the "Share..." wording macOS uses in System Settings >
+/// Privacy & Security > Analytics & Improvements: checked means send.
+///
+/// The hook is consulted at the NEXT launch, when a pending report is about to be uploaded,
+/// so unchecking this affects the next crash you trigger rather than anything already sent.
+- (NSView *)buildCrashReportingToggle {
+    NSView *container = [[NSView alloc] initWithFrame:NSZeroRect];
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+
+    NSButton *checkbox = [NSButton checkboxWithTitle:@"Share crash reports with the developer"
+                                              target:self
+                                              action:@selector(toggleShareCrashReports:)];
+    checkbox.font = [NSFont systemFontOfSize:14];
+    checkbox.contentTintColor = BSPDemoTheme.textPrimary;
+    checkbox.state = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey]
+        ? NSControlStateValueOn : NSControlStateValueOff;
+    checkbox.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:checkbox];
+    self.shareCrashReportsCheckbox = checkbox;
+
+    NSTextField *caption = [NSTextField wrappingLabelWithString:
+        @"Crash reports help us find and fix bugs. Nothing is sent when this is off - crashes are still detected, just discarded."];
+    caption.font = [NSFont systemFontOfSize:12];
+    caption.textColor = BSPDemoTheme.textSecondary;
+    caption.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:caption];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [checkbox.topAnchor constraintEqualToAnchor:container.topAnchor],
+        [checkbox.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+        [checkbox.trailingAnchor constraintLessThanOrEqualToAnchor:container.trailingAnchor],
+
+        // Indent under the checkbox title so it reads as secondary text for that row.
+        [caption.topAnchor constraintEqualToAnchor:checkbox.bottomAnchor constant:4],
+        [caption.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:20],
+        [caption.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+        [caption.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+    ]];
+
+    return container;
+}
+
+- (void)toggleShareCrashReports:(NSButton *)sender {
+    BOOL share = (sender.state == NSControlStateValueOn);
+    [[NSUserDefaults standardUserDefaults] setBool:share forKey:BSPShareCrashReportsDefaultsKey];
+    NSLog(@"Share crash reports: %@", share ? @"YES" : @"NO");
 }
 
 - (NSView *)buildRecentActivityCard {
