@@ -1001,6 +1001,19 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
     NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
     
+    // Let the delegate veto this report before anything is uploaded or shown. This sits
+    // ahead of the silent/dialog fork so a NO suppresses both, and it runs on every delivery
+    // attempt - a report kept on disk by a failed upload is asked about again next launch.
+    if (![self shouldSendPersistedReportWithFilename:crashFilename metadata:metadata]) {
+        NSLog(@"BugSplat: Delegate declined crash report %@ - discarding without uploading", crashFilename);
+        [self cleanupCrashReportWithFilename:crashFilename];
+        self.sendingInProgress = NO;
+        // Drain the rest of the queue the same way the load-failure paths above do,
+        // otherwise declined reports would block the reports behind them.
+        [self processPendingCrashReports];
+        return;
+    }
+
     // Determine if we should send silently or show a dialog
     BOOL sendSilently = [self shouldSendCrashSilently:metadata];
     
@@ -1020,6 +1033,73 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                                      metadata:metadata];
 #endif
     }
+}
+
+/**
+ * Ask the delegate whether a persisted report should be sent at all.
+ *
+ * Returns YES when the delegate does not implement the hook, so apps that never adopt it
+ * keep today's behaviour exactly. A delegate that raises is treated as having no opinion
+ * for the same reason - an exception is indistinguishable from an unimplemented method,
+ * and the established behaviour is to send.
+ */
+- (BOOL)shouldSendPersistedReportWithFilename:(NSString *)crashFilename
+                                     metadata:(NSDictionary *)metadata
+{
+    id<BugSplatDelegate> delegate = self.delegate;
+    if (![delegate respondsToSelector:@selector(bugSplat:shouldSendCrashReport:)]) {
+        return YES;
+    }
+
+    BugSplatCrashInfo *crashInfo = [self crashInfoForFilename:crashFilename metadata:metadata];
+
+    BOOL shouldSend = YES;
+    @try {
+        shouldSend = [delegate bugSplat:self shouldSendCrashReport:crashInfo];
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in bugSplat:shouldSendCrashReport: delegate: %@ - %@ (sending the report)",
+              exception.name, exception.reason);
+    }
+
+    return shouldSend;
+}
+
+/**
+ * Build the BugSplatCrashInfo handed to the delegate, entirely from the metadata recorded
+ * alongside the report, so it describes the session that crashed rather than this one.
+ *
+ * Hang reports are identified by their filename suffix, which is how the rest of the
+ * pipeline tells them apart from crashes.
+ */
+- (BugSplatCrashInfo *)crashInfoForFilename:(NSString *)crashFilename
+                                   metadata:(NSDictionary *)metadata
+{
+    BugSplatCrashInfoType type = [crashFilename hasSuffix:kBugSplatHangFilenameSuffix]
+        ? BugSplatCrashInfoTypeFatalHang
+        : BugSplatCrashInfoTypeCrash;
+
+    NSUUID *sessionID = nil;
+    id sessionIDValue = metadata[kBugSplatMetaKeySessionID];
+    if ([sessionIDValue isKindOfClass:[NSString class]]) {
+        sessionID = [[NSUUID alloc] initWithUUIDString:sessionIDValue];
+    }
+
+    id applicationName = metadata[kBugSplatMetaKeyApplicationName];
+    if (![applicationName isKindOfClass:[NSString class]]) {
+        applicationName = nil;
+    }
+
+    id applicationVersion = metadata[kBugSplatMetaKeyApplicationVersion];
+    if (![applicationVersion isKindOfClass:[NSString class]]) {
+        applicationVersion = nil;
+    }
+
+    return [[BugSplatCrashInfo alloc] initWithType:type
+                                         sessionID:sessionID
+                                         crashDate:BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp])
+                                   applicationName:applicationName
+                                applicationVersion:applicationVersion
+                                     userSubmitted:[metadata[kBugSplatMetaKeyUserSubmitted] boolValue]];
 }
 
 /**

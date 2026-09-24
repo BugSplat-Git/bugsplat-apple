@@ -17,6 +17,7 @@ FOUNDATION_EXPORT const unsigned char BugSplatVersionString[];
 
 #import <BugSplat/BugSplatDelegate.h>
 #import <BugSplat/BugSplatAttachment.h>
+#import <BugSplat/BugSplatCrashInfo.h>
 #import <BugSplat/BugSplatReportResult.h>
 #import <BugSplat/BugSplatFeedbackResult.h>
 #if TARGET_OS_OSX
