@@ -248,8 +248,9 @@
 
 - (void)testReturningNO_OverridesUserSubmitted
 {
-    // The user already agreed to send this one through the dialog and the upload failed.
-    // The hook sits ahead of that check, so it can still discard the report.
+    // This report is already marked to skip the dialog - either the user agreed to send it
+    // and the upload failed, or it was auto-submitted (fatal hangs are, by default). The hook
+    // sits ahead of that check, so it can still discard the report.
     [self plantReportNamed:@"99999999994" extraMetadata:@{ @"userSubmitted": @YES }];
 
     DecidingDelegate *delegate = [[DecidingDelegate alloc] init];
@@ -260,7 +261,7 @@
 
     XCTAssertEqual(delegate.received.count, 1);
     XCTAssertTrue(delegate.received.firstObject.userSubmitted,
-                  @"crashInfo must surface userSubmitted so an app can let prior consent win");
+                  @"crashInfo must surface userSubmitted so an app can let that prior decision win");
     XCTAssertEqual(self.mockSession.requestCount, 0, @"returning NO wins over userSubmitted");
     XCTAssertFalse([self reportExistsNamed:@"99999999994"]);
 }

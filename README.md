@@ -448,13 +448,17 @@ Not implementing the method sends the report, so existing apps are unaffected.
 | `sessionID` | The `BugSplat.sessionID` of the session that crashed, or nil for reports that predate session tracking |
 | `crashDate` | When the report was captured |
 | `applicationName` / `applicationVersion` | Recorded at capture time, so they may differ from the running app if it was updated since |
-| `userSubmitted` | `YES` when the user already agreed to send this report through the crash dialog |
+| `userSubmitted` | `YES` when the report is already marked to skip the crash dialog. This is the persisted bypass-dialog state, **not** proof of consent - an auto-submitted fatal hang carries it without any dialog having been shown |
 
 #### When it fires
 
 On the **next launch**, when the report is about to be sent - not at the moment of the crash. Crashes are recorded inside a signal handler where almost no work is safe, so the report is written to disk and processed when the app next starts. Set the delegate **before calling `start`**, which is when pending reports are processed; a delegate assigned afterwards will not be consulted.
 
-It is invoked **once per delivery attempt, not once per report**. A report whose upload fails is kept on disk and retried on a later launch, and the hook is consulted again each time - so an app that changes its mind between launches has its new answer honoured. It is also consulted for reports the user already agreed to send; check `userSubmitted` and return `YES` if that prior consent should win.
+It is invoked **once per delivery attempt, not once per report**. A report whose upload fails is kept on disk and retried on a later launch, and the hook is consulted again each time - so an app that changes its mind between launches has its new answer honoured.
+
+That also means anything you record from the hook must tolerate being called more than once for the same report. If you are counting crashes, deduplicate on `sessionID` rather than incrementing on every call, or you will over-count reports that took several launches to upload.
+
+It is also consulted for reports already marked to skip the dialog; check `userSubmitted` and return `YES` if that prior decision should win. Be aware that flag is the persisted bypass-dialog state, not proof the user agreed - `autoSubmitFatalHangReport` is on by default, and a fatal hang is marked that way without a dialog because the app was frozen and the user never had the chance to consent.
 
 #### What it covers
 
@@ -468,7 +472,8 @@ One use for this is recording that a crash happened without sending it anywhere 
 - (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo
 {
     // Your own analytics, an internal log, a counter in NSUserDefaults - whatever you like.
-    [self.analytics recordCrashForSession:crashInfo.sessionID at:crashInfo.crashDate];
+    // Keyed on sessionID so a report retried across launches is only counted once.
+    [self.analytics recordCrashOnceForSession:crashInfo.sessionID at:crashInfo.crashDate];
 
     // Nothing leaves the device when this returns NO.
     return !self.crashReportingDisabled;

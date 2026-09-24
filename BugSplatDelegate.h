@@ -49,19 +49,24 @@ NS_ASSUME_NONNULL_BEGIN
 
  It is invoked once per delivery attempt rather than once per report. A report whose upload
  fails is kept on disk and retried on a later launch, and this method is consulted again each
- time - so an app that changes its mind between launches has the new answer honoured. It is
- also consulted for reports the user already agreed to send through the crash dialog; check
- `BugSplatCrashInfo.userSubmitted` and return YES if that prior consent should win.
+ time - so an app that changes its mind between launches has the new answer honoured. Anything
+ you record from here must therefore tolerate being called more than once for the same report;
+ deduplicate on `BugSplatCrashInfo.sessionID` if you are counting crashes.
+
+ It is also consulted for reports already marked to skip the crash dialog; check
+ `BugSplatCrashInfo.userSubmitted` and return YES if that prior decision should win. Note that
+ flag is the persisted bypass-dialog state rather than proof of consent - an auto-submitted
+ fatal hang carries it without any dialog having been shown.
 
  Only crash and fatal hang reports pass through here. `-postException:`, `-postError:` and
  `-postFeedback:` upload directly, because they are explicit calls the app chose to make.
 
  One use for this is recording that a crash happened without reporting it - incrementing a
  counter in your own analytics, or writing to an internal log, while returning NO so nothing
- leaves the device:
+ leaves the device. Key the record on the sessionID so a retried report is not counted twice:
 
      - (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo {
-         [self.analytics recordCrashForSession:crashInfo.sessionID];
+         [self.analytics recordCrashOnceForSession:crashInfo.sessionID];
          return !self.crashReportingDisabled;
      }
 

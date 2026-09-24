@@ -65,11 +65,19 @@ typedef NS_ENUM(NSInteger, BugSplatCrashInfoType) {
 @property (nonatomic, readonly, copy, nullable) NSString *applicationVersion;
 
 /**
- * YES when the user has already agreed to send this report through the crash dialog and
- * the upload is being retried after an earlier failure.
+ * YES when the report is already marked to skip the crash dialog on its way out.
+ *
+ * This is the persisted "bypass the dialog" state, NOT proof of user consent. It is set
+ * when the user agrees to send a report through the crash dialog, but also when a report
+ * is marked for automatic submission - a fatal hang persisted while `autoSubmitFatalHangReport`
+ * is enabled (the default) carries it without any dialog ever being shown, because the app
+ * was frozen and the user never had the chance to consent.
+ *
+ * Treat it as "this report would be sent without asking", and do not present it to users as
+ * something they agreed to.
  *
  * Returning NO from `-bugSplat:shouldSendCrashReport:` discards the report even when this
- * is YES, so check it if prior consent should win.
+ * is YES, so check it if that prior decision should win.
  */
 @property (nonatomic, readonly) BOOL userSubmitted;
 
