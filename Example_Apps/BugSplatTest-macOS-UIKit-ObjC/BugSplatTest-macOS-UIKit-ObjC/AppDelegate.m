@@ -114,7 +114,19 @@ NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
         }
 
         [alert addButtonWithTitle:@"OK"];
-        [alert runModal];
+
+        // As a sheet, not -runModal. runModal blocks the main thread, and the hang tracker
+        // detects a hang by counting unanswered pings dispatched to the main queue - so a
+        // modal alert at launch manufactures a 2s "hang" on every single run, which then
+        // gets captured, persisted and processed as a real report. A sheet returns
+        // immediately and leaves the main thread spinning.
+        NSWindow *window = NSApplication.sharedApplication.mainWindow
+            ?: NSApplication.sharedApplication.windows.firstObject;
+        if (window) {
+            [alert beginSheetModalForWindow:window completionHandler:nil];
+        } else {
+            [alert runModal];
+        }
     });
 }
 
