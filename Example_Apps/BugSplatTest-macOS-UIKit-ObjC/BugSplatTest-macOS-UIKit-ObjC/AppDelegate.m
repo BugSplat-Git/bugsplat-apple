@@ -31,16 +31,19 @@ NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
 
 @implementation AppDelegate
 
++ (BOOL)shareCrashReportsEnabled {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:BSPShareCrashReportsDefaultsKey];
+    return value == nil ? YES : [value boolValue];
+}
+
+
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     // Install a minimal Edit menu so NSTextField gets standard keyboard
     // shortcuts (Cmd+A select-all, Cmd+C/V/X). The storyboard's MainMenu
     // only ships an App menu + Window menu, so without this Cmd+A in the
     // feedback sheet is dead.
     [self installEditMenu];
-
-    // Default to sharing, so the sample reports normally until the Privacy checkbox is
-    // unticked. Registered rather than written, so the user's own choice always wins.
-    [[NSUserDefaults standardUserDefaults] registerDefaults:@{ BSPShareCrashReportsDefaultsKey: @YES }];
 
     // Initialize BugSplat
     [[BugSplat shared] setDelegate:self];
@@ -92,7 +95,7 @@ NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
 - (void)showShouldSendCrashReportSummary {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSUInteger count = self.shouldSendCrashReportCallCount;
-        BOOL share = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey];
+        BOOL share = [AppDelegate shareCrashReportsEnabled];
 
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = [NSString stringWithFormat:@"shouldSendCrashReport fired %lu time%@ this launch",
@@ -291,7 +294,7 @@ NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
 
     // The user's answer to "Share crash reports with the developer" in the Privacy section.
     // A real app would read whatever its own settings or enterprise config expose.
-    BOOL share = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey];
+    BOOL share = [AppDelegate shareCrashReportsEnabled];
     if (!share) {
         NSLog(@"Crash report sharing is off - discarding this report without uploading it");
     }

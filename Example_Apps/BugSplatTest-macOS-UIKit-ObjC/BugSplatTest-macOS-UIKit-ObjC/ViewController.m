@@ -274,8 +274,7 @@ static NSInteger const kBSPSplatGestureKeyCount = 5;
                                               action:@selector(toggleShareCrashReports:)];
     checkbox.font = [NSFont systemFontOfSize:14];
     checkbox.contentTintColor = BSPDemoTheme.textPrimary;
-    checkbox.state = [[NSUserDefaults standardUserDefaults] boolForKey:BSPShareCrashReportsDefaultsKey]
-        ? NSControlStateValueOn : NSControlStateValueOff;
+    checkbox.state = [AppDelegate shareCrashReportsEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
     checkbox.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:checkbox];
     self.shareCrashReportsCheckbox = checkbox;
