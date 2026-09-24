@@ -24,6 +24,11 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
 /// lets the crashed session's log be found again at the next launch.
 @property (nonatomic, strong) NSURL *sessionLogFileURL;
 
+/// How many times bugSplat:shouldSendCrashReport: was called during THIS launch.
+/// Demo scaffolding so an otherwise invisible callback can be seen - deliberately in
+/// memory only, reset every launch. Nothing here is persisted.
+@property (nonatomic, assign) NSUInteger shouldSendCrashReportCallCount;
+
 @end
 
 @implementation AppDelegate
@@ -71,6 +76,41 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
     // Clean up logs from old sessions. Sessions that end normally never get the
     // delete-on-delivery callback, so their logs are pruned by age at startup.
     [self pruneOldSessionLogs];
+
+    [self showShouldSendCrashReportSummary];
+}
+
+/// Puts up an alert saying how many times the hook fired during this launch.
+///
+/// The hook is invisible from the outside - it decides whether a report is sent and then
+/// the report is simply gone - so this makes it observable while testing. Pending reports
+/// are processed inside -start, so the count is final by the time this runs.
+///
+/// Async so BugSplat's own crash dialog, if it is going to appear, gets there first.
+- (void)showShouldSendCrashReportSummary {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSUInteger count = self.shouldSendCrashReportCallCount;
+        BOOL disabled = [[NSUserDefaults standardUserDefaults] boolForKey:kCrashReportingDisabledKey];
+
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = [NSString stringWithFormat:@"shouldSendCrashReport fired %lu time%@ this launch",
+                             (unsigned long)count, count == 1 ? @"" : @"s"];
+
+        if (count == 0) {
+            alert.informativeText = @"No pending crash or fatal hang reports were found.";
+        } else if (disabled) {
+            alert.informativeText = [NSString stringWithFormat:
+                @"%@ discarded without uploading - CrashReportingDisabled is ON.",
+                count == 1 ? @"That report was" : @"Those reports were"];
+        } else {
+            alert.informativeText = [NSString stringWithFormat:
+                @"%@ allowed through - CrashReportingDisabled is OFF.",
+                count == 1 ? @"That report was" : @"Those reports were"];
+        }
+
+        [alert addButtonWithTitle:@"OK"];
+        [alert runModal];
+    });
 }
 
 #pragma mark - Edit Menu
@@ -244,6 +284,7 @@ static NSString *const kCrashReportingDisabledKey = @"CrashReportingDisabled";
     // Whatever you want to do with the fact that a crash happened goes here - your own
     // analytics, an internal log, a counter you keep yourself. BugSplat does not tally
     // reports for you; crashInfo describes this one and that is the whole of it.
+    self.shouldSendCrashReportCallCount++;
     NSLog(@"bugSplat:shouldSendCrashReport: %@", crashInfo);
 
     if ([[NSUserDefaults standardUserDefaults] boolForKey:kCrashReportingDisabledKey]) {
