@@ -444,7 +444,7 @@ Not implementing the method sends the report, so existing apps are unaffected.
 
 | Property | Description |
 | --- | --- |
-| `type` | `BugSplatCrashInfoTypeCrash` or `BugSplatCrashInfoTypeFatalHang` |
+| `type` | `BugSplatCrashInfoTypeCrash`, `BugSplatCrashInfoTypeFatalHang`, or `BugSplatCrashInfoTypeNonFatalHang` (a hang the app recovered from, when `enableNonFatalHangReporting` is on) |
 | `sessionID` | The `BugSplat.sessionID` of the session that crashed, or nil for reports that predate session tracking |
 | `crashDate` | When the report was captured |
 | `applicationName` / `applicationVersion` | Recorded at capture time, so they may differ from the running app if it was updated since |
@@ -462,7 +462,9 @@ It is also consulted for reports already marked to skip the dialog; check `userS
 
 #### What it covers
 
-Crash and fatal hang reports. `postException:`, `postError:` and `postFeedback:` upload directly and do not pass through this hook, because they are explicit calls your app chooses to make.
+Crash, fatal hang and non-fatal hang reports. `postException:`, `postError:` and `postFeedback:` upload directly and do not pass through this hook, because they are explicit calls your app chooses to make.
+
+Non-fatal hangs are uploaded during the session that recovered, rather than at the next launch, so for those the hook fires while the app is running - straight after the main thread recovers and BugSplat has gathered attachments for the report.
 
 #### Example: count crashes without reporting them
 

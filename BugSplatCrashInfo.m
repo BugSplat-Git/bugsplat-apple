@@ -27,11 +27,21 @@
     return self;
 }
 
++ (NSString *)descriptionForType:(BugSplatCrashInfoType)type
+{
+    switch (type) {
+        case BugSplatCrashInfoTypeFatalHang:    return @"fatalHang";
+        case BugSplatCrashInfoTypeNonFatalHang: return @"nonFatalHang";
+        case BugSplatCrashInfoTypeCrash:        break;
+    }
+    return @"crash";
+}
+
 - (NSString *)description
 {
     return [NSString stringWithFormat:@"<%@: type=%@, sessionID=%@, crashDate=%@, application=%@ %@, userSubmitted=%@>",
             NSStringFromClass([self class]),
-            self.type == BugSplatCrashInfoTypeFatalHang ? @"fatalHang" : @"crash",
+            [[self class] descriptionForType:self.type],
             self.sessionID.UUIDString,
             self.crashDate,
             self.applicationName,

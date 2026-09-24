@@ -19,6 +19,7 @@
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
                          isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock
+             isMainThreadBlockedByUIBlock:(BOOL(^)(void))isMainThreadBlockedByUIBlock
                                 clockBlock:(CFAbsoluteTime(^)(void))clockBlock
                        recoveryDispatcher:(void(^)(dispatch_block_t))recoveryDispatcher
                             pingDispatcher:(void(^)(dispatch_block_t))pingDispatcher;
@@ -69,6 +70,17 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                               debuggerAttached:(BOOL)debuggerAttached
                                      appActive:(BOOL)appActive
 {
+    return [self trackerWithThreshold:threshold
+                     debuggerAttached:debuggerAttached
+                            appActive:appActive
+                    mainThreadBlockedByUI:NO];
+}
+
+- (BugSplatHangTracker *)trackerWithThreshold:(NSTimeInterval)threshold
+                              debuggerAttached:(BOOL)debuggerAttached
+                                     appActive:(BOOL)appActive
+                        mainThreadBlockedByUI:(BOOL)blockedByUI
+{
     // Synchronous recovery dispatcher: tests observe recoverCount inline.
     void(^synchronousRecovery)(dispatch_block_t) = ^(dispatch_block_t b) { b(); };
     // No-op ping dispatcher: tests manually drive pongs via -handleMainQueuePong
@@ -82,6 +94,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                                                         delegate:self.mockDelegate
                                           isDebuggerAttachedBlock:^BOOL { return debuggerAttached; }
                                                 isAppActiveBlock:^BOOL { return appActive; }
+                                    isMainThreadBlockedByUIBlock:^BOOL { return blockedByUI; }
                                                        clockBlock:zeroClock
                                               recoveryDispatcher:synchronousRecovery
                                                    pingDispatcher:noopPing];
@@ -153,6 +166,44 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [self pollTracker:tracker times:10];
 
     XCTAssertEqual(self.mockDelegate.hangCount, 0);
+}
+
+- (void)testDoesNotDetect_WhileModalUIBlocksTheMainThread
+{
+    // A run-modal alert or panel, menu tracking or a window drag blocks the main thread from
+    // servicing our pings, which is indistinguishable from a hang at this level. Reporting it
+    // would mean an open save panel shows up in the dashboard as a hang.
+    BugSplatHangTracker *tracker = [self trackerWithThreshold:2.0
+                                            debuggerAttached:NO
+                                                   appActive:YES
+                                       mainThreadBlockedByUI:YES];
+
+    [self pollTracker:tracker times:10];
+
+    XCTAssertEqual(self.mockDelegate.hangCount, 0, @"modal UI must not be reported as a hang");
+}
+
+- (void)testDetectsAgain_OnceModalUIGoesAway
+{
+    __block BOOL blocked = YES;
+    BugSplatHangTracker *tracker =
+        [[BugSplatHangTracker alloc] initWithThresholdSeconds:2.0
+                                                     delegate:self.mockDelegate
+                                       isDebuggerAttachedBlock:^BOOL { return NO; }
+                                             isAppActiveBlock:^BOOL { return YES; }
+                                 isMainThreadBlockedByUIBlock:^BOOL { return blocked; }
+                                                    clockBlock:^CFAbsoluteTime { return (CFAbsoluteTime)0; }
+                                           recoveryDispatcher:^(dispatch_block_t b) { b(); }
+                                                pingDispatcher:^(dispatch_block_t b) { (void)b; }];
+
+    [self pollTracker:tracker times:10];
+    XCTAssertEqual(self.mockDelegate.hangCount, 0, @"suppressed while the modal is up");
+
+    // Dismissing the modal must not leave a backlog that fires immediately - the guard
+    // resets the counter on every suppressed poll, so a real hang has to build up afresh.
+    blocked = NO;
+    [self pollTracker:tracker times:5];
+    XCTAssertEqual(self.mockDelegate.hangCount, 1, @"a genuine hang after the modal is reported");
 }
 
 - (void)testDoesNotDetect_WhenAppInactive

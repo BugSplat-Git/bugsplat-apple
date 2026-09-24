@@ -368,6 +368,32 @@ static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable met
 
 #pragma mark - Hang Detection
 
+/// YES while the main run loop is in a mode that stops it servicing the main queue.
+///
+/// Hangs are detected by counting pings dispatched to the main queue that go unanswered, and
+/// ordinary modal AppKit UI blocks the main thread in exactly that way: -runModal on an alert
+/// or a save panel, menu tracking, a live window drag. None of those are hangs, but all of
+/// them look like one from the watchdog thread, so detection is suppressed while they are up.
+///
+/// The mode is read from the main run loop rather than the current one, because this is
+/// called on the watchdog thread. Always NO off macOS - UIKit has no blocking modal run loop.
+static BOOL BugSplatMainThreadBlockedByUI(void)
+{
+#if TARGET_OS_OSX
+    CFStringRef mode = CFRunLoopCopyCurrentMode(CFRunLoopGetMain());
+    if (!mode) {
+        return NO;
+    }
+    BOOL blocked = CFEqual(mode, (__bridge CFStringRef)NSModalPanelRunLoopMode)
+                || CFEqual(mode, (__bridge CFStringRef)NSEventTrackingRunLoopMode);
+    CFRelease(mode);
+    return blocked;
+#else
+    return NO;
+#endif
+}
+
+
 /// Returns YES when the current executable is an app extension (.appex bundle).
 - (BOOL)isRunningInAppExtension
 {
@@ -430,6 +456,9 @@ static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable met
     }
                                                             isAppActiveBlock:^BOOL {
         return [BugSplat isApplicationActive];
+    }
+                                                isMainThreadBlockedByUIBlock:^BOOL {
+        return BugSplatMainThreadBlockedByUI();
     }];
 
     [self.hangTracker start];
@@ -602,6 +631,23 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         // could wedge the very thread that just recovered. The hang queue is serial, so the
         // write it is handed here is ordered ahead of the upload dispatched below.
         [strongSelf enrichHangReportWithFilename:filename persistOnHangQueue:YES];
+
+        // Let the delegate veto this report, exactly as the launch-time path does. Without
+        // this, an in-session non-fatal hang would be the one report an app cannot suppress:
+        // it bypasses processPendingCrashReports, so the hook there never sees it, and only
+        // a failed upload would hand it to the next launch's scanner to be asked about.
+        //
+        // Consulted after enrichment, matching the crash path, where attachments and the
+        // application log are gathered at ingestion before the hook is asked. The metadata
+        // in hand is used rather than re-reading it, because the enrichment write above is
+        // queued on the hang queue and may not have landed yet.
+        if (![strongSelf shouldSendPersistedReportWithFilename:filename metadata:metadata]) {
+            NSLog(@"BugSplat: Delegate declined non-fatal hang report %@ - discarding without uploading", filename);
+            dispatch_async(strongSelf.hangQueue, ^{
+                [strongSelf cleanupCrashReportWithFilename:filename];
+            });
+            return;
+        }
 
         // Nothing to send through, so leave the report - already rewritten as non-fatal
         // with hangReportOnNextLaunch=YES - for the next launch's scanner. willSend is not
@@ -1487,9 +1533,16 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 - (BugSplatCrashInfo *)crashInfoForFilename:(NSString *)crashFilename
                                    metadata:(NSDictionary *)metadata
 {
-    BugSplatCrashInfoType type = [crashFilename hasSuffix:kBugSplatHangFilenameSuffix]
-        ? BugSplatCrashInfoTypeFatalHang
-        : BugSplatCrashInfoTypeCrash;
+    // The filename suffix only says "this is a hang" - a recovered hang is rewritten in place
+    // by -markHangReportNonFatalWithFilename: and keeps the same name, so fatal vs non-fatal
+    // has to come from the attribute that rewrite stamps.
+    BugSplatCrashInfoType type = BugSplatCrashInfoTypeCrash;
+    if ([crashFilename hasSuffix:kBugSplatHangFilenameSuffix]) {
+        id attributes = metadata[kBugSplatMetaKeyAttributes];
+        id fatal = [attributes isKindOfClass:[NSDictionary class]] ? attributes[kBugSplatHangAttrFatal] : nil;
+        type = [fatal isEqual:@"false"] ? BugSplatCrashInfoTypeNonFatalHang
+                                        : BugSplatCrashInfoTypeFatalHang;
+    }
 
     NSUUID *sessionID = nil;
     id sessionIDValue = metadata[kBugSplatMetaKeySessionID];

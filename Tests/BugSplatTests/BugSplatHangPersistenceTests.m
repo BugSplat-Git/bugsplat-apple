@@ -89,6 +89,35 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 @end
 
 
+/// Lifecycle delegate that also answers the pre-upload hook. Declines by default.
+@interface DecliningHangDelegate : NSObject <BugSplatDelegate>
+@property (nonatomic, assign) BOOL verdict;
+@property (nonatomic, assign) NSUInteger shouldSendCount;
+@property (nonatomic, assign) NSUInteger willSendCount;
+@property (nonatomic, assign) NSUInteger didFinishCount;
+@end
+
+@implementation DecliningHangDelegate
+
+- (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo
+{
+    self.shouldSendCount++;
+    return self.verdict;
+}
+
+- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+{
+    self.willSendCount++;
+}
+
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat sessionID:(nullable NSUUID *)sessionID
+{
+    self.didFinishCount++;
+}
+
+@end
+
+
 @interface BugSplatHangPersistenceTests : XCTestCase
 @property (nonatomic, strong) BugSplat *bugSplat;
 @property (nonatomic, strong, nullable) MockURLSession *mockSession;
@@ -719,6 +748,48 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     XCTAssertEqual(self.mockSession.requestCount, (NSUInteger)0, @"There was nothing left to upload");
     XCTAssertTrue(delegate.allCallbacksOnMainThread,
                   @"Lifecycle callbacks are documented as main-thread");
+}
+
+- (void)testNonFatalHangUpload_DelegateDecline_UploadsNothingAndDiscardsTheReport
+{
+    // The in-session non-fatal upload deliberately bypasses processPendingCrashReports, so
+    // without an explicit check here it would be the one report an app cannot suppress.
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    [self installMockUploadServiceSucceeding:YES];
+
+    DecliningHangDelegate *delegate = [[DecliningHangDelegate alloc] init];
+    self.bugSplat.delegate = delegate;
+
+    NSString *filename = [self persistHangReport];
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+
+    XCTAssertTrue([self waitForCondition:^BOOL {
+        return ![[NSFileManager defaultManager] fileExistsAtPath:[self crashPathForFilename:filename]];
+    } timeout:5.0], @"a declined report must be removed, not left to retry next launch");
+
+    XCTAssertGreaterThan(delegate.shouldSendCount, (NSUInteger)0, @"the hook must be consulted");
+    XCTAssertEqual(self.mockSession.requestCount, (NSUInteger)0, @"nothing may be uploaded");
+    XCTAssertEqual(delegate.willSendCount, (NSUInteger)0,
+                   @"willSend belongs to the send path and must not fire for a declined report");
+}
+
+- (void)testNonFatalHangUpload_DelegateAllows_StillUploads
+{
+    self.bugSplat.enableNonFatalHangReporting = YES;
+    [self installMockUploadServiceSucceeding:YES];
+
+    DecliningHangDelegate *delegate = [[DecliningHangDelegate alloc] init];
+    delegate.verdict = YES;
+    self.bugSplat.delegate = delegate;
+
+    NSString *filename = [self persistHangReport];
+    [self.bugSplat hangTrackerDidRecoverFromHang:nil];
+    [self drainHangQueue];
+
+    XCTAssertTrue([self waitForCondition:^BOOL { return delegate.didFinishCount > 0; } timeout:5.0]);
+    XCTAssertGreaterThan(self.mockSession.requestCount, (NSUInteger)0);
+    (void)filename;
 }
 
 - (void)testNonFatalHangUpload_WithoutUploadService_SkipsWillSend
