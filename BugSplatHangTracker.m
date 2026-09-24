@@ -33,6 +33,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
 @property (nonatomic, weak) id<BugSplatHangTrackerDelegate> delegate;
 @property (nonatomic, copy, nullable) BOOL(^isDebuggerAttachedBlock)(void);
 @property (nonatomic, copy, nullable) BOOL(^isAppActiveBlock)(void);
+@property (nonatomic, copy, nullable) BOOL(^isMainThreadBlockedByUIBlock)(void);
 @property (nonatomic, copy) CFAbsoluteTime(^clockBlock)(void);
 @property (nonatomic, copy) void(^recoveryDispatcher)(dispatch_block_t);
 @property (nonatomic, copy) void(^pingDispatcher)(dispatch_block_t);
@@ -62,11 +63,13 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
 - (instancetype)initWithThresholdSeconds:(NSTimeInterval)thresholdSeconds
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
-                         isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock {
+                         isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock
+             isMainThreadBlockedByUIBlock:(BOOL(^)(void))isMainThreadBlockedByUIBlock {
     return [self initWithThresholdSeconds:thresholdSeconds
                                  delegate:delegate
                    isDebuggerAttachedBlock:isDebuggerAttachedBlock
                           isAppActiveBlock:isAppActiveBlock
+              isMainThreadBlockedByUIBlock:isMainThreadBlockedByUIBlock
                                 clockBlock:nil
                         recoveryDispatcher:nil
                              pingDispatcher:nil];
@@ -76,6 +79,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(BOOL(^)(void))isDebuggerAttachedBlock
                          isAppActiveBlock:(BOOL(^)(void))isAppActiveBlock
+             isMainThreadBlockedByUIBlock:(BOOL(^)(void))isMainThreadBlockedByUIBlock
                                 clockBlock:(CFAbsoluteTime(^)(void))clockBlock
                        recoveryDispatcher:(void(^)(dispatch_block_t))recoveryDispatcher
                             pingDispatcher:(void(^)(dispatch_block_t))pingDispatcher {
@@ -84,6 +88,7 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
         _delegate = delegate;
         _isDebuggerAttachedBlock = [isDebuggerAttachedBlock copy];
         _isAppActiveBlock = [isAppActiveBlock copy];
+        _isMainThreadBlockedByUIBlock = [isMainThreadBlockedByUIBlock copy];
         if (clockBlock) {
             _clockBlock = [clockBlock copy];
         } else {
@@ -205,6 +210,15 @@ static inline NSInteger BugSplatHangMaxUnansweredPings(NSTimeInterval threshold)
     // App-active guard.
     BOOL(^activeCheck)(void) = self.isAppActiveBlock;
     if (activeCheck && !activeCheck()) {
+        atomic_store(&_unansweredPings, 0);
+        return;
+    }
+
+    // Modal-UI guard. A run-modal alert or panel, menu tracking or a window drag blocks the
+    // main thread from servicing our pings, which is indistinguishable from a hang at this
+    // level. Suppressing here keeps ordinary UI out of the hang reports.
+    BOOL(^uiBlockedCheck)(void) = self.isMainThreadBlockedByUIBlock;
+    if (uiBlockedCheck && uiBlockedCheck()) {
         atomic_store(&_unansweredPings, 0);
         return;
     }

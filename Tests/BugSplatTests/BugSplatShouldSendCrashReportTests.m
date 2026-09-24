@@ -387,6 +387,40 @@
     XCTAssertFalse(info.userSubmitted);
 }
 
+#pragma mark - Non-fatal hangs
+
+- (void)testCrashInfoReportsNonFatalHangWhenTheReportWasRewrittenAsRecovered
+{
+    // A recovered hang is rewritten in place by -markHangReportNonFatalWithFilename: and keeps
+    // its -hang filename, so the suffix alone cannot tell fatal from non-fatal. The
+    // bugsplat-hang-fatal attribute is what distinguishes them.
+    [self plantReportNamed:@"99999999971-hang"
+             extraMetadata:@{ @"attributes": @{ @"bugsplat-hang-fatal": @"false" } }];
+
+    DecidingDelegate *delegate = [[DecidingDelegate alloc] init];
+    delegate.verdict = NO;
+    self.bugSplat.delegate = delegate;
+
+    [self.bugSplat processPendingCrashReports];
+
+    XCTAssertEqual(delegate.received.count, 1);
+    XCTAssertEqual(delegate.received.firstObject.type, BugSplatCrashInfoTypeNonFatalHang,
+                   @"a recovered hang must not be reported to the app as a fatal one");
+}
+
+- (void)testCrashInfoStillReportsFatalHangWithoutTheRecoveredMarker
+{
+    [self plantReportNamed:@"99999999972-hang" extraMetadata:nil];
+
+    DecidingDelegate *delegate = [[DecidingDelegate alloc] init];
+    delegate.verdict = NO;
+    self.bugSplat.delegate = delegate;
+
+    [self.bugSplat processPendingCrashReports];
+
+    XCTAssertEqual(delegate.received.firstObject.type, BugSplatCrashInfoTypeFatalHang);
+}
+
 #pragma mark - Default behaviour
 
 - (void)testNotImplementingTheHookStillUploads

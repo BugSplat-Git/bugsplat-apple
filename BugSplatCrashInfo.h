@@ -14,8 +14,11 @@ NS_ASSUME_NONNULL_BEGIN
 typedef NS_ENUM(NSInteger, BugSplatCrashInfoType) {
     /** A crash captured by the signal / Mach exception handler. */
     BugSplatCrashInfoTypeCrash = 0,
-    /** A fatal main-thread hang captured by hang detection. */
-    BugSplatCrashInfoTypeFatalHang
+    /** A main-thread hang the app never recovered from. */
+    BugSplatCrashInfoTypeFatalHang,
+    /** A main-thread hang the app recovered from, reported because
+     *  `enableNonFatalHangReporting` is on. */
+    BugSplatCrashInfoTypeNonFatalHang
 };
 
 /**
@@ -32,7 +35,7 @@ typedef NS_ENUM(NSInteger, BugSplatCrashInfoType) {
 @interface BugSplatCrashInfo : NSObject
 
 /**
- * Whether this is a crash or a fatal hang.
+ * Whether this is a crash, a fatal hang, or a hang the app recovered from.
  */
 @property (nonatomic, readonly) BugSplatCrashInfoType type;
 

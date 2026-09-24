@@ -71,11 +71,21 @@ didDetectHangWithDuration:(NSTimeInterval)duration
  *                               the tracker suppresses detection for that poll. Pass nil
  *                               to disable the guard (useful for tests or for macOS where
  *                               UIApplication is unavailable).
+ * @param isMainThreadBlockedByUIBlock Optional predicate checked each poll. When it returns
+ *                               YES the tracker suppresses detection for that poll. Detection
+ *                               works by counting pings dispatched to the main queue that go
+ *                               unanswered, and ordinary modal AppKit UI - a run-modal alert
+ *                               or panel, menu tracking, a window drag - blocks the main
+ *                               thread exactly as a hang does. Without this guard a user
+ *                               sitting on an open save panel is reported as a hang. Pass nil
+ *                               to disable the guard (iOS and tvOS have no equivalent modal
+ *                               run loop, and tests generally want it off).
  */
 - (instancetype)initWithThresholdSeconds:(NSTimeInterval)thresholdSeconds
                                  delegate:(id<BugSplatHangTrackerDelegate>)delegate
                    isDebuggerAttachedBlock:(nullable BOOL(^)(void))isDebuggerAttachedBlock
-                         isAppActiveBlock:(nullable BOOL(^)(void))isAppActiveBlock;
+                         isAppActiveBlock:(nullable BOOL(^)(void))isAppActiveBlock
+             isMainThreadBlockedByUIBlock:(nullable BOOL(^)(void))isMainThreadBlockedByUIBlock;
 
 - (instancetype)init NS_UNAVAILABLE;
 
