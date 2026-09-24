@@ -8,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <stdexcept>
 #include "BugSplatInit.hpp"
 
 int setAttributeAndValue()
@@ -32,6 +33,23 @@ int sendFeedback()
     std::getline(std::cin, description);
 
     return bugSplatSendFeedback(title, description);
+}
+
+int postNonFatalError()
+{
+    // A real caught error: a C++ exception this tool recovers from. BugSplat captures a
+    // stack trace for it and uploads the report while the tool keeps running - the process
+    // does not exit, and the report shows up in the dashboard next to the real crashes,
+    // tagged with the bugsplat-nonfatal attribute.
+    try
+    {
+        throw std::runtime_error("Failed to parse config file: unexpected token at line 42");
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << "Caught std::runtime_error - sending a stack trace without crashing..." << std::endl;
+        return bugSplatPostException("std::runtime_error", e.what());
+    }
 }
 
 int checkInput(std::string input)
@@ -60,6 +78,10 @@ int checkInput(std::string input)
     {
         return sendFeedback();
     }
+    else if (input == "non-fatal")
+    {
+        return postNonFatalError();
+    }
     else if (input == "hang")
     {
         std::cout << "\nAbout to simulate a fatal main-thread hang.\n"
@@ -86,7 +108,7 @@ int checkInput(std::string input)
     }
     else
     {
-        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', 'hang', or 'q' to quit" << std::endl;
+        std::cout << "Unknown command. Try: 'seg fault', 'divide by zero', 'set', 'feedback', 'non-fatal', 'hang', or 'q' to quit" << std::endl;
     }
 
     return 0;

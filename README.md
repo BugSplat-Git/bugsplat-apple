@@ -343,6 +343,145 @@ BugSplat.shared().postFeedback(
 
 All parameters except `title` are optional. When `userName`, `userEmail`, or `appKey` are nil, BugSplat falls back to the corresponding property values set on the `BugSplat` singleton. You can also include file attachments using an array of `BugSplatAttachment` objects.
 
+### Non-Fatal Errors
+
+BugSplat can send a stack trace for something that did *not* terminate your app - an error you caught and recovered from, a failed precondition, a bad server response. This is the Apple counterpart to `BugSplat::CreateXmlReport` in the Windows SDK.
+
+Call it from the `catch` block that handled the problem. BugSplat snapshots every thread in the process at that point, marks the calling thread as the faulting one, and uploads the report while your app keeps running.
+
+**Swift:**
+
+```swift
+do {
+    try riskyOperation()
+} catch {
+    BugSplat.shared().postError(error) { result, postError in
+        if let postError {
+            print("Report failed: \(postError.localizedDescription)")
+        } else if let crashId = result?.crashId {
+            print("Reported as #\(crashId)")
+        }
+    }
+}
+```
+
+**Obj-C:**
+
+```objc
+@try {
+    [self riskyOperation];
+} @catch (NSException *exception) {
+    [[BugSplat shared] postException:exception
+                          attributes:@{@"screen": @"Checkout"}
+                         attachments:nil
+                          completion:^(BugSplatReportResult * _Nullable result, NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"Report failed: %@", error.localizedDescription);
+        } else {
+            NSLog(@"Reported as #%@", result.crashId);
+        }
+    }];
+}
+```
+
+When you have neither an `NSError` nor an `NSException` - a state machine that reached an impossible state, say - use the name/reason form:
+
+```swift
+BugSplat.shared().postException(
+    name: "ImageDecodeFailure",
+    reason: "unsupported pixel format \(format)",
+    attributes: ["asset": assetID],
+    attachments: nil
+) { result, error in }
+```
+
+Keep `name` stable and low-cardinality: it identifies this *class* of event, so don't interpolate an id or a timestamp into it. Put the varying detail in `reason` or in attributes.
+
+#### How non-fatal reports appear in the dashboard
+
+Non-fatal reports upload as ordinary Apple crash reports (crash type `macOS`/`iOS`), which is what lets the server symbolicate them against the same dSYMs your crash reports use. They therefore land in the same list as real crashes, and are tagged with these attributes so you can tell them apart:
+
+| Attribute | Value |
+| --- | --- |
+| `bugsplat-nonfatal` | Always `true` |
+| `bugsplat-nonfatal-name` | The exception name, error domain, or the `name:` you passed |
+| `bugsplat-nonfatal-captured-at` | ISO-8601 time the stack was captured |
+| `bugsplat-nonfatal-error-domain` | `postError` only - the error's domain |
+| `bugsplat-nonfatal-error-code` | `postError` only - the error's code |
+
+These five attributes are set by the SDK and cannot be overwritten by the `attributes` you pass, so a dashboard filter on `bugsplat-nonfatal` can be trusted. Any other attributes you supply are merged over the session attributes set with `setValue:forAttribute:`.
+
+#### Things to know
+
+- **`start` must have been called first.** Otherwise the completion handler receives an error and nothing is uploaded.
+- **Capturing the stack is synchronous**, on the order of a few milliseconds; only the upload is asynchronous. Don't call this in a tight loop on a hot path.
+- **A failed upload is not retried.** Unlike crash reports, non-fatal reports are not persisted to disk for a next-launch retry - the failure is reported through the completion handler so you can decide what to do.
+- **`BugSplatDelegate` is not consulted** for attachments. Pass whatever you want attached directly.
+- The completion handler is always invoked on the main queue, and is optional.
+
+### Deciding Whether to Send a Report
+
+`BugSplatDelegate` has a pre-upload hook that is consulted before any crash or fatal hang report is sent. Return `NO` and the report is discarded: nothing is uploaded, no crash dialog or alert is shown, and the report is deleted from disk.
+
+```objc
+- (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo
+{
+    return [self.settings crashReportingEnabled];
+}
+```
+
+```swift
+func bugSplat(_ bugSplat: BugSplat, shouldSendCrashReport crashInfo: BugSplatCrashInfo) -> Bool {
+    return settings.crashReportingEnabled
+}
+```
+
+Not implementing the method sends the report, so existing apps are unaffected.
+
+#### What you get
+
+`BugSplatCrashInfo` describes the report that is about to be sent, read from the metadata recorded when it was captured - so it describes the session that crashed, not the current one.
+
+| Property | Description |
+| --- | --- |
+| `type` | `BugSplatCrashInfoTypeCrash` or `BugSplatCrashInfoTypeFatalHang` |
+| `sessionID` | The `BugSplat.sessionID` of the session that crashed, or nil for reports that predate session tracking |
+| `crashDate` | When the report was captured |
+| `applicationName` / `applicationVersion` | Recorded at capture time, so they may differ from the running app if it was updated since |
+| `userSubmitted` | `YES` when the report is already marked to skip the crash dialog. This is the persisted bypass-dialog state, **not** proof of consent - an auto-submitted fatal hang carries it without any dialog having been shown |
+
+#### When it fires
+
+On the **next launch**, when the report is about to be sent - not at the moment of the crash. Crashes are recorded inside a signal handler where almost no work is safe, so the report is written to disk and processed when the app next starts. Set the delegate **before calling `start`**, which is when pending reports are processed; a delegate assigned afterwards will not be consulted.
+
+It is invoked **once per delivery attempt, not once per report**. A report whose upload fails is kept on disk and retried on a later launch, and the hook is consulted again each time - so an app that changes its mind between launches has its new answer honoured.
+
+That also means anything you record from the hook must tolerate being called more than once for the same report. If you are counting crashes, deduplicate on `sessionID` rather than incrementing on every call, or you will over-count reports that took several launches to upload.
+
+It is also consulted for reports already marked to skip the dialog; check `userSubmitted` and return `YES` if that prior decision should win. Be aware that flag is the persisted bypass-dialog state, not proof the user agreed - `autoSubmitFatalHangReport` is on by default, and a fatal hang is marked that way without a dialog because the app was frozen and the user never had the chance to consent.
+
+#### What it covers
+
+Crash and fatal hang reports. `postException:`, `postError:` and `postFeedback:` upload directly and do not pass through this hook, because they are explicit calls your app chooses to make.
+
+#### Example: count crashes without reporting them
+
+One use for this is recording that a crash happened without sending it anywhere - useful when crash reporting has to be switchable off, but you still want to know how often your app crashes:
+
+```objc
+- (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo
+{
+    // Your own analytics, an internal log, a counter in NSUserDefaults - whatever you like.
+    // Keyed on sessionID so a report retried across launches is only counted once.
+    [self.analytics recordCrashOnceForSession:crashInfo.sessionID at:crashInfo.crashDate];
+
+    // Nothing leaves the device when this returns NO.
+    return !self.crashReportingDisabled;
+}
+```
+
+Crash *detection* keeps working either way - the handler stays installed, so the next crash is still captured and offered to the hook.
+
 ### Crash Reporter Customization
 
 There are several ways to customize your BugSplat crash reporter.

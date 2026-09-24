@@ -49,6 +49,26 @@ static NSString *const kBugSplatHangAttrDetectedAt = @"bugsplat-hang-detected-at
 static NSString *const kBugSplatHangAttrAppState = @"bugsplat-hang-app-state";
 static NSString *const kBugSplatHangAttrLaunchId = @"bugsplat-hang-launch-id";
 
+// Attribute keys stamped onto reports posted for non-fatal events (caught exceptions and
+// errors). Non-fatals upload as ordinary Apple crash reports so they symbolicate against the
+// same dSYMs, which means these attributes are the only thing that tells them apart from a
+// real crash in the dashboard. The SDK owns them: caller-supplied attributes are merged
+// underneath, never over, so a filter on bugsplat-nonfatal can be trusted.
+static NSString *const kBugSplatNonFatalAttrMarker = @"bugsplat-nonfatal";
+static NSString *const kBugSplatNonFatalAttrName = @"bugsplat-nonfatal-name";
+static NSString *const kBugSplatNonFatalAttrCapturedAt = @"bugsplat-nonfatal-captured-at";
+static NSString *const kBugSplatNonFatalAttrErrorDomain = @"bugsplat-nonfatal-error-domain";
+static NSString *const kBugSplatNonFatalAttrErrorCode = @"bugsplat-nonfatal-error-code";
+
+// Errors surfaced by the non-fatal posting APIs before an upload is ever attempted. Once the
+// upload starts, errors come from BugSplatUploadService's own domain instead.
+static NSString *const kBugSplatNonFatalErrorDomain = @"com.bugsplat.nonfatal";
+typedef NS_ENUM(NSInteger, BugSplatNonFatalErrorCode) {
+    BugSplatNonFatalErrorCodeInvalidArgument = 1,
+    BugSplatNonFatalErrorCodeNotStarted = 2,
+    BugSplatNonFatalErrorCodeCaptureFailed = 3
+};
+
 // Attributes carried only by non-fatal (recovered) hang reports.
 static NSString *const kBugSplatHangAttrFatal = @"bugsplat-hang-fatal";
 static NSString *const kBugSplatHangAttrRecoveredAfterMs = @"bugsplat-hang-recovered-after-ms";
@@ -113,6 +133,10 @@ static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable met
 @property (nonatomic, strong, nullable) id<BugSplatBundleProtocol> bundleInternal;
 @property (nonatomic, strong, nullable) BugSplatUploadService *uploadService;
 @property (nonatomic, copy, nullable) NSString *currentCrashFilename;
+// Root directory for persisted crash and hang reports. Nil means the default location under
+// Application Support; -setCrashesDirectoryPathOverride: (BugSplat+Testing.h) points it
+// somewhere else so parallel test classes do not share one directory.
+@property (nonatomic, copy, nullable) NSString *crashesDirectoryPathOverride;
 @property (nonatomic, assign) BOOL isTestInstance;
 @property (nonatomic, strong, readwrite) NSUUID *sessionID;
 
@@ -190,6 +214,8 @@ static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable met
         self.currentCrashFilename = nil;
         self.isTestInstance = NO;
         self.hangDetectionThreshold = 2.0;
+        // Auto-submitted by default: the user was never asked, because the app was frozen then killed.
+        self.autoSubmitFatalHangReport = YES;
         _sessionID = [NSUUID UUID];
 
         // Configure PLCrashReporter
@@ -239,6 +265,8 @@ static BOOL BugSplatHangReportBarredFromLaterLaunch(NSDictionary * _Nullable met
         self.currentCrashFilename = nil;
         self.isTestInstance = YES;
         self.hangDetectionThreshold = 2.0;
+        // Auto-submitted by default: the user was never asked, because the app was frozen then killed.
+        self.autoSubmitFatalHangReport = YES;
         _sessionID = [NSUUID UUID];
 
         _crashReporterInternal = crashReporter;
@@ -903,10 +931,8 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     // so we snapshot current values directly - this is safe because the main thread is hung
     // and nothing else is mutating these properties while this runs.
     NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
     NSDate *now = [NSDate date];
-    NSString *nowISO = [isoFormatter stringFromDate:now];
+    NSString *nowISO = BugSplatPersistedTimestampFromDate(now);
 
     metadata[kBugSplatMetaKeyTimestamp] = nowISO;
     metadata[kBugSplatMetaKeyDatabase] = self.bugSplatDatabase;
@@ -933,16 +959,23 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     metadata[kBugSplatMetaKeyAttributes] = attributes;
 
-    // Mark auto-submittable so the next-launch scanner uploads silently without showing a dialog.
-    metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+    // Leaving userSubmitted unset routes the report down the same submission path a crash report
+    // takes. That is not the same as showing a dialog: whether one appears is then
+    // autoSubmitCrashReport's call, which defaults to NO on macOS and YES on iOS.
+    // autoSubmitFatalHangReport opts out of that path entirely - stamping the flag is precisely
+    // what makes the next-launch scanner submit silently, since shouldSendCrashSilently: checks
+    // it before it ever consults autoSubmitCrashReport.
+    if (self.autoSubmitFatalHangReport) {
+        metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
+    }
 
     NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:hangFilename]
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
     if (![metadata writeToFile:metaFilePath atomically:YES]) {
         // Without the .meta file the next-launch scanner sees an orphan .crash that
-        // lacks userSubmitted=YES, database, and attributes - it would either fail to
-        // upload or surface a dialog instead of the intended silent submit. Drop the
-        // .crash too so we don't leak a half-formed report.
+        // lacks database and attributes - it would either fail to upload or surface a
+        // dialog carrying none of the hang's context. Drop the .crash too so we don't
+        // leak a half-formed report.
         NSLog(@"BugSplat: Failed to write hang metadata; removing orphan crash file");
         [[NSFileManager defaultManager] removeItemAtPath:crashFilePath error:nil];
         return;
@@ -1097,9 +1130,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     NSDate *crashTimestamp = crashReport.systemInfo.timestamp ?: [NSDate date];
     
     // Store as ISO 8601 string for reliable persistence and API compatibility
-    NSISO8601DateFormatter *isoFormatter = [[NSISO8601DateFormatter alloc] init];
-    isoFormatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-    NSString *crashTimeISO = [isoFormatter stringFromDate:crashTimestamp];
+    NSString *crashTimeISO = BugSplatPersistedTimestampFromDate(crashTimestamp);
     metadata[kBugSplatMetaKeyTimestamp] = crashTimeISO;
 
     // Carry the crashed session's ID into the per-crash metadata so it survives offline
@@ -1383,6 +1414,19 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                               stringByAppendingPathExtension:kBugSplatMetaFileExtension];
     NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
     
+    // Let the delegate veto this report before anything is uploaded or shown. This sits
+    // ahead of the silent/dialog fork so a NO suppresses both, and it runs on every delivery
+    // attempt - a report kept on disk by a failed upload is asked about again next launch.
+    if (![self shouldSendPersistedReportWithFilename:crashFilename metadata:metadata]) {
+        NSLog(@"BugSplat: Delegate declined crash report %@ - discarding without uploading", crashFilename);
+        [self cleanupCrashReportWithFilename:crashFilename];
+        self.sendingInProgress = NO;
+        // Drain the rest of the queue the same way the load-failure paths above do,
+        // otherwise declined reports would block the reports behind them.
+        [self processPendingCrashReports];
+        return;
+    }
+
     // Determine if we should send silently or show a dialog
     BOOL sendSilently = [self shouldSendCrashSilently:metadata];
     
@@ -1405,6 +1449,73 @@ didDetectHangWithDuration:(NSTimeInterval)duration
 }
 
 /**
+ * Ask the delegate whether a persisted report should be sent at all.
+ *
+ * Returns YES when the delegate does not implement the hook, so apps that never adopt it
+ * keep today's behaviour exactly. A delegate that raises is treated as having no opinion
+ * for the same reason - an exception is indistinguishable from an unimplemented method,
+ * and the established behaviour is to send.
+ */
+- (BOOL)shouldSendPersistedReportWithFilename:(NSString *)crashFilename
+                                     metadata:(NSDictionary *)metadata
+{
+    id<BugSplatDelegate> delegate = self.delegate;
+    if (![delegate respondsToSelector:@selector(bugSplat:shouldSendCrashReport:)]) {
+        return YES;
+    }
+
+    BugSplatCrashInfo *crashInfo = [self crashInfoForFilename:crashFilename metadata:metadata];
+
+    BOOL shouldSend = YES;
+    @try {
+        shouldSend = [delegate bugSplat:self shouldSendCrashReport:crashInfo];
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in bugSplat:shouldSendCrashReport: delegate: %@ - %@ (sending the report)",
+              exception.name, exception.reason);
+    }
+
+    return shouldSend;
+}
+
+/**
+ * Build the BugSplatCrashInfo handed to the delegate, entirely from the metadata recorded
+ * alongside the report, so it describes the session that crashed rather than this one.
+ *
+ * Hang reports are identified by their filename suffix, which is how the rest of the
+ * pipeline tells them apart from crashes.
+ */
+- (BugSplatCrashInfo *)crashInfoForFilename:(NSString *)crashFilename
+                                   metadata:(NSDictionary *)metadata
+{
+    BugSplatCrashInfoType type = [crashFilename hasSuffix:kBugSplatHangFilenameSuffix]
+        ? BugSplatCrashInfoTypeFatalHang
+        : BugSplatCrashInfoTypeCrash;
+
+    NSUUID *sessionID = nil;
+    id sessionIDValue = metadata[kBugSplatMetaKeySessionID];
+    if ([sessionIDValue isKindOfClass:[NSString class]]) {
+        sessionID = [[NSUUID alloc] initWithUUIDString:sessionIDValue];
+    }
+
+    id applicationName = metadata[kBugSplatMetaKeyApplicationName];
+    if (![applicationName isKindOfClass:[NSString class]]) {
+        applicationName = nil;
+    }
+
+    id applicationVersion = metadata[kBugSplatMetaKeyApplicationVersion];
+    if (![applicationVersion isKindOfClass:[NSString class]]) {
+        applicationVersion = nil;
+    }
+
+    return [[BugSplatCrashInfo alloc] initWithType:type
+                                         sessionID:sessionID
+                                         crashDate:BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp])
+                                   applicationName:applicationName
+                                applicationVersion:applicationVersion
+                                     userSubmitted:[metadata[kBugSplatMetaKeyUserSubmitted] boolValue]];
+}
+
+/**
  * Determine if a crash should be sent silently (without showing a dialog).
  */
 - (BOOL)shouldSendCrashSilently:(NSDictionary *)metadata
@@ -1420,18 +1531,20 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
 #if TARGET_OS_OSX
-    // Crash report has expired
-    @try {
-        NSNumber *timestamp = metadata[kBugSplatMetaKeyTimestamp];
-        if (self.expirationTimeInterval > 0 && timestamp) {
-            NSTimeInterval timeSinceCrash = [[NSDate date] timeIntervalSince1970] - timestamp.doubleValue;
+    // Crash report has expired. An unparseable timestamp is unknown, not expired - skip the check
+    // and let the method return NO, which shows the dialog rather than silently sending a report
+    // the user was never shown. autoSubmitCrashReport was already ruled out above.
+    if (self.expirationTimeInterval > 0) {
+        NSDate *reportDate = BugSplatDateFromPersistedTimestamp(metadata[kBugSplatMetaKeyTimestamp]);
+        if (reportDate) {
+            NSTimeInterval timeSinceCrash = -[reportDate timeIntervalSinceNow];
             if (timeSinceCrash > self.expirationTimeInterval) {
                 NSLog(@"BugSplat: Crash report expired (%.0f seconds old)", timeSinceCrash);
                 return YES;
             }
+        } else if (metadata[kBugSplatMetaKeyTimestamp]) {
+            NSLog(@"BugSplat: Could not read crash report timestamp; skipping the expiration check");
         }
-    } @catch (NSException *exception) {
-        NSLog(@"BugSplat: Exception checking crash report expiration: %@ - %@", exception.name, exception.reason);
     }
 #else
     // iOS: User chose "Always Send"
@@ -1595,6 +1708,14 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                             if (userEmail.length > 0) self.userEmail = userEmail;
                         }
                         
+                        // The user's approval covers every pending report, not just the one the
+                        // dialog described. Mark the others before this upload starts so they are
+                        // sent silently after it, and retried silently on the next launch if the
+                        // batch is interrupted, instead of each getting its own dialog.
+                        [self markAllPendingCrashesAsSubmittedWithUserName:userName
+                                                                 userEmail:userEmail
+                                                            exceptFilename:crashFilename];
+                        
                         // Submit this crash with user-provided details
                         // Note: After this completes, remaining crashes will be sent SILENTLY
                         [self submitPersistedCrashReportWithFilename:crashFilename
@@ -1694,6 +1815,13 @@ didDetectHangWithDuration:(NSTimeInterval)duration
             UIAlertAction *sendAction = [UIAlertAction actionWithTitle:@"Send"
                                                                  style:UIAlertActionStyleDefault
                                                                handler:^(UIAlertAction *action) {
+                // The user's approval covers every pending report, not just the one the alert
+                // described. The alert collects no name or email, so nil leaves each report's
+                // own persisted values in place.
+                [self markAllPendingCrashesAsSubmittedWithUserName:nil
+                                                         userEmail:nil
+                                                    exceptFilename:crashFilename];
+                
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
                                                     metadata:metadata
@@ -1719,6 +1847,11 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                 } @catch (NSException *exception) {
                     NSLog(@"BugSplat: Exception in bugSplatWillSendCrashReportsAlways delegate: %@ - %@", exception.name, exception.reason);
                 }
+                
+                // Same as "Send": this approval covers every pending report.
+                [self markAllPendingCrashesAsSubmittedWithUserName:nil
+                                                         userEmail:nil
+                                                    exceptFilename:crashFilename];
                 
                 [self submitPersistedCrashReportWithFilename:crashFilename
                                              crashReportText:crashReportText
@@ -2028,6 +2161,268 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [self.uploadService uploadFeedback:title description:description attachments:attachments metadata:metadata completion:completion];
 }
 
+#pragma mark - Non-Fatal Error Reporting
+
+- (void)postException:(NSException *)exception
+           completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    [self postException:exception attributes:nil attachments:nil completion:completion];
+}
+
+- (void)postException:(NSException *)exception
+           attributes:(NSDictionary<NSString *, NSString *> *)attributes
+          attachments:(NSArray<BugSplatAttachment *> *)attachments
+           completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (!exception) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postException requires a non-nil exception"
+                          completion:completion];
+        return;
+    }
+
+    // Hand PLCrashReporter the real exception: if it was actually raised it carries
+    // callStackReturnAddresses from the throw site, which lands in the report as the last
+    // exception backtrace alongside the live thread stacks.
+    [self postNonFatalReportWithException:exception
+                                     name:exception.name
+                                   reason:exception.reason
+                       reservedAttributes:nil
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+- (void)postError:(NSError *)error
+       completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    [self postError:error attributes:nil attachments:nil completion:completion];
+}
+
+- (void)postError:(NSError *)error
+       attributes:(NSDictionary<NSString *, NSString *> *)attributes
+      attachments:(NSArray<BugSplatAttachment *> *)attachments
+       completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (!error) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postError requires a non-nil error"
+                          completion:completion];
+        return;
+    }
+
+    // Group by domain, not by domain+code: the stack is what distinguishes one failure from
+    // another, and folding the code into the name would split a single call site across as
+    // many groups as it has failure codes. The code travels as a searchable attribute instead.
+    // The domain attribute reuses `name` rather than error.domain so the two always agree.
+    // An NSError with an empty domain would otherwise be filed under the name "NSError" while
+    // carrying an empty domain attribute - a value that identifies nothing and that a search
+    // for the name it was filed under would never match.
+    NSString *name = error.domain.length > 0 ? error.domain : @"NSError";
+    NSDictionary<NSString *, NSString *> *reserved = @{
+        kBugSplatNonFatalAttrErrorDomain: name,
+        kBugSplatNonFatalAttrErrorCode: [@(error.code) stringValue]
+    };
+
+    // A synthesized exception has no callStackReturnAddresses, so the report's stacks come
+    // from the live thread snapshot - with the calling thread marked as the faulting one.
+    NSException *exception = [NSException exceptionWithName:name
+                                                     reason:error.localizedDescription
+                                                   userInfo:nil];
+
+    [self postNonFatalReportWithException:exception
+                                     name:name
+                                   reason:error.localizedDescription
+                       reservedAttributes:reserved
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+- (void)postExceptionWithName:(NSString *)name
+                       reason:(NSString *)reason
+                   attributes:(NSDictionary<NSString *, NSString *> *)attributes
+                  attachments:(NSArray<BugSplatAttachment *> *)attachments
+                   completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    if (name.length == 0) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeInvalidArgument
+                             message:@"postExceptionWithName requires a non-empty name"
+                          completion:completion];
+        return;
+    }
+
+    NSException *exception = [NSException exceptionWithName:name reason:reason userInfo:nil];
+
+    [self postNonFatalReportWithException:exception
+                                     name:name
+                                   reason:reason
+                       reservedAttributes:nil
+                               attributes:attributes
+                              attachments:attachments
+                               completion:completion];
+}
+
+/**
+ * Shared body of the non-fatal posting APIs, and the Apple counterpart to the Windows SDK's
+ * BugSplat::CreateXmlReport: snapshot the process, upload, keep running.
+ *
+ * The snapshot is taken synchronously on the calling thread, which is the whole point - it is
+ * the caller's stack that explains the caught error, and hopping queues first would replace it
+ * with the stack of a worker. Only the upload is asynchronous.
+ *
+ * @param exception The exception PLCrashReporter records as the report's uncaught exception.
+ * @param name Report name, used for the bugsplat-nonfatal-name attribute.
+ * @param reason Detail for this occurrence; becomes the report description.
+ * @param reservedAttributes SDK-derived attributes that outrank caller-supplied ones.
+ * @param attributes Caller-supplied attributes for this report only.
+ * @param attachments Files to include. The delegate is deliberately not consulted: it exists
+ *        to gather state about a crash that already happened, and calling it here would fire
+ *        it on an arbitrary thread on an ordinary code path.
+ * @param completion Delivered on the main queue.
+ */
+- (void)postNonFatalReportWithException:(NSException *)exception
+                                   name:(NSString *)name
+                                 reason:(NSString *)reason
+                     reservedAttributes:(NSDictionary<NSString *, NSString *> *)reservedAttributes
+                             attributes:(NSDictionary<NSString *, NSString *> *)attributes
+                            attachments:(NSArray<BugSplatAttachment *> *)attachments
+                             completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    // The upload service is created by -start, so its absence is the reliable signal that the
+    // caller has not started BugSplat yet (isStartInvoked is also NO while -start is midway
+    // through processing pending crashes, when posting is in fact already fine).
+    BugSplatUploadService *uploadService = self.uploadService;
+    if (!uploadService) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeNotStarted
+                             message:@"BugSplat has not been started - call -start before posting a non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    id<BugSplatCrashReporterProtocol> crashReporter = self.crashReporterInternal;
+    if (![crashReporter respondsToSelector:@selector(generateLiveReportWithException:error:)]) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:@"The configured crash reporter cannot capture live reports"
+                          completion:completion];
+        return;
+    }
+
+    NSDate *capturedAt = [NSDate date];
+
+    NSError *captureError = nil;
+    NSData *liveReportData = nil;
+    @try {
+        liveReportData = [crashReporter generateLiveReportWithException:exception error:&captureError];
+    } @catch (NSException *thrown) {
+        NSLog(@"BugSplat: Exception generating non-fatal report: %@ - %@", thrown.name, thrown.reason);
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:[NSString stringWithFormat:@"Exception capturing non-fatal report: %@", thrown.reason ?: thrown.name]
+                          completion:completion];
+        return;
+    }
+
+    if (liveReportData.length == 0) {
+        NSLog(@"BugSplat: Failed to generate non-fatal report: %@", captureError);
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:captureError.localizedDescription ?: @"Failed to capture a non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    NSString *reportText = nil;
+    @try {
+        NSError *parseError = nil;
+        PLCrashReport *parsed = [[PLCrashReport alloc] initWithData:liveReportData error:&parseError];
+        if (parsed) {
+            reportText = [PLCrashReportTextFormatter stringValueForCrashReport:parsed
+                                                                withTextFormat:PLCrashReportTextFormatiOS];
+        } else {
+            NSLog(@"BugSplat: Failed to parse non-fatal report: %@", parseError);
+        }
+    } @catch (NSException *thrown) {
+        NSLog(@"BugSplat: Exception formatting non-fatal report: %@ - %@", thrown.name, thrown.reason);
+    }
+
+    NSData *reportData = [reportText dataUsingEncoding:NSUTF8StringEncoding];
+    if (reportData.length == 0) {
+        [self deliverNonFatalFailure:BugSplatNonFatalErrorCodeCaptureFailed
+                             message:@"Failed to format the captured non-fatal report"
+                          completion:completion];
+        return;
+    }
+
+    // Session attributes first, then this call's attributes, then the SDK's own - so a caller
+    // cannot overwrite bugsplat-nonfatal and hide the report from a dashboard filter.
+    NSMutableDictionary<NSString *, NSString *> *mergedAttributes =
+        self.attributes ? [self.attributes mutableCopy] : [NSMutableDictionary dictionary];
+    [mergedAttributes addEntriesFromDictionary:attributes ?: @{}];
+    [mergedAttributes addEntriesFromDictionary:reservedAttributes ?: @{}];
+    mergedAttributes[kBugSplatNonFatalAttrMarker] = @"true";
+    mergedAttributes[kBugSplatNonFatalAttrName] = name;
+    mergedAttributes[kBugSplatNonFatalAttrCapturedAt] = BugSplatPersistedTimestampFromDate(capturedAt);
+
+    BugSplatCrashMetadata *metadata = [[BugSplatCrashMetadata alloc] init];
+    metadata.database = self.bugSplatDatabase;
+    metadata.applicationName = self.resolvedApplicationName;
+    metadata.applicationVersion = self.resolvedApplicationVersion;
+    metadata.userName = self.userName;
+    metadata.userEmail = self.userEmail;
+    metadata.userDescription = reason;
+    metadata.applicationKey = self.appKey;
+    metadata.notes = self.notes;
+    metadata.crashTime = BugSplatPersistedTimestampFromDate(capturedAt);
+    metadata.attributes = mergedAttributes;
+    // crashTypeId is deliberately left nil so the upload service stamps the platform's own
+    // type (macOS/iOS) and the server symbolicates the report with the app's dSYMs.
+
+    NSLog(@"BugSplat: Uploading non-fatal report '%@' (app: %@ %@, database: %@)...",
+          name, metadata.applicationName, metadata.applicationVersion, metadata.database);
+
+    [uploadService uploadCrashReport:reportData
+                       crashFilename:@"crash.crashlog"
+                         attachments:attachments
+                            metadata:metadata
+                          completion:^(BOOL success, NSError *error, NSString *infoUrl, NSNumber *crashId) {
+        // Already delivered on the main queue by the upload service.
+        if (!completion) {
+            if (!success) {
+                NSLog(@"BugSplat: Failed to upload non-fatal report '%@': %@", name, error);
+            }
+            return;
+        }
+
+        if (success) {
+            completion([[BugSplatReportResult alloc] initWithCrashId:crashId infoUrl:infoUrl], nil);
+        } else {
+            NSLog(@"BugSplat: Failed to upload non-fatal report '%@': %@", name, error);
+            completion(nil, error ?: [NSError errorWithDomain:kBugSplatNonFatalErrorDomain
+                                                         code:BugSplatNonFatalErrorCodeCaptureFailed
+                                                     userInfo:@{NSLocalizedDescriptionKey: @"Non-fatal report upload failed"}]);
+        }
+    }];
+}
+
+/// Reports a non-fatal posting failure that happened before any upload was attempted, on the
+/// main queue so callers get the same delivery contract as a completed upload.
+- (void)deliverNonFatalFailure:(BugSplatNonFatalErrorCode)code
+                       message:(NSString *)message
+                    completion:(void (^)(BugSplatReportResult * _Nullable, NSError * _Nullable))completion
+{
+    NSLog(@"BugSplat: %@", message);
+
+    if (!completion) {
+        return;
+    }
+
+    NSError *error = [NSError errorWithDomain:kBugSplatNonFatalErrorDomain
+                                         code:code
+                                     userInfo:@{NSLocalizedDescriptionKey: message}];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil, error);
+    });
+}
+
 #pragma mark - Properties
 
 - (NSBundle *)bundle
@@ -2288,13 +2683,50 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     [metadata writeToFile:metaFilePath atomically:YES];
 }
 
+/**
+ * Mark every pending crash report other than crashFilename as user-submitted.
+ *
+ * The dialog is shown once, for the newest report, and the user's approval covers
+ * everything that is pending: older crashes, hang reports, and reports left over from
+ * earlier launches. Stamping them all before the first upload starts means the chained
+ * processPendingCrashReports pass sends them silently, and an interrupted batch
+ * (offline, force-quit) retries them silently on the next launch instead of showing
+ * another dialog.
+ *
+ * The name and email the user just entered are reused for the other reports (nil leaves
+ * each report's persisted values alone). Comments are not, since they describe the
+ * report the dialog was shown for.
+ */
+- (void)markAllPendingCrashesAsSubmittedWithUserName:(nullable NSString *)userName
+                                           userEmail:(nullable NSString *)userEmail
+                                      exceptFilename:(NSString *)crashFilename
+{
+    @try {
+        for (NSString *pendingFilename in [self getPendingCrashFiles]) {
+            if ([pendingFilename isEqualToString:crashFilename]) {
+                continue;
+            }
+            [self markCrashAsSubmittedWithComments:nil
+                                          userName:userName
+                                         userEmail:userEmail
+                                  forCrashFilename:pendingFilename];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in markAllPendingCrashesAsSubmittedWithUserName: %@ - %@", exception.name, exception.reason);
+    }
+}
+
 - (NSString *)crashesDirectoryPath
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
-    NSString *appSupportDir = paths.firstObject;
-    NSString *crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
-    
+    NSString *crashesDir = self.crashesDirectoryPathOverride;
+
+    if (!crashesDir) {
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+        NSString *appSupportDir = paths.firstObject;
+        crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
+    }
+
     if (![fileManager fileExistsAtPath:crashesDir]) {
         NSError *error = nil;
         [fileManager createDirectoryAtPath:crashesDir withIntermediateDirectories:YES attributes:nil error:&error];

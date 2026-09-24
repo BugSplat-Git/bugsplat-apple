@@ -165,9 +165,25 @@ struct ContentView: View {
     }
 
     private func triggerNonCrashError() {
-        // Demo: pretend we caught an exception. Real apps would put a do/try/catch
-        // around an actual risky operation and report the type name here.
-        ActivityLog.record(.error, detail: "NSInvalidArgumentException caught")
+        // A real caught error: decoding malformed JSON. postError captures a stack trace
+        // for it and uploads the report while the app keeps running - the app does not
+        // crash, and the report shows up in the dashboard next to the real crashes,
+        // tagged with the bugsplat-nonfatal attribute.
+        do {
+            _ = try JSONDecoder().decode([String: String].self, from: Data("not json".utf8))
+        } catch {
+            BugSplat.shared().postError(error, attributes: ["screen": "Home"], attachments: nil) { result, postError in
+                if let postError {
+                    ActivityLog.record(.error, detail: "Report failed: \(postError.localizedDescription)")
+                } else if let crashId = result?.crashId {
+                    ActivityLog.record(.error, detail: "Non-crash error sent (report #\(crashId))")
+                } else {
+                    ActivityLog.record(.error, detail: "Non-crash error sent")
+                }
+                entries = ActivityLog.all()
+            }
+        }
+        ActivityLog.record(.error, detail: "DecodingError caught - sending stack trace")
         entries = ActivityLog.all()
     }
 

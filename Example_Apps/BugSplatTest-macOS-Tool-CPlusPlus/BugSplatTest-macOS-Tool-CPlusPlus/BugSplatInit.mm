@@ -156,6 +156,54 @@ int bugSplatSendFeedback(std::string title, std::string description)
     }
 }
 
+int bugSplatPostException(std::string name, std::string reason)
+{
+    @autoreleasepool {
+        NSString *nameString = @(name.c_str());
+        NSString *reasonString = @(reason.c_str());
+        NSLog(@"bugSplatPostException(%@, %@)", nameString, reasonString);
+
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        __block BugSplatReportResult *reportResult = nil;
+        __block NSError *reportError = nil;
+
+        // A C++ exception is neither an NSError nor an NSException, so there is no object
+        // to hand to postError: or postException:. postExceptionWithName:reason: takes the
+        // type name and message directly and captures the stack trace itself, so the report
+        // symbolicates against the same dSYMs as this tool's real crashes.
+        //
+        // The tool keeps running - nothing here terminates the process. The report lands in
+        // the dashboard next to the real crashes, tagged with the bugsplat-nonfatal attribute.
+        [[BugSplat shared] postExceptionWithName:nameString
+                                          reason:reasonString
+                                      attributes:@{@"command": @"non-fatal"}
+                                     attachments:nil
+                                      completion:^(BugSplatReportResult * _Nullable result, NSError * _Nullable error) {
+            reportResult = result;
+            reportError = error;
+            dispatch_semaphore_signal(semaphore);
+        }];
+
+        // Give the run loop time to process the network request
+        while (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW)) {
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        }
+
+        if (reportError) {
+            NSLog(@"Non-crash error report failed: %@", reportError.localizedDescription);
+            return 1;
+        }
+
+        if (reportResult.crashId) {
+            NSLog(@"Non-crash error sent successfully! Report #%@", reportResult.crashId);
+        } else {
+            NSLog(@"Non-crash error sent successfully!");
+        }
+
+        return 0;
+    }
+}
+
 void mainObjCRunLoop() {
     @autoreleasepool {
         // Objective-C often needs an NSRunLoop

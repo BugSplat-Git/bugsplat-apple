@@ -14,6 +14,8 @@
 
 #import "BugSplat+Testing.h"
 #import "BugSplatTestSupport.h"
+#import "BugSplatUtilities.h"
+#import "BugSplatTestCrashDirectory.h"
 #import "MockCrashReporter.h"
 #import "MockCrashStorage.h"
 #import "MockUserDefaults.h"
@@ -28,6 +30,7 @@
 @property (nonatomic, strong) MockCrashStorage *mockCrashStorage;
 @property (nonatomic, strong) MockUserDefaults *mockUserDefaults;
 @property (nonatomic, strong) MockBundle *mockBundle;
+@property (nonatomic, copy) NSString *isolatedCrashesDirectory;
 
 @end
 
@@ -51,10 +54,18 @@
                                                crashStorage:self.mockCrashStorage
                                                userDefaults:self.mockUserDefaults
                                                      bundle:self.mockBundle];
+
+    self.isolatedCrashesDirectory = BugSplatTestsMakeIsolatedCrashesDirectory();
+    [self.bugSplat setCrashesDirectoryPathOverride:self.isolatedCrashesDirectory];
 }
 
 - (void)tearDown
 {
+    // The whole directory belongs to this test, so removing it takes every planted report
+    // with it - no per-file bookkeeping needed.
+    [[NSFileManager defaultManager] removeItemAtPath:self.isolatedCrashesDirectory error:nil];
+    self.isolatedCrashesDirectory = nil;
+
     [self.mockCrashReporter reset];
     [self.mockCrashStorage reset];
     [self.mockUserDefaults reset];
@@ -317,6 +328,56 @@
     XCTAssertFalse(result);
 }
 
+#if TARGET_OS_OSX
+
+#pragma mark - Expiration Tests
+
+- (void)testShouldSendCrashSilently_RecentReportIsNotExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate([NSDate date]) };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"A report written just now must not count as expired");
+}
+
+- (void)testShouldSendCrashSilently_OldReportIsExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    NSDate *twoHoursAgo = [NSDate dateWithTimeIntervalSinceNow:-(2 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate(twoHoursAgo) };
+
+    XCTAssertTrue([self.bugSplat shouldSendCrashSilently:metadata],
+                  @"A report older than expirationTimeInterval must still expire");
+}
+
+- (void)testShouldSendCrashSilently_ExpirationIgnoredWhenNotConfigured
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    NSDate *longAgo = [NSDate dateWithTimeIntervalSinceNow:-(365 * 24 * 60 * 60)];
+    NSDictionary *metadata = @{ @"timestamp": BugSplatPersistedTimestampFromDate(longAgo) };
+
+    XCTAssertFalse([self.bugSplat shouldSendCrashSilently:metadata],
+                   @"Without expirationTimeInterval set, age must not matter");
+}
+
+- (void)testShouldSendCrashSilently_UnreadableTimestampIsNotTreatedAsExpired
+{
+    self.bugSplat.autoSubmitCrashReport = NO;
+    self.bugSplat.expirationTimeInterval = 60 * 60;
+
+    for (id value in @[ @"not a date", @0, [NSNull null], @[] ]) {
+        XCTAssertFalse([self.bugSplat shouldSendCrashSilently:@{ @"timestamp": value }],
+                       @"timestamp %@ should skip the expiration check, not expire the report", value);
+    }
+}
+
+#endif
+
 #if !TARGET_OS_OSX
 - (void)testShouldSendCrashSilently_iOS_TrueWhenAlwaysSendEnabled
 {
@@ -328,6 +389,103 @@
     XCTAssertTrue(result);
 }
 #endif
+
+#pragma mark - Stacked Crash Report Tests
+
+/// Plant a crash + meta pair in the real crashes directory as if persisted at an earlier launch.
+- (void)plantPendingReportNamed:(NSString *)filename metadata:(NSDictionary *)metadata
+{
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    // Nil when the directory could not be created. Without this the nil path turns into a
+    // writeToFile failure three lines down, which says nothing about the actual cause.
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return; }
+
+    NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    XCTAssertTrue([[@"test crash report" dataUsingEncoding:NSUTF8StringEncoding] writeToFile:crashPath atomically:YES]);
+    XCTAssertTrue([metadata writeToFile:metaPath atomically:YES]);
+}
+
+- (NSDictionary *)metadataForPlantedReportNamed:(NSString *)filename
+{
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return nil; }
+
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    return [NSDictionary dictionaryWithContentsOfFile:metaPath];
+}
+
+- (void)removePlantedReportsNamed:(NSArray<NSString *> *)filenames
+{
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    XCTAssertNotNil(dir);
+    if (dir == nil) { return; }
+
+    for (NSString *filename in filenames) {
+        for (NSString *ext in @[@"crash", @"meta"]) {
+            NSString *path = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:ext];
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
+    }
+}
+
+- (void)testMarkAllPendingCrashesAsSubmitted_MarksEveryOtherPendingReport
+{
+    // Two older reports (a crash and a hang) plus the newest crash the dialog would be
+    // shown for. Names sort after any timestamp-based leftovers in the directory.
+    NSString *olderCrash = @"99999999801";
+    NSString *olderHang = @"99999999802-hang";
+    NSString *newestCrash = @"99999999803";
+    NSArray<NSString *> *all = @[olderCrash, olderHang, newestCrash];
+    [self removePlantedReportsNamed:all];
+    NSDictionary *baseMetadata = @{ @"database": @"testdb", @"applicationName": @"TestApp", @"applicationVersion": @"1.0.0" };
+    for (NSString *filename in all) {
+        [self plantPendingReportNamed:filename metadata:baseMetadata];
+    }
+    self.bugSplat.autoSubmitCrashReport = NO;
+
+    [self.bugSplat markAllPendingCrashesAsSubmittedWithUserName:@"Jane Doe"
+                                                      userEmail:@"jane@example.com"
+                                                 exceptFilename:newestCrash];
+
+    for (NSString *filename in @[olderCrash, olderHang]) {
+        NSDictionary *metadata = [self metadataForPlantedReportNamed:filename];
+        XCTAssertTrue([metadata[@"userSubmitted"] boolValue], @"%@ should be marked user-submitted", filename);
+        XCTAssertEqualObjects(metadata[@"userName"], @"Jane Doe", @"%@ should reuse the entered name", filename);
+        XCTAssertEqualObjects(metadata[@"userEmail"], @"jane@example.com", @"%@ should reuse the entered email", filename);
+        XCTAssertNil(metadata[@"comments"], @"comments belong only to the report the dialog described");
+        XCTAssertTrue([self.bugSplat shouldSendCrashSilently:metadata],
+                      @"%@ should now be sent silently instead of getting its own dialog", filename);
+    }
+
+    NSDictionary *newestMetadata = [self metadataForPlantedReportNamed:newestCrash];
+    XCTAssertNil(newestMetadata[@"userSubmitted"],
+                 @"the excepted report is left for the submit path, which marks it together with the user's comments");
+    XCTAssertNil(newestMetadata[@"userName"]);
+
+    [self removePlantedReportsNamed:all];
+}
+
+- (void)testMarkAllPendingCrashesAsSubmitted_NilUserDetailsKeepPersistedValues
+{
+    // The iOS alert collects no name or email; each report must keep what it captured at crash time.
+    NSString *older = @"99999999811";
+    NSString *newest = @"99999999812";
+    [self removePlantedReportsNamed:@[older, newest]];
+    [self plantPendingReportNamed:older metadata:@{ @"userName": @"Persisted Name", @"userEmail": @"persisted@example.com" }];
+    [self plantPendingReportNamed:newest metadata:@{}];
+
+    [self.bugSplat markAllPendingCrashesAsSubmittedWithUserName:nil userEmail:nil exceptFilename:newest];
+
+    NSDictionary *metadata = [self metadataForPlantedReportNamed:older];
+    XCTAssertTrue([metadata[@"userSubmitted"] boolValue]);
+    XCTAssertEqualObjects(metadata[@"userName"], @"Persisted Name");
+    XCTAssertEqualObjects(metadata[@"userEmail"], @"persisted@example.com");
+
+    [self removePlantedReportsNamed:@[older, newest]];
+}
 
 #pragma mark - App Key and Notes Tests
 

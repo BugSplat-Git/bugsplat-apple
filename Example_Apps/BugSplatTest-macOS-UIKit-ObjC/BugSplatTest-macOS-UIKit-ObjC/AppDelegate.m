@@ -13,6 +13,8 @@
 /// (there is no crash report to deliver), so their logs must be cleaned up by age instead.
 static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
 
+NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
+
 @interface AppDelegate () <BugSplatDelegate>
 
 /// URL for the current session's log file. The file is named after BugSplat's
@@ -20,9 +22,21 @@ static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
 /// lets the crashed session's log be found again at the next launch.
 @property (nonatomic, strong) NSURL *sessionLogFileURL;
 
+/// How many times bugSplat:shouldSendCrashReport: was called during THIS launch.
+/// Demo scaffolding so an otherwise invisible callback can be seen - deliberately in
+/// memory only, reset every launch. Nothing here is persisted.
+@property (nonatomic, assign) NSUInteger shouldSendCrashReportCallCount;
+
 @end
 
 @implementation AppDelegate
+
++ (BOOL)shareCrashReportsEnabled {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:BSPShareCrashReportsDefaultsKey];
+    return value == nil ? YES : [value boolValue];
+}
+
+
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     // Install a minimal Edit menu so NSTextField gets standard keyboard
@@ -67,6 +81,21 @@ static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
     // Clean up logs from old sessions. Sessions that end normally never get the
     // delete-on-delivery callback, so their logs are pruned by age at startup.
     [self pruneOldSessionLogs];
+
+    [self logShouldSendCrashReportSummary];
+}
+
+/// Logs how many times the hook fired during this launch.
+///
+/// The hook is invisible from the outside - it decides whether a report is sent and then the
+/// report is simply gone - so this makes it observable while testing. Pending reports are
+/// processed inside -start, so the count is final by the time this runs.
+- (void)logShouldSendCrashReportSummary {
+    NSUInteger count = self.shouldSendCrashReportCallCount;
+    NSLog(@"bugSplat:shouldSendCrashReport: fired %lu time%@ this launch (sharing is %@)",
+          (unsigned long)count,
+          count == 1 ? @"" : @"s",
+          [AppDelegate shareCrashReportsEnabled] ? @"ON" : @"OFF");
 }
 
 #pragma mark - Edit Menu
@@ -225,6 +254,33 @@ static const NSTimeInterval kSessionLogMaxAge = 7 * 24 * 60 * 60; // 7 days
 }
 
 #pragma mark - BugSplatDelegate
+
+/// Decides whether a crash or fatal hang report is sent at all.
+///
+/// Returning NO discards the report: nothing is uploaded, no crash dialog appears, and the
+/// report is deleted. Detection keeps working either way, so the app can still record that a
+/// crash happened, if it wants to, without anything being sent.
+///
+/// Two things worth noting. This fires on the NEXT launch, when the report is about to be
+/// sent, not at the moment of the crash - so the delegate has to be set before -start.
+/// And it fires once per delivery attempt, so a report whose upload failed is offered again
+/// on a later launch.
+- (BOOL)bugSplat:(BugSplat *)bugSplat shouldSendCrashReport:(BugSplatCrashInfo *)crashInfo {
+    // Whatever you want to do with the fact that a crash happened goes here - your own
+    // analytics, an internal log, a counter you keep yourself. BugSplat does not tally
+    // reports for you; crashInfo describes this one and that is the whole of it.
+    self.shouldSendCrashReportCallCount++;
+    NSLog(@"bugSplat:shouldSendCrashReport: %@", crashInfo);
+
+    // The user's answer to "Share crash reports with the developer" in the Privacy section.
+    // A real app would read whatever its own settings or enterprise config expose.
+    BOOL share = [AppDelegate shareCrashReportsEnabled];
+    if (!share) {
+        NSLog(@"Crash report sharing is off - discarding this report without uploading it");
+    }
+
+    return share;
+}
 
 /// sessionID identifies the session the crash report being sent was recorded in,
 /// or nil if the report was recorded by an SDK version that predates session tracking.

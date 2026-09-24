@@ -16,6 +16,7 @@
 #import <BugSplat/BugSplat.h>
 #import "BugSplat+Testing.h"
 #import "BugSplatUploadService.h"
+#import "BugSplatTestCrashDirectory.h"
 #import "MockURLSession.h"
 
 // Keys shared with BugSplat.m. Duplicated here rather than exposed via a
@@ -90,8 +91,8 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
 @interface BugSplatHangPersistenceTests : XCTestCase
 @property (nonatomic, strong) BugSplat *bugSplat;
-@property (nonatomic, copy, nullable) NSString *filenameToCleanup;
 @property (nonatomic, strong, nullable) MockURLSession *mockSession;
+@property (nonatomic, copy) NSString *isolatedCrashesDirectory;
 @end
 
 @implementation BugSplatHangPersistenceTests
@@ -107,15 +108,17 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     self.bugSplat.applicationVersion = @"1.0";
     self.bugSplat.enableHangDetection = YES;
     [self.bugSplat setupHangInfrastructureForTesting];
+
+    self.isolatedCrashesDirectory = BugSplatTestsMakeIsolatedCrashesDirectory();
+    [self.bugSplat setCrashesDirectoryPathOverride:self.isolatedCrashesDirectory];
 }
 
 - (void)tearDown
 {
-    NSString *filename = self.filenameToCleanup;
-    if (filename) {
-        [self removeReportFilesForFilename:filename];
-    }
-    self.filenameToCleanup = nil;
+    // The whole directory belongs to this test, so removing it takes every report and meta
+    // file with it - no per-file bookkeeping needed.
+    [[NSFileManager defaultManager] removeItemAtPath:self.isolatedCrashesDirectory error:nil];
+    self.isolatedCrashesDirectory = nil;
     [self.mockSession reset];
     self.mockSession = nil;
     self.bugSplat = nil;
@@ -124,6 +127,9 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
 #pragma mark - Helpers
 
+
+/// Deletes a report's files mid-test, to simulate one vanishing under the uploader.
+/// Not teardown bookkeeping - the isolated crashes directory handles that.
 - (void)removeReportFilesForFilename:(NSString *)filename
 {
     NSString *dir = [self.bugSplat crashesDirectoryPath];
@@ -233,7 +239,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     [self drainHangQueue];
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename, @"Hang delegate should have persisted a report");
-    self.filenameToCleanup = filename;
     return filename;
 }
 
@@ -247,7 +252,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename, @"Hang delegate should have persisted a report");
     XCTAssertTrue([filename hasSuffix:@"-hang"], @"Hang report filename should carry the -hang suffix");
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -265,7 +269,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *crashPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"crash"];
@@ -285,7 +288,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -297,6 +299,43 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     XCTAssertNotNil(meta[kTimestampKey]);
 }
 
+- (void)testHangDelegate_AutoSubmitFatalHangReport_DefaultsToYes
+{
+    XCTAssertTrue(self.bugSplat.autoSubmitFatalHangReport,
+                  @"Hang reports must keep auto-submitting unless the app opts out");
+}
+
+- (void)testHangDelegate_AutoSubmitFatalHangReportOff_OmitsUserSubmittedFlag
+{
+    // With auto-submit off, the report must NOT be pre-marked as user-submitted: that flag is
+    // what makes the next-launch scanner skip the dialog, so leaving it off is precisely how
+    // the hang gets routed through the same path a crash report takes.
+    self.bugSplat.autoSubmitFatalHangReport = NO;
+
+    [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.0 appState:@"active"];
+    [self drainHangQueue];
+
+    NSString *filename = [self.bugSplat currentHangFilename];
+    XCTAssertNotNil(filename);
+
+    NSString *dir = [self.bugSplat crashesDirectoryPath];
+    NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
+    NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+    XCTAssertNotNil(meta);
+
+    XCTAssertNil(meta[kUserSubmittedKey],
+                 @"userSubmitted must be absent so the scanner takes the normal submission path; "
+                 @"whether that shows a dialog is then autoSubmitCrashReport's call");
+
+    // Everything else the report needs must still be there - opting out of auto-submit must not
+    // cost the hang its context.
+    XCTAssertEqualObjects(meta[kDatabaseKey], @"hangtestdb");
+    XCTAssertNotNil(meta[kTimestampKey]);
+    NSDictionary *attributes = meta[kAttributesKey];
+    XCTAssertNotNil(attributes[kHangAttrDurationMs]);
+    XCTAssertNotNil(attributes[kHangAttrAppState]);
+}
+
 - (void)testHangDelegate_MetadataContainsCurrentSessionID
 {
     [self.bugSplat hangTracker:nil didDetectHangWithDuration:2.0 appState:@"active"];
@@ -304,7 +343,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -322,7 +360,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
@@ -428,7 +465,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
     [self drainHangQueue];
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     [self.bugSplat hangTrackerDidRecoverFromHang:nil];
     [self drainHangQueue];
@@ -775,7 +811,6 @@ static NSString *const kNonFatalExceptionName = @"App Hang (Non-Fatal)";
 
     NSString *filename = [self.bugSplat currentHangFilename];
     XCTAssertNotNil(filename);
-    self.filenameToCleanup = filename;
 
     NSString *dir = [self.bugSplat crashesDirectoryPath];
     NSString *metaPath = [[dir stringByAppendingPathComponent:filename] stringByAppendingPathExtension:@"meta"];
