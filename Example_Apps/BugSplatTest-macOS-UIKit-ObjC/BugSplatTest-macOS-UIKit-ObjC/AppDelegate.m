@@ -82,52 +82,20 @@ NSString * const BSPShareCrashReportsDefaultsKey = @"ShareCrashReports";
     // delete-on-delivery callback, so their logs are pruned by age at startup.
     [self pruneOldSessionLogs];
 
-    [self showShouldSendCrashReportSummary];
+    [self logShouldSendCrashReportSummary];
 }
 
-/// Puts up an alert saying how many times the hook fired during this launch.
+/// Logs how many times the hook fired during this launch.
 ///
-/// The hook is invisible from the outside - it decides whether a report is sent and then
-/// the report is simply gone - so this makes it observable while testing. Pending reports
-/// are processed inside -start, so the count is final by the time this runs.
-///
-/// Async so BugSplat's own crash dialog, if it is going to appear, gets there first.
-- (void)showShouldSendCrashReportSummary {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSUInteger count = self.shouldSendCrashReportCallCount;
-        BOOL share = [AppDelegate shareCrashReportsEnabled];
-
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = [NSString stringWithFormat:@"shouldSendCrashReport fired %lu time%@ this launch",
-                             (unsigned long)count, count == 1 ? @"" : @"s"];
-
-        if (count == 0) {
-            alert.informativeText = @"No pending crash or fatal hang reports were found.";
-        } else if (share) {
-            alert.informativeText = [NSString stringWithFormat:
-                @"%@ allowed through - crash report sharing is ON.",
-                count == 1 ? @"That report was" : @"Those reports were"];
-        } else {
-            alert.informativeText = [NSString stringWithFormat:
-                @"%@ discarded without uploading - crash report sharing is OFF.",
-                count == 1 ? @"That report was" : @"Those reports were"];
-        }
-
-        [alert addButtonWithTitle:@"OK"];
-
-        // As a sheet, not -runModal. runModal blocks the main thread, and the hang tracker
-        // detects a hang by counting unanswered pings dispatched to the main queue - so a
-        // modal alert at launch manufactures a 2s "hang" on every single run, which then
-        // gets captured, persisted and processed as a real report. A sheet returns
-        // immediately and leaves the main thread spinning.
-        NSWindow *window = NSApplication.sharedApplication.mainWindow
-            ?: NSApplication.sharedApplication.windows.firstObject;
-        if (window) {
-            [alert beginSheetModalForWindow:window completionHandler:nil];
-        } else {
-            [alert runModal];
-        }
-    });
+/// The hook is invisible from the outside - it decides whether a report is sent and then the
+/// report is simply gone - so this makes it observable while testing. Pending reports are
+/// processed inside -start, so the count is final by the time this runs.
+- (void)logShouldSendCrashReportSummary {
+    NSUInteger count = self.shouldSendCrashReportCallCount;
+    NSLog(@"bugSplat:shouldSendCrashReport: fired %lu time%@ this launch (sharing is %@)",
+          (unsigned long)count,
+          count == 1 ? @"" : @"s",
+          [AppDelegate shareCrashReportsEnabled] ? @"ON" : @"OFF");
 }
 
 #pragma mark - Edit Menu
