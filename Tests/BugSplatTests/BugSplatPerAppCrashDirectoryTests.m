@@ -238,6 +238,55 @@ static NSString *const kThisBundleIdentifier = @"com.bugsplat.tests.thisapp";
     XCTAssertNil(existing[kApplicationNameKey], @"The report already in the per-app folder must not be overwritten");
 }
 
+- (void)testLegacyMigrationStoppedPartWay_IsResumed
+{
+    // A previous launch wrote the stamped .meta and moved one attachment, then stopped before the .crash
+    NSDictionary *legacyMetadata = [self legacyMetadataWithDatabase:@"testdb" applicationName:@"TestApp"];
+    [self plantReport:@"811958543" inDirectory:self.legacyDirectory metadata:legacyMetadata attachmentCount:2];
+    [[NSFileManager defaultManager] createDirectoryAtPath:self.crashesDirectory
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    [[NSFileManager defaultManager] moveItemAtPath:[self.legacyDirectory stringByAppendingPathComponent:@"811958543-0.data"]
+                                            toPath:[self.crashesDirectory stringByAppendingPathComponent:@"811958543-0.data"]
+                                             error:nil];
+    [@{kBundleIdentifierKey: kThisBundleIdentifier} writeToFile:[self.crashesDirectory stringByAppendingPathComponent:@"811958543.meta"]
+                                                     atomically:YES];
+    XCTAssertEqualObjects([self.bugSplat getPendingCrashFiles], @[], @"No .crash yet, so nothing is pending");
+
+    [self.bugSplat migrateLegacyCrashReports];
+
+    XCTAssertEqualObjects([self sortedContentsOfDirectory:self.crashesDirectory],
+                          (@[@"811958543-0.data", @"811958543-1.data", @"811958543.crash", @"811958543.meta"]));
+    XCTAssertEqualObjects([self sortedContentsOfDirectory:self.legacyDirectory], @[]);
+    NSDictionary *migratedMetadata = [NSDictionary dictionaryWithContentsOfFile:
+                                      [self.crashesDirectory stringByAppendingPathComponent:@"811958543.meta"]];
+    XCTAssertEqualObjects(migratedMetadata[kApplicationNameKey], @"TestApp", @"The full legacy metadata is carried over");
+    XCTAssertEqualObjects(migratedMetadata[kBundleIdentifierKey], kThisBundleIdentifier);
+}
+
+#pragma mark - Attachments
+
+- (void)testCrashAttachments_ExcludeASameNamedHangReport
+{
+    [[NSFileManager defaultManager] createDirectoryAtPath:self.crashesDirectory
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    NSData *data = [@"log" dataUsingEncoding:NSUTF8StringEncoding];
+    [self.bugSplat persistAttachments:@[[[BugSplatAttachment alloc] initWithFilename:@"crash.log" attachmentData:data contentType:@"text/plain"]]
+                     forCrashFilename:@"100"];
+    [self.bugSplat persistAttachments:@[[[BugSplatAttachment alloc] initWithFilename:@"hang.log" attachmentData:data contentType:@"text/plain"]]
+                     forCrashFilename:@"100-hang"];
+
+    NSArray<BugSplatAttachment *> *loaded = [self.bugSplat loadPersistedAttachmentsForCrashFilename:@"100"];
+    XCTAssertEqualObjects([loaded valueForKey:@"filename"], @[@"crash.log"]);
+
+    [self.bugSplat cleanupCrashReportWithFilename:@"100"];
+    XCTAssertEqualObjects([self sortedContentsOfDirectory:self.crashesDirectory], @[@"100-hang-0.data"],
+                          @"Cleaning up crash 100 must leave hang report 100-hang's attachment");
+}
+
 #pragma mark - Bundle identifier in .meta
 
 - (void)testReportNamingAnotherBundleIdentifier_IsSkippedAndNeverTouched

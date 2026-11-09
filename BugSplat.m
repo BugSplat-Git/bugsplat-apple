@@ -91,6 +91,19 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 // are never shown, sent or deleted by this one.
 static NSString *const kBugSplatMetaKeyBundleIdentifier = @"bundleIdentifier";
 
+// YES when filename is one of crashFilename's attachments, <crashFilename>-<index>.data. Requiring a
+// numeric index keeps crash 100's prefix from also matching hang report 100-hang's 100-hang-0.data.
+static BOOL BugSplatIsAttachmentOfCrash(NSString *filename, NSString *crashFilename)
+{
+    NSString *prefix = [crashFilename stringByAppendingString:@"-"];
+    NSString *suffix = [@"." stringByAppendingString:kBugSplatAttachmentFileExtension];
+    if (filename.length <= prefix.length + suffix.length || ![filename hasPrefix:prefix] || ![filename hasSuffix:suffix]) {
+        return NO;
+    }
+    NSString *index = [filename substringWithRange:NSMakeRange(prefix.length, filename.length - prefix.length - suffix.length)];
+    return [index rangeOfCharacterFromSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location == NSNotFound;
+}
+
 @interface BugSplat () <BugSplatHangTrackerDelegate>
 
 @property (atomic, assign) BOOL isStartInvoked;
@@ -2353,8 +2366,6 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         NSString *applicationName = self.resolvedApplicationName;
         NSString *appIdentifier = [self appStorageIdentifier];
         NSString *crashExtension = [NSString stringWithFormat:@".%@", kBugSplatCrashFileExtension];
-        NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
-        NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
 
         for (NSString *filename in files) {
             if (![filename hasSuffix:crashExtension]) {
@@ -2374,56 +2385,47 @@ didDetectHangWithDuration:(NSTimeInterval)duration
                 continue;
             }
 
-            // The report's attachments are <baseName>-<index>.data. Requiring a numeric index keeps
-            // a crash's prefix from also matching a hang report's (<baseName>-hang-0.data).
-            NSMutableArray<NSString *> *reportFiles = [NSMutableArray array];
-            NSString *attachmentPrefix = [NSString stringWithFormat:@"%@-", baseName];
-            for (NSString *candidate in files) {
-                if (![candidate hasPrefix:attachmentPrefix] || ![candidate hasSuffix:attachmentSuffix]) {
-                    continue;
-                }
-                NSString *index = [candidate substringWithRange:NSMakeRange(attachmentPrefix.length,
-                                                                            candidate.length - attachmentPrefix.length - attachmentSuffix.length)];
-                if (index.length > 0 && [index rangeOfCharacterFromSet:nonDigits].location == NSNotFound) {
-                    [reportFiles addObject:candidate];
-                }
-            }
-            // .meta goes last: if a move fails part way, the .crash already in the new folder is
-            // still delivered, while a .crash stranded in the legacy folder without its .meta could
-            // never be attributed again.
-            [reportFiles addObject:filename];
-            [reportFiles addObject:metaFilename];
-
-            BOOL collides = NO;
-            for (NSString *reportFile in reportFiles) {
-                if ([fileManager fileExistsAtPath:[crashesDir stringByAppendingPathComponent:reportFile]]) {
-                    collides = YES;
-                    break;
-                }
-            }
-            if (collides) {
+            // Only a .crash makes a report pending, so it's the one name that can collide. A .meta or
+            // .data without one is left from a migration that stopped part way, and is replaced.
+            NSString *crashPath = [crashesDir stringByAppendingPathComponent:filename];
+            if ([fileManager fileExistsAtPath:crashPath]) {
                 NSLog(@"BugSplat: Not migrating legacy crash report %@, a report with that name already exists", baseName);
                 continue;
             }
 
+            // The stamped .meta and the attachments go first and the .crash last, so the report is
+            // never pending without its metadata. If a step fails, the legacy .crash and .meta stay
+            // put and the next launch starts this report over.
+            NSMutableDictionary *ownedMetadata = [metadata mutableCopy];
+            ownedMetadata[kBugSplatMetaKeyBundleIdentifier] = appIdentifier;
+            if (![ownedMetadata writeToFile:[crashesDir stringByAppendingPathComponent:metaFilename] atomically:YES]) {
+                NSLog(@"BugSplat: Failed to write metadata for legacy crash report %@", baseName);
+                continue;
+            }
+
             BOOL moved = YES;
-            for (NSString *reportFile in reportFiles) {
+            for (NSString *candidate in files) {
+                if (!BugSplatIsAttachmentOfCrash(candidate, baseName)) {
+                    continue;
+                }
+                NSString *destination = [crashesDir stringByAppendingPathComponent:candidate];
+                [fileManager removeItemAtPath:destination error:nil];
                 NSError *error = nil;
-                if (![fileManager moveItemAtPath:[legacyDir stringByAppendingPathComponent:reportFile]
-                                          toPath:[crashesDir stringByAppendingPathComponent:reportFile]
-                                           error:&error]) {
-                    NSLog(@"BugSplat: Failed to migrate %@ from the legacy crashes directory: %@", reportFile, error);
+                if (![fileManager moveItemAtPath:[legacyDir stringByAppendingPathComponent:candidate] toPath:destination error:&error]) {
+                    NSLog(@"BugSplat: Failed to migrate %@ from the legacy crashes directory: %@", candidate, error);
                     moved = NO;
                     break;
                 }
             }
-            if (!moved) {
+            NSError *error = nil;
+            if (!moved || ![fileManager moveItemAtPath:[legacyDir stringByAppendingPathComponent:filename] toPath:crashPath error:&error]) {
+                if (error) {
+                    NSLog(@"BugSplat: Failed to migrate %@ from the legacy crashes directory: %@", filename, error);
+                }
                 continue;
             }
 
-            NSMutableDictionary *ownedMetadata = [metadata mutableCopy];
-            ownedMetadata[kBugSplatMetaKeyBundleIdentifier] = appIdentifier;
-            [ownedMetadata writeToFile:[crashesDir stringByAppendingPathComponent:metaFilename] atomically:YES];
+            [fileManager removeItemAtPath:[legacyDir stringByAppendingPathComponent:metaFilename] error:nil];
             NSLog(@"BugSplat: Migrated crash report %@ from the legacy shared crashes directory", baseName);
         }
     } @catch (NSException *exception) {
@@ -2524,14 +2526,12 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
     NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
-    NSString *attachmentPrefix = [NSString stringWithFormat:@"%@-", crashFilename];
-    NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
-    
+
     for (NSString *filename in files) {
         @autoreleasepool {
             @try {
                 // Only load attachments that belong to this crash
-                if (![filename hasPrefix:attachmentPrefix] || ![filename hasSuffix:attachmentSuffix]) {
+                if (!BugSplatIsAttachmentOfCrash(filename, crashFilename)) {
                     continue;
                 }
                 
@@ -2597,11 +2597,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         
         // Delete all attachment files for this crash
         NSArray *files = [fileManager contentsOfDirectoryAtPath:crashesDir error:nil];
-        NSString *attachmentPrefix = [NSString stringWithFormat:@"%@-", crashFilename];
-        NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
-        
+
         for (NSString *filename in files) {
-            if ([filename hasPrefix:attachmentPrefix] && [filename hasSuffix:attachmentSuffix]) {
+            if (BugSplatIsAttachmentOfCrash(filename, crashFilename)) {
                 NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
                 [fileManager removeItemAtPath:filePath error:nil];
                 NSLog(@"BugSplat: Cleaned up attachment file %@", filename);

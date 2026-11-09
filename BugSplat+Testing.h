@@ -36,6 +36,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)appStorageIdentifier;
 - (NSString *)defaultCrashesDirectoryPath;
 - (void)migrateLegacyCrashReports;
+- (void)persistAttachments:(NSArray<BugSplatAttachment *> *)attachments forCrashFilename:(NSString *)crashFilename;
+- (NSArray<BugSplatAttachment *> *)loadPersistedAttachmentsForCrashFilename:(NSString *)crashFilename;
+- (void)cleanupCrashReportWithFilename:(NSString *)crashFilename;
 
 /**
  * Redirects persisted crash and hang reports to `path` instead of this app's directory under
