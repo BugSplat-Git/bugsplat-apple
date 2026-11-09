@@ -94,9 +94,11 @@ static NSString *const kThisBundleIdentifier = @"com.bugsplat.tests.thisapp";
     }
 }
 
+/// The report files in directory, sorted. Hidden files, such as the migration lock, are left out.
 - (NSArray<NSString *> *)sortedContentsOfDirectory:(NSString *)directory
 {
     NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:nil] ?: @[];
+    files = [files filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"NOT SELF BEGINSWITH '.'"]];
     return [files sortedArrayUsingSelector:@selector(compare:)];
 }
 
@@ -263,6 +265,26 @@ static NSString *const kThisBundleIdentifier = @"com.bugsplat.tests.thisapp";
                                       [self.crashesDirectory stringByAppendingPathComponent:@"811958543.meta"]];
     XCTAssertEqualObjects(migratedMetadata[kApplicationNameKey], @"TestApp", @"The full legacy metadata is carried over");
     XCTAssertEqualObjects(migratedMetadata[kBundleIdentifierKey], kThisBundleIdentifier);
+}
+
+- (void)testLegacyMigration_ReleasesItsLockForTheNextMigration
+{
+    NSDictionary *legacyMetadata = [self legacyMetadataWithDatabase:@"testdb" applicationName:@"TestApp"];
+    [self plantReport:@"811958543" inDirectory:self.legacyDirectory metadata:legacyMetadata attachmentCount:1];
+    [self.bugSplat migrateLegacyCrashReports];
+
+    NSString *lockPath = [self.crashesDirectory stringByAppendingPathComponent:@".migration.lock"];
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:lockPath]);
+    XCTAssertEqualObjects([self.bugSplat getPendingCrashFiles], @[@"811958543"], @"The lock file is not a report");
+
+    // A second migration, with the lock file still there, isn't blocked by the first
+    [self plantReport:@"811958600" inDirectory:self.legacyDirectory metadata:legacyMetadata attachmentCount:1];
+    [self.bugSplat migrateLegacyCrashReports];
+
+    XCTAssertEqualObjects([self sortedContentsOfDirectory:self.legacyDirectory], @[]);
+    XCTAssertEqualObjects([self sortedContentsOfDirectory:self.crashesDirectory],
+                          (@[@"811958543-0.data", @"811958543.crash", @"811958543.meta",
+                             @"811958600-0.data", @"811958600.crash", @"811958600.meta"]));
 }
 
 #pragma mark - Attachments

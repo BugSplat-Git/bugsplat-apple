@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include <pthread.h>
 #import <stdatomic.h>
 #import <mach/mach.h>
@@ -2344,6 +2346,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
  */
 - (void)migrateLegacyCrashReports
 {
+    int lockFD = -1;
     @try {
         NSFileManager *fileManager = [NSFileManager defaultManager];
         NSString *legacyDir = [self legacyCrashesDirectoryPath];
@@ -2361,6 +2364,17 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         if (!crashesDir || [crashesDir.stringByStandardizingPath isEqualToString:legacyDir.stringByStandardizingPath]) {
             return;
         }
+
+        // Two launches of this app can migrate at once, and one would delete the attachment the other
+        // had just moved, taking it for a leftover. Only one migrates at a time, and the second then
+        // lists the legacy folder after the first has finished. Other apps never migrate these reports.
+        lockFD = open([crashesDir stringByAppendingPathComponent:@".migration.lock"].fileSystemRepresentation,
+                      O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (lockFD < 0 || flock(lockFD, LOCK_EX) != 0) {
+            NSLog(@"BugSplat: Could not lock the crashes directory for migration (errno %d), migrating next launch", errno);
+            return;
+        }
+        files = [fileManager contentsOfDirectoryAtPath:legacyDir error:nil];
 
         NSString *database = self.bugSplatDatabase;
         NSString *applicationName = self.resolvedApplicationName;
@@ -2430,6 +2444,10 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         }
     } @catch (NSException *exception) {
         NSLog(@"BugSplat: Exception in migrateLegacyCrashReports: %@ - %@", exception.name, exception.reason);
+    } @finally {
+        if (lockFD >= 0) {
+            close(lockFD);
+        }
     }
 }
 
