@@ -31,13 +31,21 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)markAllPendingCrashesAsSubmittedWithUserName:(nullable NSString *)userName
                                            userEmail:(nullable NSString *)userEmail
                                       exceptFilename:(NSString *)crashFilename;
+- (NSArray<NSString *> *)getPendingCrashFiles;
+- (void)cleanupAllPendingCrashReports;
+- (NSString *)appStorageIdentifier;
+- (NSString *)defaultCrashesDirectoryPath;
+- (void)migrateLegacyCrashReports;
+- (void)persistAttachments:(NSArray<BugSplatAttachment *> *)attachments forCrashFilename:(NSString *)crashFilename;
+- (NSArray<BugSplatAttachment *> *)loadPersistedAttachmentsForCrashFilename:(NSString *)crashFilename;
+- (void)cleanupCrashReportWithFilename:(NSString *)crashFilename;
 
 /**
- * Redirects persisted crash and hang reports to `path` instead of the shared directory under
+ * Redirects persisted crash and hang reports to `path` instead of this app's directory under
  * Application Support. Pass nil to restore the default.
  *
- * Every BugSplat instance otherwise writes to the same directory. The test schemes set
- * `parallelizable = "YES"`, so XCTest runs test classes in separate worker processes at the
+ * Every BugSplat instance in a process otherwise writes to the same directory. The test schemes
+ * set `parallelizable = "YES"`, so XCTest runs test classes in separate worker processes at the
  * same time - and a scan like -enrichPendingHangReports walks every report in that directory,
  * including ones another class planted. Each test that touches the crashes directory points
  * this at its own temporary directory in -setUp and removes it in -tearDown.
@@ -47,6 +55,12 @@ NS_ASSUME_NONNULL_BEGIN
  * category that declares a method its own @implementation does not define.
  */
 - (void)setCrashesDirectoryPathOverride:(nullable NSString *)path;
+
+/// Points -migrateLegacyCrashReports at `path` instead of the shared legacy folder under
+/// Application Support. While the crashes directory is overridden and this is nil, there is no
+/// legacy folder, so tests never touch the real one. Declared here for the same reason as the
+/// setter above.
+- (void)setLegacyCrashesDirectoryPathOverride:(nullable NSString *)path;
 
 /// The basename of the hang report most recently persisted by the hang delegate. Declared here
 /// for the same reason as the setter above - it is a synthesized property accessor.

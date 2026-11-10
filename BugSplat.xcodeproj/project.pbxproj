@@ -49,12 +49,14 @@
 		73DEAA0D4412D3A9CF562633 /* BugSplatHangPersistenceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */; };
 		C0FFEE0000000000000000B3 /* BugSplatNonFatalReportTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000B1 /* BugSplatNonFatalReportTests.m */; };
 		C0FFEE0000000000000000C3 /* BugSplatShouldSendCrashReportTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000C1 /* BugSplatShouldSendCrashReportTests.m */; };
+		C0FFEE0000000000000000D3 /* BugSplatPerAppCrashDirectoryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000D1 /* BugSplatPerAppCrashDirectoryTests.m */; };
 		5E551D000000000000000001 /* BugSplatSessionIDTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E551D000000000000000003 /* BugSplatSessionIDTests.m */; };
 		5E551D000000000000000002 /* BugSplatSessionIDTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E551D000000000000000003 /* BugSplatSessionIDTests.m */; };
 		5E551D000000000000000004 /* BugSplatCrashReportWindowKeyEquivalentTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E551D000000000000000005 /* BugSplatCrashReportWindowKeyEquivalentTests.m */; };
 		7C235FBB8C978B3EC7E2CE49 /* BugSplatHangPersistenceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */; };
 		C0FFEE0000000000000000B2 /* BugSplatNonFatalReportTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000B1 /* BugSplatNonFatalReportTests.m */; };
 		C0FFEE0000000000000000C2 /* BugSplatShouldSendCrashReportTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000C1 /* BugSplatShouldSendCrashReportTests.m */; };
+		C0FFEE0000000000000000D2 /* BugSplatPerAppCrashDirectoryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE0000000000000000D1 /* BugSplatPerAppCrashDirectoryTests.m */; };
 		AA0000032E3FA00000000003 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		AA0000052E3FA00000000005 /* BugSplatUploadService.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0000042E3FA00000000004 /* BugSplatUploadService.m */; };
 		AA0000062E3FA00000000006 /* BugSplatUploadService.h in Headers */ = {isa = PBXBuildFile; fileRef = AA0000072E3FA00000000007 /* BugSplatUploadService.h */; };
@@ -153,6 +155,7 @@
 		680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatHangPersistenceTests.m; sourceTree = "<group>"; };
 		C0FFEE0000000000000000B1 /* BugSplatNonFatalReportTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatNonFatalReportTests.m; sourceTree = "<group>"; };
 		C0FFEE0000000000000000C1 /* BugSplatShouldSendCrashReportTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatShouldSendCrashReportTests.m; sourceTree = "<group>"; };
+		C0FFEE0000000000000000D1 /* BugSplatPerAppCrashDirectoryTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatPerAppCrashDirectoryTests.m; sourceTree = "<group>"; };
 		5E551D000000000000000003 /* BugSplatSessionIDTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatSessionIDTests.m; sourceTree = "<group>"; };
 		5E551D000000000000000005 /* BugSplatCrashReportWindowKeyEquivalentTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatCrashReportWindowKeyEquivalentTests.m; sourceTree = "<group>"; };
 		6FDD85DA23C98D5070707CC4 /* BugSplatHangTracker.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = BugSplatHangTracker.m; sourceTree = "<group>"; };
@@ -325,6 +328,7 @@
 				680274C471C325469FD5AB4B /* BugSplatHangPersistenceTests.m */,
 				C0FFEE0000000000000000B1 /* BugSplatNonFatalReportTests.m */,
 				C0FFEE0000000000000000C1 /* BugSplatShouldSendCrashReportTests.m */,
+				C0FFEE0000000000000000D1 /* BugSplatPerAppCrashDirectoryTests.m */,
 				5E551D000000000000000003 /* BugSplatSessionIDTests.m */,
 				5E551D000000000000000005 /* BugSplatCrashReportWindowKeyEquivalentTests.m */,
 			);
@@ -649,6 +653,7 @@
 				7C235FBB8C978B3EC7E2CE49 /* BugSplatHangPersistenceTests.m in Sources */,
 				C0FFEE0000000000000000B2 /* BugSplatNonFatalReportTests.m in Sources */,
 				C0FFEE0000000000000000C2 /* BugSplatShouldSendCrashReportTests.m in Sources */,
+				C0FFEE0000000000000000D2 /* BugSplatPerAppCrashDirectoryTests.m in Sources */,
 				5E551D000000000000000001 /* BugSplatSessionIDTests.m in Sources */,
 				5E551D000000000000000004 /* BugSplatCrashReportWindowKeyEquivalentTests.m in Sources */,
 			);
@@ -673,6 +678,7 @@
 				73DEAA0D4412D3A9CF562633 /* BugSplatHangPersistenceTests.m in Sources */,
 				C0FFEE0000000000000000B3 /* BugSplatNonFatalReportTests.m in Sources */,
 				C0FFEE0000000000000000C3 /* BugSplatShouldSendCrashReportTests.m in Sources */,
+				C0FFEE0000000000000000D3 /* BugSplatPerAppCrashDirectoryTests.m in Sources */,
 				5E551D000000000000000002 /* BugSplatSessionIDTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

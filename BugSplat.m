@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include <pthread.h>
 #import <stdatomic.h>
 #import <mach/mach.h>
@@ -87,6 +89,22 @@ static NSString *const kBugSplatMetaKeySessionID = @"sessionID";
 // Set once a persisted hang report has had its delegate attachments / application log
 // gathered at next launch, so offline-retry launches don't re-invoke the delegate.
 static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
+// The app that wrote the report (see -appStorageIdentifier). Reports naming a different app
+// are never shown, sent or deleted by this one.
+static NSString *const kBugSplatMetaKeyBundleIdentifier = @"bundleIdentifier";
+
+// YES when filename is one of crashFilename's attachments, <crashFilename>-<index>.data. Requiring a
+// numeric index keeps crash 100's prefix from also matching hang report 100-hang's 100-hang-0.data.
+static BOOL BugSplatIsAttachmentOfCrash(NSString *filename, NSString *crashFilename)
+{
+    NSString *prefix = [crashFilename stringByAppendingString:@"-"];
+    NSString *suffix = [@"." stringByAppendingString:kBugSplatAttachmentFileExtension];
+    if (filename.length <= prefix.length + suffix.length || ![filename hasPrefix:prefix] || ![filename hasSuffix:suffix]) {
+        return NO;
+    }
+    NSString *index = [filename substringWithRange:NSMakeRange(prefix.length, filename.length - prefix.length - suffix.length)];
+    return [index rangeOfCharacterFromSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location == NSNotFound;
+}
 
 @interface BugSplat () <BugSplatHangTrackerDelegate>
 
@@ -103,6 +121,9 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
 // Application Support; -setCrashesDirectoryPathOverride: (BugSplat+Testing.h) points it
 // somewhere else so parallel test classes do not share one directory.
 @property (nonatomic, copy, nullable) NSString *crashesDirectoryPathOverride;
+// The shared crashes directory earlier SDK versions used, to adopt this app's reports from.
+// Nil means the default location, or none at all while crashesDirectoryPathOverride is set.
+@property (nonatomic, copy, nullable) NSString *legacyCrashesDirectoryPathOverride;
 @property (nonatomic, assign) BOOL isTestInstance;
 @property (nonatomic, strong, readwrite) NSUUID *sessionID;
 
@@ -280,7 +301,11 @@ static NSString *const kBugSplatMetaKeyHangEnriched = @"hangEnriched";
     self.uploadService = [[BugSplatUploadService alloc] initWithDatabase:self.bugSplatDatabase
                                                          applicationName:self.resolvedApplicationName
                                                       applicationVersion:self.resolvedApplicationVersion];
-    
+
+    // Adopt this app's reports from the shared folder earlier SDK versions wrote to, so
+    // they are delivered from the per-app folder below. Reports from other apps stay put.
+    [self migrateLegacyCrashReports];
+
     // First, check for any NEW crash report from PLCrashReporter
     // The crash-time metadata is embedded in the crash report via customData
     if ([self.crashReporter hasPendingCrashReport]) {
@@ -562,6 +587,7 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     metadata[kBugSplatMetaKeyApplicationVersion] = self.resolvedApplicationVersion;
     // The hang happened in THIS session, so the current session ID is the right one
     metadata[kBugSplatMetaKeySessionID] = self.sessionID.UUIDString;
+    metadata[kBugSplatMetaKeyBundleIdentifier] = [self appStorageIdentifier];
     if (self.userName) metadata[kBugSplatMetaKeyUserName] = self.userName;
     if (self.userEmail) metadata[kBugSplatMetaKeyUserEmail] = self.userEmail;
     if (self.appKey) metadata[kBugSplatMetaKeyAppKey] = self.appKey;
@@ -757,6 +783,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     if (crashedSessionID) {
         metadata[kBugSplatMetaKeySessionID] = crashedSessionID.UUIDString;
     }
+
+    // PLCrashReporter keeps a separate pending report per app, so this crash is this app's.
+    metadata[kBugSplatMetaKeyBundleIdentifier] = [self appStorageIdentifier];
 
     // crashTimeProperties was extracted from the crash report's customData above
     if (crashTimeProperties) {
@@ -1179,11 +1208,24 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     
     NSMutableArray<NSString *> *crashFilenames = [NSMutableArray array];
     NSString *crashExtension = [NSString stringWithFormat:@".%@", kBugSplatCrashFileExtension];
-    
+    NSString *appIdentifier = [self appStorageIdentifier];
+
     for (NSString *filename in files) {
         if ([filename hasSuffix:crashExtension]) {
             // Extract base filename without extension
             NSString *baseName = [filename stringByDeletingPathExtension];
+
+            // Defense in depth: the directory is already per app, but a report whose .meta
+            // names another app is never this app's to show, send or delete. Leave it alone.
+            NSString *metaFilePath = [[crashesDir stringByAppendingPathComponent:baseName]
+                                      stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+            NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:metaFilePath];
+            id owner = metadata[kBugSplatMetaKeyBundleIdentifier];
+            if ([owner isKindOfClass:[NSString class]] && ![owner isEqualToString:appIdentifier]) {
+                NSLog(@"BugSplat: Skipping crash report %@, which belongs to %@", baseName, owner);
+                continue;
+            }
+
             [crashFilenames addObject:baseName];
         }
     }
@@ -2184,7 +2226,10 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     } else {
         metadata = [NSMutableDictionary dictionary];
     }
-    
+    if (!metadata[kBugSplatMetaKeyBundleIdentifier]) {
+        metadata[kBugSplatMetaKeyBundleIdentifier] = [self appStorageIdentifier];
+    }
+
     // Mark as user-submitted so we retry silently on future launches
     metadata[kBugSplatMetaKeyUserSubmitted] = @YES;
     NSLog(@"BugSplat: Marked crash %@ as user-submitted", crashFilename);
@@ -2238,16 +2283,178 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
 }
 
+/**
+ * The identifier that scopes this app's crashes directory and is recorded in each .meta file.
+ *
+ * The main bundle identifier, or for a process without one (a command-line tool with no
+ * embedded Info.plist) the process name. That is the same fallback PLCrashReporter uses to
+ * keep its own pending report per app, and unlike a pid or path it stays the same across
+ * launches and moves of the executable.
+ */
+- (NSString *)appStorageIdentifier
+{
+    NSString *identifier = [self.bundleProtocol objectForInfoDictionaryKey:@"CFBundleIdentifier"];
+    if (![identifier isKindOfClass:[NSString class]] || identifier.length == 0) {
+        const char *progname = getprogname();
+        identifier = progname ? [NSString stringWithUTF8String:progname] : nil;
+    }
+    if (identifier.length == 0) {
+        identifier = @"Unknown";
+    }
+    // It becomes a path component, so it must not contain a separator
+    return [identifier stringByReplacingOccurrencesOfString:@"/" withString:@"_"];
+}
+
+/**
+ * Application Support/BugSplat/<appStorageIdentifier>/Crashes. Does not create the directory.
+ *
+ * Non-sandboxed macOS apps share one Application Support folder, so the directory has to name
+ * the app: a shared one let every app show and upload every other app's reports.
+ */
+- (NSString *)defaultCrashesDirectoryPath
+{
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    NSString *bugSplatDir = [paths.firstObject stringByAppendingPathComponent:@"BugSplat"];
+    return [[bugSplatDir stringByAppendingPathComponent:[self appStorageIdentifier]]
+            stringByAppendingPathComponent:@"Crashes"];
+}
+
+/**
+ * The shared Application Support/BugSplat/Crashes folder that earlier SDK versions wrote every
+ * app's reports to, or nil when there is none to look at. Never created.
+ */
+- (nullable NSString *)legacyCrashesDirectoryPath
+{
+    if (self.legacyCrashesDirectoryPathOverride) {
+        return self.legacyCrashesDirectoryPathOverride;
+    }
+    // A redirected crashes directory (tests) must not reach into the real Application Support
+    if (self.crashesDirectoryPathOverride) {
+        return nil;
+    }
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    return [paths.firstObject stringByAppendingPathComponent:@"BugSplat/Crashes"];
+}
+
+/**
+ * Move this app's reports out of the legacy shared folder into its own crashes directory.
+ *
+ * A legacy .meta records no bundle identifier, so a report is adopted only when its .meta names
+ * this app's database and application name. Everything else - other apps' reports, .meta files
+ * too sparse to attribute, orphaned .meta and .data files - is left exactly where it is for its
+ * owner to collect, never moved or deleted.
+ */
+- (void)migrateLegacyCrashReports
+{
+    int lockFD = -1;
+    @try {
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSString *legacyDir = [self legacyCrashesDirectoryPath];
+        BOOL isDirectory = NO;
+        if (!legacyDir || ![fileManager fileExistsAtPath:legacyDir isDirectory:&isDirectory] || !isDirectory) {
+            return;
+        }
+
+        NSArray<NSString *> *files = [fileManager contentsOfDirectoryAtPath:legacyDir error:nil];
+        if (files.count == 0) {
+            return;
+        }
+
+        NSString *crashesDir = [self crashesDirectoryPath];
+        if (!crashesDir || [crashesDir.stringByStandardizingPath isEqualToString:legacyDir.stringByStandardizingPath]) {
+            return;
+        }
+
+        // Two launches of this app can migrate at once, and one would delete the attachment the other
+        // had just moved, taking it for a leftover. Only one migrates at a time, and the second then
+        // lists the legacy folder after the first has finished. Other apps never migrate these reports.
+        lockFD = open([crashesDir stringByAppendingPathComponent:@".migration.lock"].fileSystemRepresentation,
+                      O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (lockFD < 0 || flock(lockFD, LOCK_EX) != 0) {
+            NSLog(@"BugSplat: Could not lock the crashes directory for migration (errno %d), migrating next launch", errno);
+            return;
+        }
+        files = [fileManager contentsOfDirectoryAtPath:legacyDir error:nil];
+
+        NSString *database = self.bugSplatDatabase;
+        NSString *applicationName = self.resolvedApplicationName;
+        NSString *appIdentifier = [self appStorageIdentifier];
+        NSString *crashExtension = [NSString stringWithFormat:@".%@", kBugSplatCrashFileExtension];
+
+        for (NSString *filename in files) {
+            if (![filename hasSuffix:crashExtension]) {
+                continue;
+            }
+
+            NSString *baseName = [filename stringByDeletingPathExtension];
+            NSString *metaFilename = [baseName stringByAppendingPathExtension:kBugSplatMetaFileExtension];
+            NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:
+                                      [legacyDir stringByAppendingPathComponent:metaFilename]];
+            id reportDatabase = metadata[kBugSplatMetaKeyDatabase];
+            id reportApplicationName = metadata[kBugSplatMetaKeyApplicationName];
+            id reportOwner = metadata[kBugSplatMetaKeyBundleIdentifier];
+            if (![reportDatabase isKindOfClass:[NSString class]] || ![reportDatabase isEqualToString:database] ||
+                ![reportApplicationName isKindOfClass:[NSString class]] || ![reportApplicationName isEqualToString:applicationName] ||
+                (reportOwner && ![reportOwner isEqual:appIdentifier])) {
+                continue;
+            }
+
+            // Only a .crash makes a report pending, so it's the one name that can collide. A .meta or
+            // .data without one is left from a migration that stopped part way, and is replaced.
+            NSString *crashPath = [crashesDir stringByAppendingPathComponent:filename];
+            if ([fileManager fileExistsAtPath:crashPath]) {
+                NSLog(@"BugSplat: Not migrating legacy crash report %@, a report with that name already exists", baseName);
+                continue;
+            }
+
+            // The stamped .meta and the attachments go first and the .crash last, so the report is
+            // never pending without its metadata. If a step fails, the legacy .crash and .meta stay
+            // put and the next launch starts this report over.
+            NSMutableDictionary *ownedMetadata = [metadata mutableCopy];
+            ownedMetadata[kBugSplatMetaKeyBundleIdentifier] = appIdentifier;
+            if (![ownedMetadata writeToFile:[crashesDir stringByAppendingPathComponent:metaFilename] atomically:YES]) {
+                NSLog(@"BugSplat: Failed to write metadata for legacy crash report %@", baseName);
+                continue;
+            }
+
+            BOOL moved = YES;
+            for (NSString *candidate in files) {
+                if (!BugSplatIsAttachmentOfCrash(candidate, baseName)) {
+                    continue;
+                }
+                NSString *destination = [crashesDir stringByAppendingPathComponent:candidate];
+                [fileManager removeItemAtPath:destination error:nil];
+                NSError *error = nil;
+                if (![fileManager moveItemAtPath:[legacyDir stringByAppendingPathComponent:candidate] toPath:destination error:&error]) {
+                    NSLog(@"BugSplat: Failed to migrate %@ from the legacy crashes directory: %@", candidate, error);
+                    moved = NO;
+                    break;
+                }
+            }
+            NSError *error = nil;
+            if (!moved || ![fileManager moveItemAtPath:[legacyDir stringByAppendingPathComponent:filename] toPath:crashPath error:&error]) {
+                if (error) {
+                    NSLog(@"BugSplat: Failed to migrate %@ from the legacy crashes directory: %@", filename, error);
+                }
+                continue;
+            }
+
+            [fileManager removeItemAtPath:[legacyDir stringByAppendingPathComponent:metaFilename] error:nil];
+            NSLog(@"BugSplat: Migrated crash report %@ from the legacy shared crashes directory", baseName);
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"BugSplat: Exception in migrateLegacyCrashReports: %@ - %@", exception.name, exception.reason);
+    } @finally {
+        if (lockFD >= 0) {
+            close(lockFD);
+        }
+    }
+}
+
 - (NSString *)crashesDirectoryPath
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSString *crashesDir = self.crashesDirectoryPathOverride;
-
-    if (!crashesDir) {
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
-        NSString *appSupportDir = paths.firstObject;
-        crashesDir = [appSupportDir stringByAppendingPathComponent:@"BugSplat/Crashes"];
-    }
+    NSString *crashesDir = self.crashesDirectoryPathOverride ?: [self defaultCrashesDirectoryPath];
 
     if (![fileManager fileExistsAtPath:crashesDir]) {
         NSError *error = nil;
@@ -2337,14 +2544,12 @@ didDetectHangWithDuration:(NSTimeInterval)duration
     }
     
     NSMutableArray<BugSplatAttachment *> *attachments = [NSMutableArray array];
-    NSString *attachmentPrefix = [NSString stringWithFormat:@"%@-", crashFilename];
-    NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
-    
+
     for (NSString *filename in files) {
         @autoreleasepool {
             @try {
                 // Only load attachments that belong to this crash
-                if (![filename hasPrefix:attachmentPrefix] || ![filename hasSuffix:attachmentSuffix]) {
+                if (!BugSplatIsAttachmentOfCrash(filename, crashFilename)) {
                     continue;
                 }
                 
@@ -2410,11 +2615,9 @@ didDetectHangWithDuration:(NSTimeInterval)duration
         
         // Delete all attachment files for this crash
         NSArray *files = [fileManager contentsOfDirectoryAtPath:crashesDir error:nil];
-        NSString *attachmentPrefix = [NSString stringWithFormat:@"%@-", crashFilename];
-        NSString *attachmentSuffix = [NSString stringWithFormat:@".%@", kBugSplatAttachmentFileExtension];
-        
+
         for (NSString *filename in files) {
-            if ([filename hasPrefix:attachmentPrefix] && [filename hasSuffix:attachmentSuffix]) {
+            if (BugSplatIsAttachmentOfCrash(filename, crashFilename)) {
                 NSString *filePath = [crashesDir stringByAppendingPathComponent:filename];
                 [fileManager removeItemAtPath:filePath error:nil];
                 NSLog(@"BugSplat: Cleaned up attachment file %@", filename);
