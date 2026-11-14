@@ -596,4 +596,51 @@
     XCTAssertFalse(self.mockCrashReporter.wasEnabled);
 }
 
+#pragma mark - Signal Handler Type Tests
+
+// PLCrashReporterSignalHandlerType values, read through KVC from the reporter's private
+// configuration because the tests do not see the PLCrashReporter headers.
+static const NSUInteger kSignalHandlerTypeBSD = 0;
+#if !TARGET_OS_TV
+static const NSUInteger kSignalHandlerTypeMach = 1;
+#endif
+
+static NSUInteger BugSplatTestsSignalHandlerType(BugSplat *bugSplat)
+{
+    return [[(NSObject *)[bugSplat crashReporter] valueForKeyPath:@"config.signalHandlerType"] unsignedIntegerValue];
+}
+
+#if !TARGET_OS_TV
+- (void)testUseBSDSignalHandlers_DefaultsToMach
+{
+    BugSplat *bugSplat = [[BugSplat alloc] init];
+
+    XCTAssertFalse(bugSplat.useBSDSignalHandlers);
+    XCTAssertEqual(BugSplatTestsSignalHandlerType(bugSplat), kSignalHandlerTypeMach);
+}
+#endif
+
+- (void)testUseBSDSignalHandlers_CreatesCrashReporterWithBSDHandlers
+{
+    BugSplat *bugSplat = [[BugSplat alloc] init];
+    id<BugSplatCrashReporterProtocol> original = [bugSplat crashReporter];
+
+    bugSplat.useBSDSignalHandlers = YES;
+
+    XCTAssertTrue(bugSplat.useBSDSignalHandlers);
+    XCTAssertNotEqual([bugSplat crashReporter], original);
+    XCTAssertEqual(BugSplatTestsSignalHandlerType(bugSplat), kSignalHandlerTypeBSD);
+}
+
+- (void)testUseBSDSignalHandlers_IgnoredAfterStart
+{
+    [self.bugSplat setDebuggerAttachedOverride:@NO];
+    [self.bugSplat start];
+
+    self.bugSplat.useBSDSignalHandlers = YES;
+
+    XCTAssertFalse(self.bugSplat.useBSDSignalHandlers);
+    XCTAssertEqual([self.bugSplat crashReporter], self.mockCrashReporter);
+}
+
 @end
