@@ -106,6 +106,22 @@ static BOOL BugSplatIsAttachmentOfCrash(NSString *filename, NSString *crashFilen
     return [index rangeOfCharacterFromSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location == NSNotFound;
 }
 
+static id<BugSplatCrashReporterProtocol> BugSplatCreateCrashReporter(BOOL useBSDSignalHandlers)
+{
+    // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
+#if TARGET_OS_TV
+    PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeBSD;
+#else
+    PLCrashReporterSignalHandlerType signalHandlerType =
+        useBSDSignalHandlers ? PLCrashReporterSignalHandlerTypeBSD : PLCrashReporterSignalHandlerTypeMach;
+#endif
+    PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
+        initWithSignalHandlerType:signalHandlerType
+        symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
+
+    return (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
+}
+
 @interface BugSplat () <BugSplatHangTrackerDelegate>
 
 @property (atomic, assign) BOOL isStartInvoked;
@@ -196,19 +212,8 @@ static BOOL BugSplatIsAttachmentOfCrash(NSString *filename, NSString *crashFilen
         self.autoSubmitFatalHangReport = YES;
         _sessionID = [NSUUID UUID];
 
-        // Configure PLCrashReporter
-        // Note: Mach exception handling is not available on tvOS, use BSD signal handling instead
-#if TARGET_OS_TV
-        PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeBSD;
-#else
-        PLCrashReporterSignalHandlerType signalHandlerType = PLCrashReporterSignalHandlerTypeMach;
-#endif
-        PLCrashReporterConfig *config = [[PLCrashReporterConfig alloc]
-            initWithSignalHandlerType:signalHandlerType
-            symbolicationStrategy:PLCrashReporterSymbolicationStrategyNone];
+        _crashReporterInternal = BugSplatCreateCrashReporter(NO);
 
-        _crashReporterInternal = (id<BugSplatCrashReporterProtocol>)[[PLCrashReporter alloc] initWithConfiguration:config];
-        
         // Use real defaults by default
         _userDefaultsInternal = (id<BugSplatUserDefaultsProtocol>)[NSUserDefaults standardUserDefaults];
         _bundleInternal = (id<BugSplatBundleProtocol>)[NSBundle mainBundle];
@@ -267,6 +272,21 @@ static BOOL BugSplatIsAttachmentOfCrash(NSString *filename, NSString *crashFilen
 - (PLCrashReporter *)crashReporter
 {
     return (PLCrashReporter *)self.crashReporterInternal;
+}
+
+- (void)setUseBSDSignalHandlers:(BOOL)useBSDSignalHandlers
+{
+    if (self.isStartInvoked) {
+        NSLog(@"BugSplat: useBSDSignalHandlers must be set before start; ignoring.");
+        return;
+    }
+    _useBSDSignalHandlers = useBSDSignalHandlers;
+
+    // The handler type is fixed when PLCrashReporter is created, so create it again. Nothing is
+    // lost: the reporter is not enabled until -start, which also sets its custom data again.
+    if (!self.isTestInstance) {
+        self.crashReporterInternal = BugSplatCreateCrashReporter(useBSDSignalHandlers);
+    }
 }
 
 - (void)start

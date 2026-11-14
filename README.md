@@ -653,6 +653,15 @@ A few practical notes:
 
 Every app in `Example_Apps` demonstrates this pattern end to end.
 
+#### Signal Handlers
+
+BugSplat catches crashes with Mach exception handlers by default (BSD signal handlers on tvOS). A Mach exception handler sees a fault before any signal handler in the process, so it does not work with a runtime that turns some faults into exceptions from its own signal handlers, such as Mono: every `NullReferenceException`, even a caught one, would become a crash report. Set `useBSDSignalHandlers` to `YES` before calling `start` to use BSD signal handlers instead. The runtime can then install its handlers after `start`, handle its own faults, and pass the rest on to BugSplat.
+
+```objc
+[BugSplat shared].useBSDSignalHandlers = YES;
+[[BugSplat shared] start];
+```
+
 #### Bitcode
 
 Bitcode was introduced by Apple to allow apps sent to the App Store to be recompiled by Apple itself and apply the latest optimization. Bitcode has now been officially deprecated by Apple and should be removed or disabled. If Bitcode is enabled, the symbols generated for your app in the store will be different than the ones from your own build system. We recommend that you disable bitcode in order for BugSplat to reliably symbolicate crash reports. Disabling bitcode significantly simplifies symbols management and currently doesn't have any known downsides for iOS apps.
